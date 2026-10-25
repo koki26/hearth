@@ -4,3 +4,4 @@ members = ["hearth-protocol"]
 
 [workspace.package]
 edition = "2024"
+license = "MIT"
