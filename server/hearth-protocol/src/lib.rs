@@ -4,6 +4,8 @@
 use std::fmt;
 
 pub const PROTOCOL_VERSION: u16 = 1;
+/// QUIC ALPN protocol id.
+pub const ALPN: &[u8] = b"hearth/1";
 pub const MAX_NAME_LEN: usize = 32;
 /// Upper bound for a control message body. Current messages are < 40 bytes.
 pub const MAX_CONTROL_LEN: usize = 256;

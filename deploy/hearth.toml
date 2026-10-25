@@ -1,0 +1,11 @@
+# Hearth server configuration. Every key is optional; the values below are the defaults.
+
+# UDP port to listen on (QUIC).
+port = 7777
+
+# Players allowed in the room at once.
+max_players = 16
+
+# Directory for the server's TLS certificate and key (created on first run).
+# Keep it across restarts: clients will pin this certificate.
+data_dir = "data"

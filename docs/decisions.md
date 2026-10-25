@@ -57,3 +57,26 @@ player count, and clients need only one code path for "a player appeared".
 
 `.gitignore` excludes `.godot/` (the import cache) but not per-asset `*.import`
 files. Those hold import settings, and Godot's docs say to version them.
+
+## D9 — Server: one room, a shared player map, rate limits per client
+
+Milestone 1 has a single room. The player map sits behind a `std::sync::Mutex`
+that is never held across an `.await`. Join/leave broadcasts happen while the lock
+is held, so every client sees membership changes in the same order. Each datagram
+is decoded (that's the validation), then encoded once and sent to every other
+player. Pose and voice have token-bucket limits, so a client can't make the server
+amplify a flood to everyone. Revisit for multiple rooms, or if lock contention
+shows up in profiles.
+
+## D10 — TLS certificate is kept in `data_dir`
+
+It's generated on first run and reused afterwards. This milestone doesn't need it, but
+TOFU (D3) does: a pinned fingerprint only works if the certificate stays the same
+across restarts. On Unix the key file is written with mode 0600. The Docker
+deployment must mount `data_dir` as a volume.
+
+## D11 — Crypto backend: `ring`, not `aws-lc-rs`
+
+quinn/rustls default to aws-lc-rs, which needs CMake and NASM to build on Windows.
+ring builds with just a C compiler on both platforms, which keeps the static binary
+and the GDExtension simple to build.

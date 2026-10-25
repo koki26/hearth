@@ -6,7 +6,10 @@ writing another implementation, and it must stay in sync with that code.
 
 ## Transport
 
-- QUIC (`quinn`). ALPN: `hearth/1`.
+- QUIC (`quinn`), TLS 1.3. ALPN: `hearth/1`. TLS server name: `hearth`. The server
+  certificate is self-signed (see docs/decisions.md D3).
+- The server closes a connection that stays idle for 10 s. Clients send poses at
+  `tick_hz`, which keeps the connection alive.
 - **Control stream:** the client opens one bidirectional stream right after
   connecting. Every reliable message goes on it.
 - **Datagrams:** pose and voice go in QUIC unreliable datagrams, one message per
@@ -55,6 +58,12 @@ Example: `Hello { version: 1, name: "Ada" }` is
 | `0x21` | VoiceRelay | S→C | `from u16`, `seq u16`, Opus frame |
 
 Clients only send `Pose` and `Voice`. The server drops relay types that come from clients.
+
+Server limits per client:
+- **Pose:** a token bucket at 1.5 × `tick_hz` per second with a burst of 10.
+- **Voice:** 75 frames/s with a burst of 25.
+
+The server drops datagrams over those limits and clears unknown `flags` bits before relaying.
 
 ### Pose (33 bytes)
 

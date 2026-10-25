@@ -3,3 +3,6 @@ target/
 
 # Godot (the cache lives in .godot/; per-asset *.import files hold import settings and are committed)
 .godot/
+
+# Server runtime data (TLS key!)
+data/
