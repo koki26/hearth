@@ -1,0 +1,6 @@
+[workspace]
+resolver = "3"
+members = ["hearth-protocol"]
+
+[workspace.package]
+edition = "2024"
