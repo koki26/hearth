@@ -1,0 +1,23 @@
+[gd_scene load_steps=4 format=3]
+
+[sub_resource type="BoxMesh" id="1_box"]
+size = Vector3(0.45, 0.45, 0.45)
+
+[sub_resource type="BoxShape3D" id="2_shape"]
+size = Vector3(0.45, 0.45, 0.45)
+
+[sub_resource type="StandardMaterial3D" id="3_wood"]
+albedo_color = Color(0.65, 0.45, 0.26, 1)
+roughness = 0.85
+
+[node name="Crate" type="RigidBody3D"]
+collision_layer = 1
+collision_mask = 3
+mass = 4.0
+
+[node name="Mesh" type="MeshInstance3D" parent="."]
+mesh = SubResource("1_box")
+surface_material_override/0 = SubResource("3_wood")
+
+[node name="Shape" type="CollisionShape3D" parent="."]
+shape = SubResource("2_shape")

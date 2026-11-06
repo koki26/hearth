@@ -1,64 +1,72 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://main.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://avatar.tscn" id="2_avatar"]
 [ext_resource type="PackedScene" path="res://connect.tscn" id="3_connect"]
+[ext_resource type="PackedScene" path="res://world.tscn" id="4_world"]
 
-[sub_resource type="ProceduralSkyMaterial" id="1_sky_material"]
-
-[sub_resource type="Sky" id="2_sky"]
-sky_material = SubResource("1_sky_material")
-
-[sub_resource type="Environment" id="3_environment"]
-background_mode = 2
-sky = SubResource("2_sky")
-ambient_light_source = 3
-reflected_light_source = 2
-
-[sub_resource type="PlaneMesh" id="4_floor"]
-size = Vector2(20, 20)
-
-[sub_resource type="StandardMaterial3D" id="5_floor_material"]
-albedo_color = Color(0.22, 0.24, 0.27, 1)
-
-[sub_resource type="BoxMesh" id="6_hand"]
+[sub_resource type="BoxMesh" id="1_hand"]
 size = Vector3(0.08, 0.05, 0.12)
 
-[sub_resource type="StandardMaterial3D" id="7_hand_material"]
+[sub_resource type="StandardMaterial3D" id="2_hand_material"]
 albedo_color = Color(0.9, 0.73, 0.4, 1)
+
+[sub_resource type="SphereShape3D" id="3_grip"]
+radius = 0.07
 
 [node name="Main" type="Node3D"]
 script = ExtResource("1_main")
 avatar_scene = ExtResource("2_avatar")
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
-environment = SubResource("3_environment")
-
-[node name="Sun" type="DirectionalLight3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 0.643, -0.766, 0, 0.766, 0.643, 0, 6, 0)
-shadow_enabled = true
-
-[node name="Floor" type="MeshInstance3D" parent="."]
-mesh = SubResource("4_floor")
-surface_material_override/0 = SubResource("5_floor_material")
+[node name="World" parent="." instance=ExtResource("4_world")]
 
 [node name="XROrigin3D" type="XROrigin3D" parent="."]
 
 [node name="Camera" type="XRCamera3D" parent="XROrigin3D"]
 
+[node name="Hud" type="Label3D" parent="XROrigin3D/Camera"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.22, -0.8)
+no_depth_test = true
+fixed_size = true
+pixel_size = 0.0007
+text = "Mic on"
+
+[node name="GroundRay" type="RayCast3D" parent="XROrigin3D"]
+enabled = false
+target_position = Vector3(0, -4, 0)
+collision_mask = 1
+
 [node name="LeftHand" type="XRController3D" parent="XROrigin3D"]
 tracker = &"left_hand"
 
 [node name="Mesh" type="MeshInstance3D" parent="XROrigin3D/LeftHand"]
-mesh = SubResource("6_hand")
-surface_material_override/0 = SubResource("7_hand_material")
+mesh = SubResource("1_hand")
+surface_material_override/0 = SubResource("2_hand_material")
+
+[node name="Grip" type="RigidBody3D" parent="XROrigin3D/LeftHand" groups=["hand"]]
+collision_layer = 2
+collision_mask = 1
+freeze = true
+freeze_mode = 1
+
+[node name="Shape" type="CollisionShape3D" parent="XROrigin3D/LeftHand/Grip"]
+shape = SubResource("3_grip")
 
 [node name="RightHand" type="XRController3D" parent="XROrigin3D"]
 tracker = &"right_hand"
 
 [node name="Mesh" type="MeshInstance3D" parent="XROrigin3D/RightHand"]
-mesh = SubResource("6_hand")
-surface_material_override/0 = SubResource("7_hand_material")
+mesh = SubResource("1_hand")
+surface_material_override/0 = SubResource("2_hand_material")
+
+[node name="Grip" type="RigidBody3D" parent="XROrigin3D/RightHand" groups=["hand"]]
+collision_layer = 2
+collision_mask = 1
+freeze = true
+freeze_mode = 1
+
+[node name="Shape" type="CollisionShape3D" parent="XROrigin3D/RightHand/Grip"]
+shape = SubResource("3_grip")
 
 [node name="Peers" type="Node3D" parent="."]
 
@@ -67,7 +75,7 @@ surface_material_override/0 = SubResource("7_hand_material")
 [node name="Client" type="HearthClient" parent="."]
 
 [node name="Status" type="Label3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, -2)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.2, -2)
 billboard = 1
 pixel_size = 0.003
 text = "Hearth"

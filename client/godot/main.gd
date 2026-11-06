@@ -13,6 +13,8 @@ const MOUSE_SENSITIVITY := 0.003
 const VR_SPEED := 2.5
 const VR_TURN_DEG := 100.0
 const STICK_DEADZONE := 0.15
+const GRAVITY := 12.0
+const JUMP_SPEED := 4.2
 
 @export var avatar_scene: PackedScene
 
@@ -20,6 +22,10 @@ var _xr: XRInterface
 var _in_vr := false
 var _joined := false
 var _xr_retry := 0.0
+var _fall := 0.0
+var _grounded := false
+var _muted := false
+var _found := 0
 var _peers := {}
 
 
@@ -29,6 +35,12 @@ func _ready() -> void:
 	# Render to the headset right away, so you can pick VR while wearing it.
 	if _enter_vr():
 		_status("Pull a trigger to join as %s" % $Connect.summary())
+
+	$XROrigin3D/LeftHand.button_pressed.connect(_on_hand_button.bind(false))
+	$XROrigin3D/RightHand.button_pressed.connect(_on_hand_button.bind(true))
+	for pickup: Node3D in get_tree().get_nodes_in_group("pickup"):
+		pickup.collected.connect(_on_collected)
+	_update_hud()
 
 	$Connect.connect_requested.connect(_on_connect_requested)
 	$Client.connected.connect(_on_connected)
@@ -54,6 +66,7 @@ func _process(delta: float) -> void:
 	if not _joined:
 		_offer_vr(delta)
 		return
+	_fall_and_land(delta)
 	if not _in_vr:
 		_flat_move(delta)
 	var flags := FLAG_VR if _in_vr else 0
@@ -164,7 +177,14 @@ func _status(text: String) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if _in_vr or not _joined:
+	if not _joined:
+		return
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_SPACE:
+			_jump()
+		elif event.keycode == KEY_M:
+			_toggle_mute()
+	if _in_vr:
 		return
 	if event is InputEventMouseButton and event.pressed:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
@@ -174,6 +194,61 @@ func _unhandled_input(event: InputEvent) -> void:
 		var camera: XRCamera3D = $XROrigin3D/Camera
 		camera.rotation.y -= event.relative.x * MOUSE_SENSITIVITY
 		camera.rotation.x = clampf(camera.rotation.x - event.relative.y * MOUSE_SENSITIVITY, -1.5, 1.5)
+
+
+## Jump on A, mute on X, with the same handler for either hand so left-handed
+## players get both.
+func _on_hand_button(button: String, right_hand: bool) -> void:
+	if not _joined:
+		return # A button press is how you join from inside the headset.
+	if button == "ax_button":
+		if right_hand:
+			_jump()
+		else:
+			_toggle_mute()
+
+
+func _jump() -> void:
+	if _grounded:
+		_fall = JUMP_SPEED
+		_grounded = false
+
+
+func _toggle_mute() -> void:
+	_muted = not _muted
+	_update_hud()
+
+
+func _on_collected() -> void:
+	_found += 1
+	_update_hud()
+
+
+func _update_hud() -> void:
+	$XROrigin3D/Camera/Hud.text = "%s    Found %d" % ["Mic MUTED" if _muted else "Mic on", _found]
+
+
+## The play space floats on whatever is under the player's head, so you can
+## jump, fall off a crate, and stand on one.
+func _fall_and_land(delta: float) -> void:
+	var origin: XROrigin3D = $XROrigin3D
+	var camera: XRCamera3D = $XROrigin3D/Camera
+	var ray: RayCast3D = $XROrigin3D/GroundRay
+	ray.position = Vector3(camera.position.x, 0.2, camera.position.z)
+	ray.force_raycast_update()
+
+	_fall -= GRAVITY * delta
+	origin.position.y += _fall * delta
+	if not ray.is_colliding():
+		_grounded = false
+		return
+	var ground: float = ray.get_collision_point().y
+	if origin.position.y <= ground and _fall <= 0.0:
+		origin.position.y = ground
+		_fall = 0.0
+		_grounded = true
+	else:
+		_grounded = false
 
 
 ## Left stick walks where you are looking, right stick turns smoothly around

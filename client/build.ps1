@@ -6,11 +6,13 @@ param(
 	[switch]$InstallTemplates,
 	[string]$Godot = $(if ($env:GODOT) { $env:GODOT } else { "godot" })
 )
-$ErrorActionPreference = "Stop"
+# Native tools write progress to stderr, which "Stop" would treat as fatal.
+$ErrorActionPreference = "Continue"
 $root = Resolve-Path "$PSScriptRoot/.."
 $build = if ($Release -or $Export) { "release" } else { "debug" }
 
 cargo build -p hearth-client @(if ($build -eq "release") { "--release" })
+if ($LASTEXITCODE -ne 0) { throw "cargo build failed." }
 New-Item -ItemType Directory -Force "$PSScriptRoot/godot/bin" | Out-Null
 Copy-Item "$root/target/$build/hearth_client.dll" "$PSScriptRoot/godot/bin/" -Force
 Write-Host "Copied the $build extension to client/godot/bin."
@@ -31,7 +33,7 @@ if (-not (Test-Path $dir)) {
 	$unpacked = "$env:TEMP/godot-templates-$templates"
 	if (-not (Test-Path $zip)) {
 		Write-Host "Downloading export templates for $templates (about 1 GB) ..."
-		Invoke-WebRequest "https://github.com/godotengine/godot/releases/download/$tag/Godot_v${tag}_export_templates.tpz" -OutFile $zip
+		Invoke-WebRequest "https://github.com/godotengine/godot/releases/download/$tag/Godot_v${tag}_export_templates.tpz" -OutFile $zip -ErrorAction Stop
 	}
 	Write-Host "Unpacking export templates ..."
 	Expand-Archive $zip $unpacked -Force

@@ -1,8 +1,11 @@
 extends Node3D
 
-## One remote player: head and hands, smoothed between the 20 Hz updates.
+## One remote player: a head, hands, and a body levitating under the head.
+## Smoothed between the 20 Hz pose updates.
 
 @export var smoothing := 18.0
+
+const BODY_DROP := 0.5
 
 var _head := Transform3D.IDENTITY
 var _left := Transform3D.IDENTITY
@@ -26,3 +29,7 @@ func _process(delta: float) -> void:
 	$Head.transform = $Head.transform.interpolate_with(_head, weight)
 	$Left.transform = $Left.transform.interpolate_with(_left, weight)
 	$Right.transform = $Right.transform.interpolate_with(_right, weight)
+	# The body hangs below the head and only follows its yaw, so a player
+	# looking down does not tip their whole body over.
+	$Body.position = $Head.position + Vector3.DOWN * BODY_DROP
+	$Body.rotation.y = $Head.transform.basis.get_euler().y

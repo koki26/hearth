@@ -189,3 +189,24 @@ The SteamVR probe shells out to `tasklist` and `reg query` with
 `CREATE_NO_WINDOW` instead of taking a process-listing or registry crate: two
 short commands at startup, no dependency, and the whole file is behind
 `#[cfg(windows)]`.
+
+## D21 — A home world of local props, and a jump that rides a raycast
+
+The scene is a real place now: a courtyard around a fire, crates and gems, in
+`world.tscn` so `main.tscn` stays the networking rig. Crates are plain
+`RigidBody3D` and the hands are frozen kinematic bodies, which is enough to
+shove them without any grab code. None of it is networked: poses and voice are
+all the protocol carries, and syncing objects needs an owner per object, a new
+message type and a tie-break for two players grabbing the same crate. Keeping
+them local is honest and costs nothing to replace later.
+
+Jumping moves the `XROrigin3D` with a velocity and a downward `RayCast3D` under
+the head, rather than wrapping the origin in a `CharacterBody3D`. The ray tells
+us the height of whatever is beneath (floor or crate), which is all a jump and a
+landing need; a character body would also want a capsule, slide resolution and a
+decision about what happens when someone walks their real body into a wall.
+Hands sit on collision layer 2 so they never block that ray.
+
+The mic toggle is state and HUD only, because there is no mic yet (D14). It
+ships anyway: the HUD is where it has to be either way, and the state is what
+voice will read when it lands.

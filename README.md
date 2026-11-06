@@ -70,9 +70,16 @@ buttons work too) to join in VR with the name and address on the screen. **Play
 in VR** does the same from the monitor, and says so when no runtime answers. A
 headset that only shows up later is picked up within a second.
 
-In VR the **left stick walks** you where you are looking and the **right stick
-turns** you smoothly around your own head. On the desktop it is WASD and the
-mouse.
+|            | VR                    | Desktop                        |
+|------------|-----------------------|--------------------------------|
+| Move       | left stick            | WASD                           |
+| Turn, look | right stick           | mouse (click to grab, Esc frees) |
+| Jump       | **A**                 | **Space**                      |
+| Mute mic   | **X**                 | **M**                          |
+| Join       | either trigger        | the buttons on screen          |
+
+The mic state and how many gems you have picked up sit on a small HUD in front
+of you, in VR and on the desktop alike.
 
 Any OpenXR runtime works — SteamVR, Oculus, Virtual Desktop, Monado. If SteamVR
 is already running, Hearth joins it instead of waking a different runtime and
@@ -130,8 +137,13 @@ The client **does not verify the server's certificate**, so somebody on the path
 could read or change the traffic. Keep it to a LAN, a VPN or a tunnel you trust
 until certificate pinning lands (decisions D3).
 
-Not there yet: voice (the protocol carries it, nothing captures audio), more than
-one room, and avatars with more than a head and two hands.
+Not there yet:
+
+- **Voice.** The protocol carries Opus frames and the server relays them, but
+  nothing captures or plays audio yet, so the mute button only flips the
+  indicator.
+- **Shared world objects.** Crates and pickups are local to each player.
+- More than one room, and legs.
 
 ## License
 
