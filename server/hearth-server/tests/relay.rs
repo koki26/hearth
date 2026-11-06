@@ -5,9 +5,10 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use hearth_protocol::{ALPN, Control, Datagram, PROTOCOL_VERSION, Peer, Pose, RejectReason, Transform};
-use hearth_server::{CERT_NAME, read_control};
+use hearth_server::{CERT_NAME, Roster, read_control};
 use quinn::crypto::rustls::QuicClientConfig;
 use rustls::pki_types::CertificateDer;
+use tokio::sync::watch;
 use tokio::time::timeout;
 
 const T: Duration = Duration::from_secs(5);
@@ -56,25 +57,36 @@ impl Client {
     }
 }
 
-async fn start(max_players: u16) -> (SocketAddr, CertificateDer<'static>) {
+async fn start(max_players: u16) -> (SocketAddr, CertificateDer<'static>, watch::Receiver<Roster>) {
     let (cert, key) = hearth_server::generate_cert().unwrap();
     let endpoint = hearth_server::endpoint(0, cert.clone(), key).unwrap();
     let port = endpoint.local_addr().unwrap().port();
-    tokio::spawn(hearth_server::serve(endpoint, max_players));
-    (([127, 0, 0, 1], port).into(), cert)
+    let (tx, roster) = watch::channel(Roster::new());
+    tokio::spawn(hearth_server::serve_with_roster(endpoint, max_players, tx));
+    (([127, 0, 0, 1], port).into(), cert, roster)
+}
+
+/// The GUI's player list, which updates on every join and leave.
+async fn roster(rx: &mut watch::Receiver<Roster>) -> Roster {
+    timeout(T, rx.changed()).await.unwrap().unwrap();
+    rx.borrow_and_update().clone()
 }
 
 #[tokio::test]
 async fn two_players_join_relay_and_leave() {
-    let (addr, cert) = start(2).await;
+    let (addr, cert, mut players) = start(2).await;
 
     let mut ada = Client::connect(addr, &cert, PROTOCOL_VERSION, "Ada").await;
     assert_eq!(ada.next().await, Control::Welcome { your_id: 1, tick_hz: 20 });
+
+    assert_eq!(roster(&mut players).await, vec![(1, "Ada".to_owned())]);
 
     let mut bob = Client::connect(addr, &cert, PROTOCOL_VERSION, "Bob").await;
     assert_eq!(bob.next().await, Control::Welcome { your_id: 2, tick_hz: 20 });
     assert_eq!(bob.next().await, Control::PeerJoined(Peer { id: 1, name: "Ada".into() }));
     assert_eq!(ada.next().await, Control::PeerJoined(Peer { id: 2, name: "Bob".into() }));
+
+    assert_eq!(roster(&mut players).await, vec![(1, "Ada".to_owned()), (2, "Bob".to_owned())]);
 
     // Room is full.
     let mut cy = Client::connect(addr, &cert, PROTOCOL_VERSION, "Cy").await;
@@ -91,6 +103,7 @@ async fn two_players_join_relay_and_leave() {
 
     bob.conn.close(0u8.into(), b"bye");
     assert_eq!(ada.next().await, Control::PeerLeft { id: 2 });
+    assert_eq!(roster(&mut players).await, vec![(1, "Ada".to_owned())]);
 
     // Bob's slot (and id) is free again.
     let mut dee = Client::connect(addr, &cert, PROTOCOL_VERSION, "Dee").await;
@@ -101,7 +114,7 @@ async fn two_players_join_relay_and_leave() {
 
 #[tokio::test]
 async fn rejects_bad_version_and_bad_name() {
-    let (addr, cert) = start(4).await;
+    let (addr, cert, _) = start(4).await;
     let mut old = Client::connect(addr, &cert, PROTOCOL_VERSION + 1, "Ada").await;
     assert_eq!(old.next().await, Control::Reject { reason: RejectReason::BadVersion });
     let mut bad = Client::connect(addr, &cert, PROTOCOL_VERSION, "a\u{7}b").await;

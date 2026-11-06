@@ -106,3 +106,18 @@ side captures or plays audio: that needs an Opus encoder in the extension (a C
 dependency on every platform) plus jitter buffering. Head and hand presence is
 what makes the space feel inhabited, so it ships first. The client ignores
 `VoiceRelay` datagrams for now.
+
+## D15 — The server GUI is its own crate, the client's connect screen is Godot UI
+
+`hearth-server-gui` (eframe/egui) is separate from `hearth-server` so the plain
+server keeps building on a headless Linux box or in Docker, where winit and glow
+have no window system to link against. It talks to the server through one
+`tokio::sync::watch` channel carrying the roster, published while the room lock
+is held, so the player list can never show a stale membership order. `start.bat`
+launches the GUI, or the console server with `--noGUI`.
+
+On the client, the connect screen is a plain Godot `CanvasLayer`: it runs before
+XR is switched on, so you type the address on the monitor and put the headset on
+afterwards. A 3D panel plus a VR keyboard would be the alternative, and that is
+a lot of machinery for one field you fill in once (the last address and name are
+remembered in `user://settings.cfg`).

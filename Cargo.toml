@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["server/hearth-protocol", "server/hearth-server", "client/hearth-client"]
+members = ["server/hearth-protocol", "server/hearth-server", "server/hearth-server-gui", "client/hearth-client"]
 
 [workspace.package]
 edition = "2024"

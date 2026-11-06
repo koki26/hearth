@@ -8,7 +8,7 @@ use hearth_protocol::{ALPN, Control, Datagram, DecodeError, PROTOCOL_VERSION, Pe
 use quinn::crypto::rustls::QuicServerConfig;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
 use serde::Deserialize;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, watch};
 use tokio::time::timeout;
 use tracing::{debug, info, warn};
 
@@ -108,9 +108,13 @@ struct Player {
     control: mpsc::Sender<Control>,
 }
 
+/// Who is in the room, for the GUI; published on every membership change.
+pub type Roster = Vec<(u16, String)>;
+
 struct Room {
     max_players: u16,
     players: Mutex<HashMap<u16, Player>>,
+    roster: watch::Sender<Roster>,
 }
 
 fn broadcast_control(players: &HashMap<u16, Player>, except: u16, msg: Control) {
@@ -123,6 +127,12 @@ fn broadcast_control(players: &HashMap<u16, Player>, except: u16, msg: Control) 
 }
 
 impl Room {
+    fn publish(&self, players: &HashMap<u16, Player>) {
+        let mut roster: Roster = players.iter().map(|(&id, player)| (id, player.name.clone())).collect();
+        roster.sort();
+        let _ = self.roster.send(roster);
+    }
+
     fn relay(&self, from: u16, msg: &Datagram) {
         let bytes = bytes::Bytes::from(msg.encode());
         for (&id, player) in self.players.lock().unwrap().iter() {
@@ -134,7 +144,11 @@ impl Room {
 }
 
 pub async fn serve(endpoint: quinn::Endpoint, max_players: u16) {
-    let room = Arc::new(Room { max_players, players: Mutex::default() });
+    serve_with_roster(endpoint, max_players, watch::channel(Roster::new()).0).await
+}
+
+pub async fn serve_with_roster(endpoint: quinn::Endpoint, max_players: u16, roster: watch::Sender<Roster>) {
+    let room = Arc::new(Room { max_players, players: Mutex::default(), roster });
     while let Some(incoming) = endpoint.accept().await {
         let room = room.clone();
         tokio::spawn(async move {
@@ -180,6 +194,7 @@ async fn handle_connection(incoming: quinn::Incoming, room: Arc<Room>) -> anyhow
             }
             broadcast_control(&players, id, Control::PeerJoined(Peer { id, name: name.clone() }));
             players.insert(id, Player { name: name.clone(), conn: conn.clone(), control: control_tx });
+            room.publish(&players);
         }
         free_id
     };
@@ -206,6 +221,7 @@ async fn handle_connection(incoming: quinn::Incoming, room: Arc<Room>) -> anyhow
         let mut players = room.players.lock().unwrap();
         players.remove(&id);
         broadcast_control(&players, id, Control::PeerLeft { id });
+        room.publish(&players);
     }
     writer.abort();
     info!(id, %name, reason = %result.as_ref().err().map(|e| e.to_string()).unwrap_or_default(), "player left");
