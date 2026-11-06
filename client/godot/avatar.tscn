@@ -1,0 +1,42 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://avatar.gd" id="1_avatar"]
+
+[sub_resource type="BoxMesh" id="1_head"]
+size = Vector3(0.2, 0.25, 0.22)
+
+[sub_resource type="SphereMesh" id="2_nose"]
+radius = 0.03
+height = 0.06
+
+[sub_resource type="BoxMesh" id="3_hand"]
+size = Vector3(0.08, 0.05, 0.12)
+
+[sub_resource type="StandardMaterial3D" id="4_skin"]
+albedo_color = Color(0.45, 0.62, 0.9, 1)
+
+[node name="Avatar" type="Node3D"]
+script = ExtResource("1_avatar")
+
+[node name="Head" type="MeshInstance3D" parent="."]
+mesh = SubResource("1_head")
+surface_material_override/0 = SubResource("4_skin")
+
+[node name="Nose" type="MeshInstance3D" parent="Head"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.12)
+mesh = SubResource("2_nose")
+
+[node name="Label" type="Label3D" parent="Head"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3, 0)
+billboard = 1
+no_depth_test = true
+pixel_size = 0.002
+text = "player"
+
+[node name="Left" type="MeshInstance3D" parent="."]
+mesh = SubResource("3_hand")
+surface_material_override/0 = SubResource("4_skin")
+
+[node name="Right" type="MeshInstance3D" parent="."]
+mesh = SubResource("3_hand")
+surface_material_override/0 = SubResource("4_skin")

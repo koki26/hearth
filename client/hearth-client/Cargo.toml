@@ -1,0 +1,21 @@
+[package]
+name = "hearth-client"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Hearth VR client: Godot 4 GDExtension over the Hearth QUIC protocol"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+anyhow.workspace = true
+godot = "0.5.5"
+hearth-protocol.workspace = true
+quinn.workspace = true
+rustls.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+hearth-server = { path = "../../server/hearth-server" }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }

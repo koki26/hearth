@@ -1,0 +1,70 @@
+[gd_scene load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://main.gd" id="1_main"]
+[ext_resource type="PackedScene" path="res://avatar.tscn" id="2_avatar"]
+
+[sub_resource type="ProceduralSkyMaterial" id="1_sky_material"]
+
+[sub_resource type="Sky" id="2_sky"]
+sky_material = SubResource("1_sky_material")
+
+[sub_resource type="Environment" id="3_environment"]
+background_mode = 2
+sky = SubResource("2_sky")
+ambient_light_source = 3
+reflected_light_source = 2
+
+[sub_resource type="PlaneMesh" id="4_floor"]
+size = Vector2(20, 20)
+
+[sub_resource type="StandardMaterial3D" id="5_floor_material"]
+albedo_color = Color(0.22, 0.24, 0.27, 1)
+
+[sub_resource type="BoxMesh" id="6_hand"]
+size = Vector3(0.08, 0.05, 0.12)
+
+[sub_resource type="StandardMaterial3D" id="7_hand_material"]
+albedo_color = Color(0.9, 0.73, 0.4, 1)
+
+[node name="Main" type="Node3D"]
+script = ExtResource("1_main")
+avatar_scene = ExtResource("2_avatar")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("3_environment")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.643, -0.766, 0, 0.766, 0.643, 0, 6, 0)
+shadow_enabled = true
+
+[node name="Floor" type="MeshInstance3D" parent="."]
+mesh = SubResource("4_floor")
+surface_material_override/0 = SubResource("5_floor_material")
+
+[node name="XROrigin3D" type="XROrigin3D" parent="."]
+
+[node name="Camera" type="XRCamera3D" parent="XROrigin3D"]
+
+[node name="LeftHand" type="XRController3D" parent="XROrigin3D"]
+tracker = &"left_hand"
+
+[node name="Mesh" type="MeshInstance3D" parent="XROrigin3D/LeftHand"]
+mesh = SubResource("6_hand")
+surface_material_override/0 = SubResource("7_hand_material")
+
+[node name="RightHand" type="XRController3D" parent="XROrigin3D"]
+tracker = &"right_hand"
+
+[node name="Mesh" type="MeshInstance3D" parent="XROrigin3D/RightHand"]
+mesh = SubResource("6_hand")
+surface_material_override/0 = SubResource("7_hand_material")
+
+[node name="Peers" type="Node3D" parent="."]
+
+[node name="Client" type="HearthClient" parent="."]
+
+[node name="Status" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, -2)
+billboard = 1
+pixel_size = 0.003
+text = "Hearth"

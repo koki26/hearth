@@ -80,3 +80,29 @@ deployment must mount `data_dir` as a volume.
 quinn/rustls default to aws-lc-rs, which needs CMake and NASM to build on Windows.
 ring builds with just a C compiler on both platforms, which keeps the static binary
 and the GDExtension simple to build.
+
+## D12 — Client: one background thread owns the connection, Godot gets signals
+
+`hearth-client` keeps all networking in `net.rs`, which knows nothing about Godot:
+`Client::connect` spawns a thread with a current-thread tokio runtime, and the
+Godot node polls an `std::sync::mpsc` channel in `_process` and re-emits each
+event as a Godot signal. Poses go the other way through an unbounded channel.
+That keeps the engine thread free of `.await`, lets the networking be tested
+without Godot (`client/hearth-client/tests/relay.rs`), and means dropping the
+node closes the connection. The node also throttles `send_pose` to the server's
+`tick_hz`, so a 90 Hz headset doesn't trip the server's rate limit.
+
+## D13 — The client tries every address a host resolves to
+
+`localhost` resolves to `::1` first on most systems, while the server binds
+`0.0.0.0`. Rather than bind dual-stack on the server (which needs per-OS socket
+options), the client walks the resolved addresses in order with a 5 s timeout each
+and keeps the first connection that succeeds.
+
+## D14 — Voice is deferred past the first playable version
+
+The protocol carries Opus frames and the server already relays them, but neither
+side captures or plays audio: that needs an Opus encoder in the extension (a C
+dependency on every platform) plus jitter buffering. Head and hand presence is
+what makes the space feel inhabited, so it ships first. The client ignores
+`VoiceRelay` datagrams for now.
