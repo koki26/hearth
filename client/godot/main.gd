@@ -113,7 +113,8 @@ func _leave_vr() -> void:
 
 
 ## In the headset there is no mouse, so a trigger pull joins with whatever the
-## connect screen holds.
+## connect screen holds. Grip and the face buttons count too, because the
+## default OpenXR action map binds them differently per controller.
 func _offer_vr(delta: float) -> void:
 	if not _in_vr:
 		_xr_retry -= delta
@@ -123,7 +124,11 @@ func _offer_vr(delta: float) -> void:
 				_status("Pull a trigger to join as %s" % $Connect.summary())
 		return
 	for hand: XRController3D in [$XROrigin3D/LeftHand, $XROrigin3D/RightHand]:
-		if hand.is_button_pressed("trigger_click") or hand.get_float("trigger") > 0.6:
+		for button: String in ["trigger_click", "grip_click", "ax_button", "by_button"]:
+			if hand.is_button_pressed(button):
+				$Connect.join_in_vr()
+				return
+		if hand.get_float("trigger") > 0.6 or hand.get_float("grip") > 0.6:
 			$Connect.join_in_vr()
 			return
 

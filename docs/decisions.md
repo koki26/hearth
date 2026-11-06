@@ -145,3 +145,18 @@ because a runtime often starts after the game does — and the headset shows the
 room with a prompt in front of you. Pulling either trigger joins with whatever
 the screen holds, so a mode can be picked with the headset on. Typing a new name
 or address still needs the monitor; the saved ones cover every later launch.
+
+## D18 — Any OpenXR runtime, with an escape hatch for SteamVR
+
+The client never names a runtime: it asks for OpenXR and Windows hands over
+whichever runtime is registered as active, so SteamVR, Oculus, Virtual Desktop
+and Monado all work with no code per vendor (verified on SteamVR/OpenXR 2.18.4
+and VirtualDesktopXR 1.1). The catch is that runtimes fight over that slot —
+Virtual Desktop claims it while its streamer runs — so `play.bat --steamvr` sets
+`XR_RUNTIME_JSON` from Steam's install path before launching. It has to be the
+launcher: the OpenXR loader reads that variable when the instance is created,
+which happens before any of our code runs.
+
+The join button is not one fixed binding either. The default OpenXR action map
+binds controllers differently per vendor, so trigger, grip and the face buttons
+all count.

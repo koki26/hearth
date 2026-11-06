@@ -52,7 +52,7 @@ says so, and `-InstallTemplates` downloads them for you (about 1.2 GB, once).
 You get `dist/Hearth.exe` with everything packed in, next to the extension it
 loads, `hearth_client.dll` — zip the two up and anyone on Windows can play.
 
-Run it, and it asks how you want to play:
+Run `play.bat` (or `dist\Hearth.exe` directly), and it asks how you want to play:
 
 ```
 ┌─ Hearth ───────────────────────────┐
@@ -65,10 +65,19 @@ Run it, and it asks how you want to play:
 ```
 
 The headset starts showing the room as soon as a runtime answers, even before
-you join, so you can keep it on: **pull either trigger** to join in VR with the
-name and address on the screen. **Play in VR** does the same from the monitor,
-and says so if no OpenXR runtime (SteamVR, Oculus, Virtual Desktop, Monado…) is
-running. A headset that only appears later is picked up within a second.
+you join, so you can keep it on: **pull either trigger** (grip and the face
+buttons work too) to join in VR with the name and address on the screen. **Play
+in VR** does the same from the monitor, and says so when no runtime answers. A
+headset that only shows up later is picked up within a second.
+
+Any OpenXR runtime works — SteamVR, Oculus, Virtual Desktop, Monado — and the
+client uses whichever one Windows currently has set as *the* OpenXR runtime.
+Virtual Desktop takes that slot while its streamer runs, so to insist on
+SteamVR:
+
+```
+play.bat --steamvr
+```
 
 **Play on desktop** keeps you in the window: click to capture the mouse, look
 with the mouse, move with WASD, Escape to release. Two desktop clients on one
