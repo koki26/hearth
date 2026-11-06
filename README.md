@@ -52,7 +52,7 @@ says so, and `-InstallTemplates` downloads them for you (about 1.2 GB, once).
 You get `dist/Hearth.exe` with everything packed in, next to the extension it
 loads, `hearth_client.dll` — zip the two up and anyone on Windows can play.
 
-Run `play.bat` (or `dist\Hearth.exe` directly), and it asks how you want to play:
+Run it, and it asks how you want to play:
 
 ```
 ┌─ Hearth ───────────────────────────┐
@@ -74,11 +74,11 @@ In VR the **left stick walks** you where you are looking and the **right stick
 turns** you smoothly around your own head. On the desktop it is WASD and the
 mouse.
 
-Any OpenXR runtime works — SteamVR, Oculus, Virtual Desktop, Monado. `play.bat`
-picks SteamVR when SteamVR is already running, so starting Hearth never pulls
-the headset out of it; otherwise it takes whatever Windows has set as *the*
-OpenXR runtime. `play.bat --steamvr` insists on SteamVR even when it is not
-running yet. (Starting `dist\Hearth.exe` straight does no such detection.)
+Any OpenXR runtime works — SteamVR, Oculus, Virtual Desktop, Monado. If SteamVR
+is already running, Hearth joins it instead of waking a different runtime and
+leaving SteamVR to shut down; otherwise it takes whatever Windows has set as
+*the* OpenXR runtime. To pin one yourself, set `XR_RUNTIME_JSON` to its JSON
+manifest before starting the game.
 
 **Play on desktop** keeps you in the window: click to capture the mouse, look
 with the mouse, move with WASD, Escape to release. Two desktop clients on one

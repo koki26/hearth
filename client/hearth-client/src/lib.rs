@@ -2,6 +2,7 @@
 //! and turns wire poses into Godot transforms and signals.
 
 pub mod net;
+mod steamvr;
 
 use std::time::{Duration, Instant};
 
@@ -12,7 +13,18 @@ use hearth_protocol::{Pose, Transform};
 struct HearthExtension;
 
 #[gdextension]
-unsafe impl ExtensionLibrary for HearthExtension {}
+unsafe impl ExtensionLibrary for HearthExtension {
+    // Core runs before the engine brings up OpenXR.
+    fn min_level() -> InitLevel {
+        InitLevel::Core
+    }
+
+    fn on_stage_init(stage: InitStage) {
+        if stage == InitStage::Core {
+            steamvr::prefer_if_running();
+        }
+    }
+}
 
 #[derive(GodotClass)]
 #[class(base = Node)]

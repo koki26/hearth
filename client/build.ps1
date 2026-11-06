@@ -42,4 +42,8 @@ if (-not (Test-Path $dir)) {
 
 New-Item -ItemType Directory -Force "$root/dist" | Out-Null
 & $Godot --headless --path "$PSScriptRoot/godot" --export-release "Windows Desktop"
+if (-not (Test-Path "$root/dist/Hearth.exe")) { throw "Export failed, see the Godot output above." }
+# Godot's own copy of the extension fails while the editor holds it open, so
+# copy it over the top rather than make people close the editor.
+Copy-Item "$PSScriptRoot/godot/bin/hearth_client.dll" "$root/dist/" -Force
 Write-Host "Exported dist/Hearth.exe."

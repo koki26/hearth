@@ -176,3 +176,16 @@ origin, so the view does not swing. Both read `primary` and fall back to
 `secondary`, which is where the default action map puts a trackpad. Teleport and
 snap turning are the comfort options to add next if smooth turning makes anyone
 sick.
+
+## D20 — The runtime choice lives in the extension, not in a launcher
+
+D19 put the "keep a running SteamVR" check in `play.bat`, which only helps the
+people who use the launcher. The GDExtension's `on_stage_init(Core)` runs before
+the engine brings up OpenXR (verified: the engine then reports SteamVR/OpenXR
+instead of VirtualDesktopXR), so the check moved into the exe and `play.bat` is
+gone. `XR_RUNTIME_JSON` set by hand is still honoured and skips the check.
+
+The SteamVR probe shells out to `tasklist` and `reg query` with
+`CREATE_NO_WINDOW` instead of taking a process-listing or registry crate: two
+short commands at startup, no dependency, and the whole file is behind
+`#[cfg(windows)]`.
