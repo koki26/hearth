@@ -48,8 +48,9 @@ client/build.ps1 -Export          # -> dist/Hearth.exe
 ```
 
 The first run needs Godot's export templates; if they are missing the script
-says so, and `-InstallTemplates` downloads them for you (about 1 GB, once).
-`dist/Hearth.exe` is a single file you can hand to anyone on Windows.
+says so, and `-InstallTemplates` downloads them for you (about 1.2 GB, once).
+You get `dist/Hearth.exe` with everything packed in, next to the extension it
+loads, `hearth_client.dll` — zip the two up and anyone on Windows can play.
 
 Run it, and it asks how you want to play:
 

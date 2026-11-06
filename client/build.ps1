@@ -26,14 +26,18 @@ if (-not (Test-Path $dir)) {
 		throw "Export templates for $templates are missing. Install them in Godot (Editor > Manage Export Templates), or rerun with -InstallTemplates to download them (about 1 GB)."
 	}
 	$tag = $templates -replace "\.stable$", "-stable"
-	$tpz = "$env:TEMP/godot-templates-$templates.tpz"
+	# A .tpz is a zip, but Expand-Archive only accepts the .zip extension.
+	$zip = "$env:TEMP/godot-templates-$templates.zip"
 	$unpacked = "$env:TEMP/godot-templates-$templates"
-	Write-Host "Downloading export templates for $templates ..."
-	Invoke-WebRequest "https://github.com/godotengine/godot/releases/download/$tag/Godot_v${tag}_export_templates.tpz" -OutFile $tpz
-	Expand-Archive $tpz $unpacked -Force
+	if (-not (Test-Path $zip)) {
+		Write-Host "Downloading export templates for $templates (about 1 GB) ..."
+		Invoke-WebRequest "https://github.com/godotengine/godot/releases/download/$tag/Godot_v${tag}_export_templates.tpz" -OutFile $zip
+	}
+	Write-Host "Unpacking export templates ..."
+	Expand-Archive $zip $unpacked -Force
 	New-Item -ItemType Directory -Force $dir | Out-Null
 	Move-Item "$unpacked/templates/*" $dir -Force
-	Remove-Item $tpz, $unpacked -Recurse -Force
+	Remove-Item $zip, $unpacked -Recurse -Force
 }
 
 New-Item -ItemType Directory -Force "$root/dist" | Out-Null

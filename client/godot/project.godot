@@ -19,4 +19,5 @@ renderer/rendering_method="forward_plus"
 [xr]
 
 openxr/enabled=true
+openxr/startup_alert=false
 shaders/enabled=true
