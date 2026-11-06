@@ -5,14 +5,14 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-anyhow = "1.0.104"
+anyhow.workspace = true
 bytes = "1.12.1"
-hearth-protocol = { version = "0.1.0", path = "../hearth-protocol" }
-quinn = { version = "0.11.12", default-features = false, features = ["runtime-tokio", "rustls-ring", "log"] }
+hearth-protocol.workspace = true
+quinn.workspace = true
 rcgen = "0.14.10"
-rustls = { version = "0.23.46", default-features = false, features = ["ring", "std", "logging"] }
+rustls.workspace = true
 serde = { version = "1.0.229", features = ["derive"] }
-tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros", "signal", "time", "sync"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "signal"] }
 toml = "1.1.8"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
