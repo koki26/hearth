@@ -1,7 +1,8 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://main.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://avatar.tscn" id="2_avatar"]
+[ext_resource type="PackedScene" path="res://connect.tscn" id="3_connect"]
 
 [sub_resource type="ProceduralSkyMaterial" id="1_sky_material"]
 
@@ -60,6 +61,8 @@ mesh = SubResource("6_hand")
 surface_material_override/0 = SubResource("7_hand_material")
 
 [node name="Peers" type="Node3D" parent="."]
+
+[node name="Connect" parent="." instance=ExtResource("3_connect")]
 
 [node name="Client" type="HearthClient" parent="."]
 

@@ -1,52 +1,54 @@
 extends Node3D
 
-## Connects to a Hearth server, streams the local head/hand poses and spawns
-## an avatar per remote player. Pass settings as user args:
-##   Hearth.exe -- --server 10.0.0.5 --port 7777 --name Ada
+## Connects to a Hearth server, streams the local head and hand poses and
+## spawns an avatar per remote player. Args skip the connect screen:
+##   Hearth.exe -- --server 192.168.1.20 --port 7777 --name Ada
 
 const FLAG_VR := 1
 const FLAG_LEFT := 2
 const FLAG_RIGHT := 4
+const FLAT_EYE_HEIGHT := 1.7
 const FLAT_SPEED := 3.0
 const MOUSE_SENSITIVITY := 0.003
 
 @export var avatar_scene: PackedScene
-@export var server := "127.0.0.1"
-@export var port := 7777
 
 var _xr: XRInterface
+var _in_vr := false
+var _joined := false
 var _peers := {}
 
 
 func _ready() -> void:
-	var args := _user_args()
 	_xr = XRServer.find_interface("OpenXR")
-	if _xr and _xr.is_initialized():
-		get_viewport().use_xr = true
-		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
-	else:
+	if _xr and not _xr.is_initialized():
 		_xr = null
-		$XROrigin3D/Camera.position.y = 1.7
-		_status("No headset - flat mode. Click to look, WASD to move.")
+	$XROrigin3D/Camera.position.y = FLAT_EYE_HEIGHT
 
+	$Connect.connect_requested.connect(_on_connect_requested)
 	$Client.connected.connect(_on_connected)
-	$Client.rejected.connect(func(reason: String) -> void: _status("Rejected: " + reason))
-	$Client.disconnected.connect(_on_disconnected)
+	$Client.rejected.connect(func(reason: String) -> void: _failed("Server refused the join: " + reason))
+	$Client.disconnected.connect(func(reason: String) -> void: _failed(reason))
 	$Client.peer_joined.connect(_on_peer_joined)
 	$Client.peer_left.connect(_on_peer_left)
 	$Client.peer_pose.connect(_on_peer_pose)
 
-	var host: String = args.get("server", server)
-	var player_port := int(args.get("port", port))
-	var player_name: String = args.get("name", "Player%d" % (randi() % 1000))
-	_status("Connecting to %s:%d as %s..." % [host, player_port, player_name])
-	$Client.connect_to_server(host, player_port, player_name)
+	var args := _user_args()
+	if args.has("server") or args.has("name"):
+		var host: String = args.get("server", "127.0.0.1")
+		var port := int(args.get("port", 7777))
+		var player_name: String = args.get("name", "Player%d" % (randi() % 1000))
+		$Connect.fill(host, port, player_name)
+		$Connect.busy("Connecting to %s:%d..." % [host, port])
+		_on_connect_requested(host, port, player_name)
 
 
 func _process(delta: float) -> void:
-	if not _xr:
+	if not _joined:
+		return
+	if not _in_vr:
 		_flat_move(delta)
-	var flags := FLAG_VR if _xr else 0
+	var flags := FLAG_VR if _in_vr else 0
 	var left: XRController3D = $XROrigin3D/LeftHand
 	var right: XRController3D = $XROrigin3D/RightHand
 	if left.get_has_tracking_data():
@@ -56,14 +58,35 @@ func _process(delta: float) -> void:
 	$Client.send_pose($XROrigin3D/Camera.global_transform, left.global_transform, right.global_transform, flags)
 
 
-func _on_connected(your_id: int, tick_hz: int) -> void:
-	_status("Connected as player %d (%d Hz)" % [your_id, tick_hz])
+func _on_connect_requested(host: String, port: int, player_name: String) -> void:
+	$Client.connect_to_server(host, port, player_name)
 
 
-func _on_disconnected(reason: String) -> void:
-	_status("Disconnected: " + reason)
+func _on_connected(your_id: int, _tick_hz: int) -> void:
+	_joined = true
+	$Connect.hide()
+	if _xr:
+		get_viewport().use_xr = true
+		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
+		$XROrigin3D/Camera.position.y = 0.0
+		_in_vr = true
+		_status("You are player %d. Put the headset on." % your_id)
+	else:
+		_status("You are player %d. No headset: click to look, WASD to move." % your_id)
+
+
+func _failed(reason: String) -> void:
+	_joined = false
 	for id: int in _peers.keys():
 		_on_peer_left(id)
+	if _in_vr:
+		get_viewport().use_xr = false
+		$XROrigin3D/Camera.position.y = FLAT_EYE_HEIGHT
+		_in_vr = false
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	$Connect.failed(reason)
+	$Connect.show()
+	print(reason)
 
 
 func _on_peer_joined(id: int, peer_name: String) -> void:
@@ -92,7 +115,7 @@ func _status(text: String) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if _xr:
+	if _in_vr or not _joined:
 		return
 	if event is InputEventMouseButton and event.pressed:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED

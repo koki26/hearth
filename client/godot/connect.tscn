@@ -1,0 +1,94 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://connect.gd" id="1_connect"]
+
+[sub_resource type="StyleBoxFlat" id="1_panel"]
+bg_color = Color(0.09, 0.1, 0.13, 0.94)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[node name="Connect" type="CanvasLayer"]
+script = ExtResource("1_connect")
+
+[node name="Dim" type="ColorRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.05, 0.06, 0.08, 0.85)
+
+[node name="Panel" type="PanelContainer" parent="."]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -190.0
+offset_top = -130.0
+offset_right = 190.0
+offset_bottom = 130.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("1_panel")
+
+[node name="Margin" type="MarginContainer" parent="Panel"]
+layout_mode = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 20
+
+[node name="Rows" type="VBoxContainer" parent="Panel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Title" type="Label" parent="Panel/Margin/Rows"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "Hearth"
+horizontal_alignment = 1
+
+[node name="Hint" type="Label" parent="Panel/Margin/Rows"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.68, 0.72, 0.78, 1)
+text = "Join a room. Put the headset on after connecting."
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="Spacer" type="Control" parent="Panel/Margin/Rows"]
+custom_minimum_size = Vector2(0, 8)
+layout_mode = 2
+
+[node name="NameLabel" type="Label" parent="Panel/Margin/Rows"]
+layout_mode = 2
+text = "Your name"
+
+[node name="PlayerName" type="LineEdit" parent="Panel/Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+max_length = 32
+
+[node name="AddressLabel" type="Label" parent="Panel/Margin/Rows"]
+layout_mode = 2
+text = "Server address"
+
+[node name="Address" type="LineEdit" parent="Panel/Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+placeholder_text = "127.0.0.1:7777"
+
+[node name="Connect" type="Button" parent="Panel/Margin/Rows"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+text = "Connect"
+
+[node name="Message" type="Label" parent="Panel/Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.72, 0.4, 1)
+horizontal_alignment = 1
+autowrap_mode = 3
