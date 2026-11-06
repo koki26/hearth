@@ -4,17 +4,15 @@
 use std::fmt;
 
 pub const PROTOCOL_VERSION: u16 = 1;
-/// QUIC ALPN protocol id.
 pub const ALPN: &[u8] = b"hearth/1";
 pub const MAX_NAME_LEN: usize = 32;
-/// Upper bound for a control message body. Current messages are < 40 bytes.
+/// Upper bound for a control message body; current messages are < 40 bytes.
 pub const MAX_CONTROL_LEN: usize = 256;
 /// Keeps a voice datagram under the 1200-byte QUIC minimum path MTU.
 pub const MAX_VOICE_FRAME: usize = 1000;
 /// Position units per metre: i16 covers ±64 m at ~2 mm resolution.
 pub const POS_SCALE: f32 = 512.0;
 
-/// Bits of `Pose::flags`.
 pub mod flags {
     pub const VR: u8 = 1 << 0;
     pub const LEFT_HAND: u8 = 1 << 1;
@@ -59,8 +57,6 @@ impl fmt::Display for DecodeError {
 }
 
 impl std::error::Error for DecodeError {}
-
-// ---------------------------------------------------------------- quantization
 
 pub fn quantize_pos(metres: f32) -> i16 {
     // `as` saturates out-of-range values and maps NaN to 0.
@@ -109,9 +105,6 @@ pub fn dequantize_rot(packed: u32) -> [f32; 4] {
     q.map(|c| c / len)
 }
 
-// ---------------------------------------------------------------- messages
-
-/// A quantized position + rotation, in wire form.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Transform {
     pub pos: [i16; 3],
@@ -130,8 +123,7 @@ impl Transform {
     }
 }
 
-/// IK targets for one avatar. All three transforms are always sent; `flags`
-/// says which hands are tracked.
+/// All three transforms are always sent; `flags` says which hands are tracked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Pose {
     pub seq: u16,
@@ -154,7 +146,6 @@ pub enum RejectReason {
     BadName = 3,
 }
 
-/// Messages on the reliable control stream.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Control {
     Hello { version: u16, name: String },
@@ -164,7 +155,6 @@ pub enum Control {
     PeerLeft { id: u16 },
 }
 
-/// Messages sent as unreliable QUIC datagrams.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Datagram {
     Pose(Pose),
@@ -214,8 +204,7 @@ impl Control {
         out[start..start + 2].copy_from_slice(&len.to_le_bytes());
     }
 
-    /// Reads a frame's length prefix; rejects oversized frames before the
-    /// body is read.
+    /// Rejects an oversized frame before its body is read.
     pub fn body_len(prefix: [u8; 2]) -> Result<usize, DecodeError> {
         let len = u16::from_le_bytes(prefix) as usize;
         if len > MAX_CONTROL_LEN {
@@ -224,8 +213,7 @@ impl Control {
         Ok(len)
     }
 
-    /// Decodes one message body (without its length prefix).
-    pub fn decode(body: &[u8]) -> Result<Self, DecodeError> {
+        pub fn decode(body: &[u8]) -> Result<Self, DecodeError> {
         if body.len() > MAX_CONTROL_LEN {
             return Err(DecodeError::TooLong);
         }
@@ -356,7 +344,6 @@ impl<'a> Reader<'a> {
             right: self.transform()?,
         })
     }
-    /// A voice frame is the rest of the datagram.
     fn voice_frame(&mut self) -> Result<Vec<u8>, DecodeError> {
         let frame = std::mem::take(&mut self.0);
         if frame.is_empty() || frame.len() > MAX_VOICE_FRAME {
@@ -373,7 +360,7 @@ impl<'a> Reader<'a> {
 mod tests {
     use super::*;
 
-    /// Deterministic xorshift so tests need no `rand` dependency.
+    /// Deterministic xorshift, so no `rand` dependency.
     struct Rng(u64);
     impl Rng {
         fn next(&mut self) -> u64 {

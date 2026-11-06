@@ -1,6 +1,3 @@
-//! Hearth relay server: accepts QUIC connections, runs the join handshake and
-//! forwards pose/voice datagrams between players in a single room.
-
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -17,7 +14,7 @@ use tracing::{debug, info, warn};
 
 pub const TICK_HZ: u8 = 20;
 const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
-/// Certificate subject name; clients connect using this as the TLS server name.
+/// Certificate subject name; clients use it as the TLS server name.
 pub const CERT_NAME: &str = "hearth";
 
 #[derive(Debug, Clone, Deserialize)]
@@ -25,7 +22,6 @@ pub const CERT_NAME: &str = "hearth";
 pub struct Config {
     pub port: u16,
     pub max_players: u16,
-    /// Holds the server's TLS certificate and key.
     pub data_dir: PathBuf,
 }
 
@@ -51,8 +47,8 @@ pub fn generate_cert() -> anyhow::Result<(CertificateDer<'static>, PrivateKeyDer
     Ok((generated.cert.der().clone(), key.into()))
 }
 
-/// Loads the certificate from `dir`, generating and saving one on first run.
-/// It is kept stable across restarts so clients can pin it (see docs/decisions.md D3).
+/// Generates and saves a certificate on first run; it must stay stable across
+/// restarts so clients can pin it (docs/decisions.md D3).
 pub fn load_or_create_cert(dir: &Path) -> anyhow::Result<(CertificateDer<'static>, PrivateKeyDer<'static>)> {
     let (cert_path, key_path) = (dir.join("cert.der"), dir.join("key.der"));
     if cert_path.exists() && key_path.exists() {
@@ -89,7 +85,6 @@ pub fn endpoint(
     crypto.alpn_protocols = vec![ALPN.to_vec()];
 
     let mut transport = quinn::TransportConfig::default();
-    // One control stream per client; nothing else may be opened.
     transport.max_concurrent_bidi_streams(1u8.into());
     transport.max_concurrent_uni_streams(0u8.into());
     transport.max_idle_timeout(Some(Duration::from_secs(10).try_into()?));
@@ -99,7 +94,6 @@ pub fn endpoint(
     Ok(quinn::Endpoint::server(config, ([0, 0, 0, 0], port).into())?)
 }
 
-/// Reads one length-prefixed control message.
 pub async fn read_control(recv: &mut quinn::RecvStream) -> anyhow::Result<Control> {
     let mut prefix = [0; 2];
     recv.read_exact(&mut prefix).await?;
@@ -119,11 +113,9 @@ struct Room {
     players: Mutex<HashMap<u16, Player>>,
 }
 
-/// Callers hold the room lock across the membership change and this broadcast,
-/// so every client sees joins and leaves in one consistent order.
 fn broadcast_control(players: &HashMap<u16, Player>, except: u16, msg: Control) {
     for (&id, player) in players {
-            // A full queue means the client stopped reading; the writer task drops it.
+            // A full queue means the client stopped reading.
             if id != except && player.control.try_send(msg.clone()).is_err() {
             player.conn.close(0u8.into(), b"control backlog");
         }
@@ -135,14 +127,12 @@ impl Room {
         let bytes = bytes::Bytes::from(msg.encode());
         for (&id, player) in self.players.lock().unwrap().iter() {
             if id != from {
-                // Only fails if the peer has datagrams disabled or the message is too large; dropping is fine.
                 let _ = player.conn.send_datagram(bytes.clone());
             }
         }
     }
 }
 
-/// Accepts connections until the endpoint is closed.
 pub async fn serve(endpoint: quinn::Endpoint, max_players: u16) {
     let room = Arc::new(Room { max_players, players: Mutex::default() });
     while let Some(incoming) = endpoint.accept().await {
@@ -176,7 +166,7 @@ async fn handle_connection(incoming: quinn::Incoming, room: Arc<Room>) -> anyhow
         Err(err) => return Err(err),
     };
 
-    // Room size plus headroom: Welcome and the existing-peer list are queued here up front.
+    // Room size plus headroom: Welcome and the peer list are queued up front.
     let (control_tx, mut control_rx) = mpsc::channel(room.max_players as usize + 16);
     let joined = {
         let mut players = room.players.lock().unwrap();
@@ -234,7 +224,7 @@ async fn reject(conn: &quinn::Connection, mut send: quinn::SendStream, reason: R
 }
 
 async fn relay_datagrams(conn: &quinn::Connection, room: &Room, id: u16) -> anyhow::Result<()> {
-    // Allow 1.5x the nominal rate plus a burst, so network jitter isn't punished.
+    // 1.5x the nominal rate plus a burst, so jitter isn't punished.
     let mut pose_limit = RateLimit::new(TICK_HZ as f32 * 1.5, 10.0);
     let mut voice_limit = RateLimit::new(75.0, 25.0); // 20 ms frames = 50/s
     loop {
@@ -255,7 +245,6 @@ async fn relay_datagrams(conn: &quinn::Connection, room: &Room, id: u16) -> anyh
     }
 }
 
-/// Token bucket.
 struct RateLimit {
     tokens: f32,
     rate: f32,

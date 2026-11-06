@@ -31,7 +31,6 @@ async fn main() -> anyhow::Result<()> {
 
     info!("shutting down");
     endpoint.close(0u8.into(), b"server shutting down");
-    // Give clients a moment to receive the close frame.
     let _ = tokio::time::timeout(Duration::from_secs(3), endpoint.wait_idle()).await;
     let _ = server.await;
     info!("stopped");

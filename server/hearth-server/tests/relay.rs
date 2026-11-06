@@ -1,4 +1,4 @@
-//! End-to-end: real QUIC clients against an in-process server.
+//! Hand-rolled QUIC clients against an in-process server.
 
 use std::net::SocketAddr;
 use std::sync::Arc;
