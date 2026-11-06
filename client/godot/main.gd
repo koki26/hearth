@@ -2,7 +2,7 @@ extends Node3D
 
 ## Connects to a Hearth server, streams the local head and hand poses and
 ## spawns an avatar per remote player. Args skip the connect screen:
-##   Hearth.exe -- --server 192.168.1.20 --port 7777 --name Ada
+##   Hearth.exe -- --server 192.168.1.20 --port 7777 --name Ada --mode desktop
 
 const FLAG_VR := 1
 const FLAG_LEFT := 2
@@ -14,6 +14,7 @@ const MOUSE_SENSITIVITY := 0.003
 @export var avatar_scene: PackedScene
 
 var _xr: XRInterface
+var _want_vr := false
 var _in_vr := false
 var _joined := false
 var _peers := {}
@@ -24,6 +25,7 @@ func _ready() -> void:
 	if _xr and not _xr.is_initialized():
 		_xr = null
 	$XROrigin3D/Camera.position.y = FLAT_EYE_HEIGHT
+	$Connect.set_vr_available(_xr != null)
 
 	$Connect.connect_requested.connect(_on_connect_requested)
 	$Client.connected.connect(_on_connected)
@@ -40,7 +42,7 @@ func _ready() -> void:
 		var player_name: String = args.get("name", "Player%d" % (randi() % 1000))
 		$Connect.fill(host, port, player_name)
 		$Connect.busy("Connecting to %s:%d..." % [host, port])
-		_on_connect_requested(host, port, player_name)
+		_on_connect_requested(host, port, player_name, args.get("mode", "vr") == "vr")
 
 
 func _process(delta: float) -> void:
@@ -58,14 +60,15 @@ func _process(delta: float) -> void:
 	$Client.send_pose($XROrigin3D/Camera.global_transform, left.global_transform, right.global_transform, flags)
 
 
-func _on_connect_requested(host: String, port: int, player_name: String) -> void:
+func _on_connect_requested(host: String, port: int, player_name: String, use_vr: bool) -> void:
+	_want_vr = use_vr and _xr != null
 	$Client.connect_to_server(host, port, player_name)
 
 
 func _on_connected(your_id: int, _tick_hz: int) -> void:
 	_joined = true
 	$Connect.hide()
-	if _xr:
+	if _want_vr:
 		get_viewport().use_xr = true
 		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
 		$XROrigin3D/Camera.position.y = 0.0

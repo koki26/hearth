@@ -6,3 +6,6 @@ target/
 
 # Server runtime data (TLS key!)
 data/
+
+# Exported client builds
+dist/

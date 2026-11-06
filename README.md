@@ -41,39 +41,55 @@ cargo run --release -p hearth-server -- deploy/hearth.toml
 
 ## Join from the client
 
-1. Build the extension: `client/build.ps1 -Release`
-   (Linux/macOS: `cargo build --release -p hearth-client` then copy
-   `target/release/libhearth_client.so` into `client/godot/bin/`)
-2. Open `client/godot` in Godot 4.7 and press **F5**.
-3. Type your name and the server address, click **Connect**, then put the
-   headset on.
+Build the client once:
 
-```
-┌─ Hearth ─────────────────┐
-│  Your name               │
-│  [ Ada               ]   │
-│  Server address          │
-│  [ 192.168.1.20:7777 ]   │
-│  [      Connect      ]   │
-└──────────────────────────┘
+```powershell
+client/build.ps1 -Export          # -> dist/Hearth.exe
 ```
 
-The address can be `host` or `host:port`; the port defaults to 7777, and your
-last name and address are remembered. To skip the screen entirely:
+The first run needs Godot's export templates; if they are missing the script
+says so, and `-InstallTemplates` downloads them for you (about 1 GB, once).
+`dist/Hearth.exe` is a single file you can hand to anyone on Windows.
+
+Run it, and it asks how you want to play:
+
+```
+┌─ Hearth ───────────────────────────┐
+│  Your name                         │
+│  [ Ada                         ]   │
+│  Server address                    │
+│  [ 192.168.1.20:7777           ]   │
+│  [ Play in VR ] [ Play on desktop ]│
+└────────────────────────────────────┘
+```
+
+**Play in VR** needs a headset with any OpenXR runtime running (SteamVR, Oculus,
+Virtual Desktop, Monado…); the button is greyed out when none is found. Put the
+headset on after you click — the screen itself lives on the monitor.
+
+**Play on desktop** keeps you in the window: click to capture the mouse, look
+with the mouse, move with WASD, Escape to release. Two desktop clients on one
+machine is the easy way to test a server.
+
+The address takes `host` or `host:port` (port 7777 by default), and your last
+name and address come back next time. To skip the screen:
 
 ```sh
-godot --path client/godot -- --server 192.168.1.20 --name Ada
+Hearth.exe -- --server 192.168.1.20 --name Ada --mode desktop
 ```
 
-**No headset?** The client falls back to a flat window: click to capture the
-mouse, look with the mouse, move with WASD, Escape to release. Handy for testing
-two players on one machine.
+To work on the client instead of shipping it, run `client/build.ps1` (debug
+extension, no export), open `client/godot` in Godot 4.7 and press F5. On Linux
+and macOS, `cargo build --release -p hearth-client` and copy
+`target/release/libhearth_client.so` (or `.dylib`) into `client/godot/bin/`.
 
 ## What you need
 
 - Rust 1.95+ ([rustup](https://rustup.rs))
-- [Godot 4.7](https://godotengine.org) for the client
-- A headset with any OpenXR runtime (SteamVR, Oculus, Virtual Desktop, Monado…)
+- [Godot 4.7](https://godotengine.org) to build or edit the client (players only
+  need the exported exe)
+- For VR: a headset with any OpenXR runtime
+- Windows for `start.bat` and the exe; everything else is cross-platform
 
 ## How it works
 

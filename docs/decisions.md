@@ -121,3 +121,16 @@ XR is switched on, so you type the address on the monitor and put the headset on
 afterwards. A 3D panel plus a VR keyboard would be the alternative, and that is
 a lot of machinery for one field you fill in once (the last address and name are
 remembered in `user://settings.cfg`).
+
+## D16 — The client asks VR or desktop at launch instead of guessing
+
+It used to enter VR whenever an OpenXR runtime answered, which is wrong often
+enough to matter: people leave SteamVR running, test two clients on one machine,
+or want to show the room on a monitor. So the connect screen has two join
+buttons, and the VR one is disabled when no runtime is found. `--mode desktop`
+does the same from the command line. OpenXR still initializes at startup
+(Godot only registers the interface when the project setting is on), so a
+headset runtime may wake up even for a desktop player.
+
+The client ships as a single `dist/Hearth.exe` with the pack embedded, built by
+`client/build.ps1 -Export`, so sharing it is one file plus an address.
