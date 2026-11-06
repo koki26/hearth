@@ -12,6 +12,7 @@ crate-type = ["cdylib", "rlib"]
 anyhow.workspace = true
 godot = "0.5.5"
 hearth-protocol.workspace = true
+opus = "0.4.0"
 quinn.workspace = true
 rustls.workspace = true
 tokio.workspace = true

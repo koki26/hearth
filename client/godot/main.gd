@@ -15,6 +15,12 @@ const VR_TURN_DEG := 100.0
 const STICK_DEADZONE := 0.15
 const GRAVITY := 12.0
 const JUMP_SPEED := 4.2
+const HAND_GRAB_REACH := 0.28
+const VIEW_GRAB_REACH := 1.1
+const MIC_BUS := "Mic"
+
+@export var mic_on_icon: Texture2D
+@export var mic_muted_icon: Texture2D
 
 @export var avatar_scene: PackedScene
 
@@ -25,7 +31,10 @@ var _xr_retry := 0.0
 var _fall := 0.0
 var _grounded := false
 var _muted := false
-var _found := 0
+var _capture: AudioEffectCapture
+## Holder node -> the body it carries, and that body's last travel per second.
+var _held := {}
+var _throw := {}
 var _peers := {}
 
 
@@ -38,8 +47,14 @@ func _ready() -> void:
 
 	$XROrigin3D/LeftHand.button_pressed.connect(_on_hand_button.bind(false))
 	$XROrigin3D/RightHand.button_pressed.connect(_on_hand_button.bind(true))
-	for pickup: Node3D in get_tree().get_nodes_in_group("pickup"):
-		pickup.collected.connect(_on_collected)
+	$XROrigin3D/LeftHand.button_released.connect(_on_hand_release.bind(false))
+	$XROrigin3D/RightHand.button_released.connect(_on_hand_release.bind(true))
+	var bus := AudioServer.get_bus_index(MIC_BUS)
+	if bus >= 0:
+		AudioServer.set_bus_mute(bus, true) # Nobody wants to hear themselves.
+		_capture = AudioServer.get_bus_effect(bus, 0)
+	else:
+		push_warning("No Mic audio bus: voice will not be sent.")
 	_update_hud()
 
 	$Connect.connect_requested.connect(_on_connect_requested)
@@ -49,6 +64,7 @@ func _ready() -> void:
 	$Client.peer_joined.connect(_on_peer_joined)
 	$Client.peer_left.connect(_on_peer_left)
 	$Client.peer_pose.connect(_on_peer_pose)
+	$Client.peer_voice.connect(_on_peer_voice)
 
 	var args := _user_args()
 	if args.has("server") or args.has("name"):
@@ -67,6 +83,8 @@ func _process(delta: float) -> void:
 		_offer_vr(delta)
 		return
 	_fall_and_land(delta)
+	_carry(delta)
+	_send_voice()
 	if not _in_vr:
 		_flat_move(delta)
 	var flags := FLAG_VR if _in_vr else 0
@@ -102,6 +120,8 @@ func _failed(reason: String) -> void:
 	_joined = false
 	for id: int in _peers.keys():
 		_on_peer_left(id)
+	for holder: Node3D in _held.keys():
+		_release(holder)
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	$Connect.failed(reason)
 	$Connect.show()
@@ -182,8 +202,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_SPACE:
 			_jump()
-		elif event.keycode == KEY_M:
+		elif event.keycode == KEY_V:
 			_toggle_mute()
+		elif event.keycode == KEY_E and not _in_vr:
+			_grab($XROrigin3D/Camera/HoldPoint, VIEW_GRAB_REACH)
 	if _in_vr:
 		return
 	if event is InputEventMouseButton and event.pressed:
@@ -201,11 +223,20 @@ func _unhandled_input(event: InputEvent) -> void:
 func _on_hand_button(button: String, right_hand: bool) -> void:
 	if not _joined:
 		return # A button press is how you join from inside the headset.
-	if button == "ax_button":
-		if right_hand:
-			_jump()
-		else:
-			_toggle_mute()
+	var hand: Node3D = $XROrigin3D/RightHand if right_hand else $XROrigin3D/LeftHand
+	match button:
+		"ax_button":
+			if right_hand:
+				_jump()
+			else:
+				_toggle_mute()
+		"grip_click", "trigger_click":
+			_grab(hand, HAND_GRAB_REACH)
+
+
+func _on_hand_release(button: String, right_hand: bool) -> void:
+	if button == "grip_click" or button == "trigger_click":
+		_release($XROrigin3D/RightHand if right_hand else $XROrigin3D/LeftHand)
 
 
 func _jump() -> void:
@@ -219,13 +250,73 @@ func _toggle_mute() -> void:
 	_update_hud()
 
 
-func _on_collected() -> void:
-	_found += 1
-	_update_hud()
-
-
 func _update_hud() -> void:
-	$XROrigin3D/Camera/Hud.text = "%s    Found %d" % ["Mic MUTED" if _muted else "Mic on", _found]
+	$XROrigin3D/Camera/MicIcon.texture = mic_muted_icon if _muted else mic_on_icon
+
+
+## Mic -> Opus -> the server. The capture buffer is drained even while muted,
+## so unmuting does not play back a backlog.
+func _send_voice() -> void:
+	if _capture == null:
+		return
+	var available := _capture.get_frames_available()
+	if available <= 0:
+		return
+	var captured := _capture.get_buffer(available)
+	if _muted:
+		return
+	var mono := PackedFloat32Array()
+	mono.resize(captured.size())
+	for i in captured.size():
+		mono[i] = (captured[i].x + captured[i].y) * 0.5
+	$Client.send_voice(mono)
+
+
+func _on_peer_voice(id: int, samples: PackedFloat32Array) -> void:
+	if _peers.has(id):
+		_peers[id].push_voice(samples)
+
+
+## Picking things up: whatever is closest to the hand, or to a point in front
+## of the camera on the desktop. Held objects are frozen and follow the holder;
+## letting go hands them the holder's speed, so they can be thrown. None of
+## this is networked, so what you move does not move for anybody else.
+func _grab(holder: Node3D, reach: float) -> void:
+	if _held.has(holder):
+		_release(holder)
+		return
+	var carried := _held.values()
+	var best: RigidBody3D = null
+	var nearest := reach
+	for body: RigidBody3D in get_tree().get_nodes_in_group("grabbable"):
+		var distance := body.global_position.distance_to(holder.global_position)
+		if distance < nearest and not carried.has(body):
+			best = body
+			nearest = distance
+	if best == null:
+		return
+	best.freeze = true
+	_held[holder] = best
+
+
+func _release(holder: Node3D) -> void:
+	if not _held.has(holder):
+		return
+	var body: RigidBody3D = _held[holder]
+	_held.erase(holder)
+	body.freeze = false
+	body.linear_velocity = _throw.get(body, Vector3.ZERO)
+	body.angular_velocity = Vector3.ZERO
+	_throw.erase(body)
+
+
+func _carry(delta: float) -> void:
+	for holder: Node3D in _held:
+		var body: RigidBody3D = _held[holder]
+		var was := body.global_position
+		body.global_transform = holder.global_transform
+		if delta > 0.0:
+			_throw[body] = (body.global_position - was) / delta
 
 
 ## The play space floats on whatever is under the player's head, so you can

@@ -16,6 +16,14 @@ use tokio::sync::mpsc::{UnboundedSender, unbounded_channel};
 const CERT_NAME: &str = "hearth";
 const CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
+/// What the Godot side pushes towards the server.
+#[derive(Debug)]
+pub enum Outgoing {
+    Pose(Pose),
+    /// One encoded Opus frame.
+    Voice(Vec<u8>),
+}
+
 #[derive(Debug)]
 pub enum Event {
     Connected { your_id: u16, tick_hz: u8 },
@@ -23,19 +31,20 @@ pub enum Event {
     PeerJoined { id: u16, name: String },
     PeerLeft { id: u16 },
     PeerPose { from: u16, pose: Pose },
+    PeerVoice { from: u16, frame: Vec<u8> },
     Disconnected(String),
 }
 
 pub struct Client {
     events: Receiver<Event>,
-    poses: UnboundedSender<Pose>,
+    outgoing: UnboundedSender<Outgoing>,
 }
 
 impl Client {
     /// Starts connecting in the background; failures arrive as `Disconnected`.
     pub fn connect(host: String, port: u16, name: String) -> Self {
         let (event_tx, events) = channel();
-        let (poses, pose_rx) = unbounded_channel();
+        let (outgoing, outgoing_rx) = unbounded_channel();
         std::thread::spawn(move || {
             let runtime = match tokio::runtime::Builder::new_current_thread().enable_all().build() {
                 Ok(runtime) => runtime,
@@ -44,21 +53,21 @@ impl Client {
                     return;
                 }
             };
-            let result = runtime.block_on(run(host, port, name, &event_tx, pose_rx));
+            let result = runtime.block_on(run(host, port, name, &event_tx, outgoing_rx));
             let _ = event_tx.send(Event::Disconnected(match result {
                 Ok(()) => "connection closed".into(),
                 Err(err) => format!("{err:#}"),
             }));
         });
-        Self { events, poses }
+        Self { events, outgoing }
     }
 
     pub fn poll(&self) -> Option<Event> {
         self.events.try_recv().ok()
     }
 
-    pub fn send_pose(&self, pose: Pose) {
-        let _ = self.poses.send(pose);
+    pub fn send(&self, message: Outgoing) {
+        let _ = self.outgoing.send(message);
     }
 }
 
@@ -67,7 +76,7 @@ async fn run(
     port: u16,
     name: String,
     events: &Sender<Event>,
-    mut poses: tokio::sync::mpsc::UnboundedReceiver<Pose>,
+    mut outgoing: tokio::sync::mpsc::UnboundedReceiver<Outgoing>,
 ) -> anyhow::Result<()> {
     hearth_protocol::validate_name(&name)?;
     let (endpoint, conn) = connect(&host, port).await?;
@@ -77,6 +86,7 @@ async fn run(
     Control::Hello { version: PROTOCOL_VERSION, name }.encode(&mut buf);
     send.write_all(&buf).await?;
 
+    let mut voice_seq = 0u16;
     loop {
         tokio::select! {
             msg = read_control(&mut recv) => match msg? {
@@ -89,14 +99,20 @@ async fn run(
                 Control::PeerLeft { id } => send_event(events, Event::PeerLeft { id })?,
                 other => anyhow::bail!("unexpected control message {other:?}"),
             },
-            datagram = conn.read_datagram() => {
-                // Voice is not implemented yet: VoiceRelay is ignored.
-                if let Ok(Datagram::PoseRelay { from, pose }) = Datagram::decode(&datagram?) {
-                    send_event(events, Event::PeerPose { from, pose })?;
+            datagram = conn.read_datagram() => match Datagram::decode(&datagram?) {
+                Ok(Datagram::PoseRelay { from, pose }) => send_event(events, Event::PeerPose { from, pose })?,
+                Ok(Datagram::VoiceRelay { from, frame, .. }) => {
+                    send_event(events, Event::PeerVoice { from, frame })?
                 }
-            }
-            pose = poses.recv() => match pose {
-                Some(pose) => { let _ = conn.send_datagram(Datagram::Pose(pose).encode().into()); }
+                _ => {}
+            },
+            message = outgoing.recv() => match message {
+                Some(Outgoing::Pose(pose)) => { let _ = conn.send_datagram(Datagram::Pose(pose).encode().into()); }
+                Some(Outgoing::Voice(frame)) => {
+                    voice_seq = voice_seq.wrapping_add(1);
+                    let voice = Datagram::Voice { seq: voice_seq, frame };
+                    let _ = conn.send_datagram(voice.encode().into());
+                }
                 // The Client handle was dropped.
                 None => {
                     conn.close(0u8.into(), b"bye");

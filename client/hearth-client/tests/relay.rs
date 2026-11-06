@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-use hearth_client::net::{Client, Event};
+use hearth_client::net::{Client, Event, Outgoing};
 use hearth_protocol::{Pose, RejectReason, Transform, flags};
 
 async fn next_event(client: &Client) -> Event {
@@ -37,9 +37,14 @@ async fn two_clients_see_each_other_and_exchange_poses() {
 
     let head = Transform::from_f32([0.0, 1.7, -0.5], [0.0, 0.0, 0.0, 1.0]);
     let sent = Pose { seq: 1, flags: flags::VR, head, left: head, right: head };
-    bob.send_pose(sent);
+    bob.send(Outgoing::Pose(sent));
     let Event::PeerPose { from, pose } = next_event(&ada).await else { panic!("expected a pose") };
     assert_eq!((from, pose), (2, sent));
+
+    // Voice goes the same way, round trip through the server's relay.
+    bob.send(Outgoing::Voice(vec![9, 8, 7]));
+    let Event::PeerVoice { from, frame } = next_event(&ada).await else { panic!("expected voice") };
+    assert_eq!((from, frame), (2, vec![9, 8, 7]));
 
     drop(bob);
     assert!(matches!(next_event(&ada).await, Event::PeerLeft { id: 2 }));

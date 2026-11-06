@@ -210,3 +210,38 @@ Hands sit on collision layer 2 so they never block that ray.
 The mic toggle is state and HUD only, because there is no mic yet (D14). It
 ships anyway: the HUD is where it has to be either way, and the state is what
 voice will read when it lands.
+
+## D22 — Voice is real Opus, and cmake is now a build requirement for the client
+
+This supersedes D14. The `opus` crate builds libopus with cmake, which D11 went
+out of its way to avoid for the server — but there is no pure-Rust Opus encoder,
+and the alternative was hand-rolling a codec (16 kHz ADPCM: worse sound, more
+bandwidth, and a protocol doc that no longer matches the name "Opus"). Only
+people building the client pay the cmake cost; players run the exe. On Windows
+`client/build.ps1` adds the default CMake install to `PATH` and picks the
+Visual Studio 2022 generator, because cmake otherwise chooses a generator it
+cannot find.
+
+The audio path: a Godot `AudioEffectCapture` on a muted "Mic" bus is drained
+every frame and handed to the extension as mono floats; Rust buffers them and
+emits one 20 ms Opus frame per 960 samples, so GDScript never has to care about
+frame boundaries. Incoming frames are decoded per speaker — Opus decoders are
+stateful, so a shared one would garble two people talking at once — and pushed
+into an `AudioStreamGenerator` on that player's head, which makes voices
+positional for free. The capture buffer is drained even while muted, so
+unmuting does not replay a backlog. There is no jitter buffer yet: frames play
+as they arrive.
+
+## D23 — Grabbing freezes the body and hands it back its speed
+
+Picking something up freezes the `RigidBody3D` and copies the holder's transform
+onto it each frame; letting go unfreezes it and sets `linear_velocity` from how
+far it travelled in the last frame, which is what makes throwing work without a
+physics joint. A joint would be more correct against walls, but needs tuning per
+mass and can explode when two hands fight over one body. On the desktop the
+"hand" is a point in front of the camera with a longer reach, so one code path
+serves both.
+
+The HUD is one icon, not text: an SVG mic that turns red and crossed out when
+muted. Text in a headset is either too small to read or too big to ignore, and
+a mute indicator is the one thing you want to check at a glance.

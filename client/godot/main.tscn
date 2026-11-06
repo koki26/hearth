@@ -1,9 +1,11 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://main.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://avatar.tscn" id="2_avatar"]
 [ext_resource type="PackedScene" path="res://connect.tscn" id="3_connect"]
 [ext_resource type="PackedScene" path="res://world.tscn" id="4_world"]
+[ext_resource type="Texture2D" path="res://icons/mic.svg" id="5_mic"]
+[ext_resource type="Texture2D" path="res://icons/mic_muted.svg" id="6_mic_muted"]
 
 [sub_resource type="BoxMesh" id="1_hand"]
 size = Vector3(0.08, 0.05, 0.12)
@@ -14,9 +16,13 @@ albedo_color = Color(0.9, 0.73, 0.4, 1)
 [sub_resource type="SphereShape3D" id="3_grip"]
 radius = 0.07
 
+[sub_resource type="AudioStreamMicrophone" id="4_microphone"]
+
 [node name="Main" type="Node3D"]
 script = ExtResource("1_main")
 avatar_scene = ExtResource("2_avatar")
+mic_on_icon = ExtResource("5_mic")
+mic_muted_icon = ExtResource("6_mic_muted")
 
 [node name="World" parent="." instance=ExtResource("4_world")]
 
@@ -24,12 +30,15 @@ avatar_scene = ExtResource("2_avatar")
 
 [node name="Camera" type="XRCamera3D" parent="XROrigin3D"]
 
-[node name="Hud" type="Label3D" parent="XROrigin3D/Camera"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.22, -0.8)
+[node name="MicIcon" type="Sprite3D" parent="XROrigin3D/Camera"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.26, -0.8)
 no_depth_test = true
 fixed_size = true
-pixel_size = 0.0007
-text = "Mic on"
+pixel_size = 0.0013
+texture = ExtResource("5_mic")
+
+[node name="HoldPoint" type="Node3D" parent="XROrigin3D/Camera"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.2, -0.22, -0.55)
 
 [node name="GroundRay" type="RayCast3D" parent="XROrigin3D"]
 enabled = false
@@ -68,6 +77,11 @@ freeze_mode = 1
 [node name="Shape" type="CollisionShape3D" parent="XROrigin3D/RightHand/Grip"]
 shape = SubResource("3_grip")
 
+[node name="Mic" type="AudioStreamPlayer" parent="."]
+stream = SubResource("4_microphone")
+autoplay = true
+bus = &"Mic"
+
 [node name="Peers" type="Node3D" parent="."]
 
 [node name="Connect" parent="." instance=ExtResource("3_connect")]
@@ -75,7 +89,7 @@ shape = SubResource("3_grip")
 [node name="Client" type="HearthClient" parent="."]
 
 [node name="Status" type="Label3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.2, -2)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, -2)
 billboard = 1
 pixel_size = 0.003
 text = "Hearth"

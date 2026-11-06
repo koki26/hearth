@@ -70,16 +70,17 @@ buttons work too) to join in VR with the name and address on the screen. **Play
 in VR** does the same from the monitor, and says so when no runtime answers. A
 headset that only shows up later is picked up within a second.
 
-|            | VR                    | Desktop                        |
-|------------|-----------------------|--------------------------------|
-| Move       | left stick            | WASD                           |
-| Turn, look | right stick           | mouse (click to grab, Esc frees) |
-| Jump       | **A**                 | **Space**                      |
-| Mute mic   | **X**                 | **M**                          |
-| Join       | either trigger        | the buttons on screen          |
+|             | VR                        | Desktop                          |
+|-------------|---------------------------|----------------------------------|
+| Move        | left stick                | WASD                             |
+| Turn, look  | right stick               | mouse (click to grab, Esc frees) |
+| Jump        | **A**                     | **Space**                        |
+| Mute mic    | **X**                     | **V**                            |
+| Pick up     | grip or trigger, near it  | **E**, standing close            |
+| Join        | either trigger            | the buttons on screen            |
 
-The mic state and how many gems you have picked up sit on a small HUD in front
-of you, in VR and on the desktop alike.
+A mic icon in front of you turns red and crossed out while you are muted — the
+only thing on the HUD.
 
 Any OpenXR runtime works — SteamVR, Oculus, Virtual Desktop, Monado. If SteamVR
 is already running, Hearth joins it instead of waking a different runtime and
@@ -106,6 +107,8 @@ and macOS, `cargo build --release -p hearth-client` and copy
 ## What you need
 
 - Rust 1.95+ ([rustup](https://rustup.rs))
+- To build the client: [CMake](https://cmake.org) and a Visual Studio C++
+  toolchain, which libopus needs. Players running the exe need neither.
 - [Godot 4.7](https://godotengine.org) to build or edit the client (players only
   need the exported exe)
 - For VR: a headset with any OpenXR runtime
@@ -139,10 +142,9 @@ until certificate pinning lands (decisions D3).
 
 Not there yet:
 
-- **Voice.** The protocol carries Opus frames and the server relays them, but
-  nothing captures or plays audio yet, so the mute button only flips the
-  indicator.
-- **Shared world objects.** Crates and pickups are local to each player.
+- **Shared world objects.** Crates and gems are local to each player.
+- **A jitter buffer.** Voice frames play as they arrive, so a bumpy connection
+  crackles.
 - More than one room, and legs.
 
 ## License

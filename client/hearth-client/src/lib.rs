@@ -3,6 +3,7 @@
 
 pub mod net;
 mod steamvr;
+pub mod voice;
 
 use std::time::{Duration, Instant};
 
@@ -35,12 +36,22 @@ pub struct HearthClient {
     /// Minimum gap between poses, from the server's `tick_hz`.
     interval: Duration,
     last_pose: Option<Instant>,
+    encoder: Option<voice::Encoder>,
+    decoders: voice::Decoders,
 }
 
 #[godot_api]
 impl INode for HearthClient {
     fn init(base: Base<Node>) -> Self {
-        Self { base, client: None, seq: 0, interval: Duration::from_millis(50), last_pose: None }
+        Self {
+            base,
+            client: None,
+            seq: 0,
+            interval: Duration::from_millis(50),
+            last_pose: None,
+            encoder: None,
+            decoders: voice::Decoders::default(),
+        }
     }
 
     fn process(&mut self, _delta: f64) {
@@ -59,7 +70,15 @@ impl INode for HearthClient {
                     self.signals().disconnected().emit(&GString::from(reason.as_str()));
                 }
                 net::Event::PeerJoined { id, name } => self.signals().peer_joined().emit(id as i32, &GString::from(name.as_str())),
-                net::Event::PeerLeft { id } => self.signals().peer_left().emit(id as i32),
+                net::Event::PeerLeft { id } => {
+                    self.decoders.forget(id);
+                    self.signals().peer_left().emit(id as i32);
+                }
+                net::Event::PeerVoice { from, frame } => {
+                    if let Some(pcm) = self.decoders.decode(from, &frame) {
+                        self.signals().peer_voice().emit(from as i32, &PackedFloat32Array::from(pcm.as_slice()));
+                    }
+                }
                 net::Event::PeerPose { from, pose } => self.signals().peer_pose().emit(
                     from as i32,
                     to_godot(pose.head),
@@ -87,6 +106,9 @@ impl HearthClient {
     /// `flags` bit 0 = peer is in VR, bits 1/2 = left/right hand tracked.
     #[signal]
     fn peer_pose(id: i32, head: Transform3D, left: Transform3D, right: Transform3D, flags: i32);
+    /// Decoded mono 48 kHz samples from one speaker.
+    #[signal]
+    fn peer_voice(id: i32, samples: PackedFloat32Array);
 
     /// Replaces any existing connection. Progress arrives as signals.
     #[func]
@@ -98,6 +120,31 @@ impl HearthClient {
     #[func]
     fn disconnect_from_server(&mut self) {
         self.client = None;
+    }
+
+    /// Captured mono 48 kHz samples; any length. Whole 20 ms frames are
+    /// encoded and sent, the rest waits for the next call.
+    #[func]
+    fn send_voice(&mut self, samples: PackedFloat32Array) {
+        let Some(client) = &self.client else { return };
+        if self.encoder.is_none() {
+            match voice::Encoder::new() {
+                Ok(encoder) => self.encoder = Some(encoder),
+                Err(err) => {
+                    godot_error!("no voice: {err:#}");
+                    return;
+                }
+            }
+        }
+        let encoder = self.encoder.as_mut().expect("just created");
+        for frame in encoder.push(samples.as_slice()) {
+            client.send(net::Outgoing::Voice(frame));
+        }
+    }
+
+    #[func]
+    fn voice_sample_rate(&self) -> i32 {
+        voice::SAMPLE_RATE as i32
     }
 
     #[func]
@@ -115,13 +162,13 @@ impl HearthClient {
         }
         self.last_pose = Some(now);
         self.seq = self.seq.wrapping_add(1);
-        client.send_pose(Pose {
+        client.send(net::Outgoing::Pose(Pose {
             seq: self.seq,
             flags: flags as u8,
             head: from_godot(head),
             left: from_godot(left),
             right: from_godot(right),
-        });
+        }));
     }
 }
 

@@ -9,6 +9,15 @@ param(
 # Native tools write progress to stderr, which "Stop" would treat as fatal.
 $ErrorActionPreference = "Continue"
 $root = Resolve-Path "$PSScriptRoot/.."
+
+# libopus is built from source with cmake, which is not on PATH after a default
+# install, and which otherwise picks a Visual Studio generator it cannot find.
+if (-not (Get-Command cmake -ErrorAction SilentlyContinue) -and (Test-Path "$env:ProgramFiles/CMake/bin/cmake.exe")) {
+	$env:PATH = "$env:ProgramFiles/CMake/bin;$env:PATH"
+}
+if (-not $env:CMAKE_GENERATOR -and (Test-Path "$env:ProgramFiles/Microsoft Visual Studio/2022")) {
+	$env:CMAKE_GENERATOR = "Visual Studio 17 2022"
+}
 $build = if ($Release -or $Export) { "release" } else { "debug" }
 
 cargo build -p hearth-client @(if ($build -eq "release") { "--release" })

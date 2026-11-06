@@ -7,9 +7,33 @@ extends Node3D
 
 const BODY_DROP := 0.5
 
+var _voice: AudioStreamGeneratorPlayback
 var _head := Transform3D.IDENTITY
 var _left := Transform3D.IDENTITY
 var _right := Transform3D.IDENTITY
+
+
+func _ready() -> void:
+	$Head/Voice.play()
+	_voice = $Head/Voice.get_stream_playback()
+
+
+func _exit_tree() -> void:
+	_voice = null # Otherwise Godot reports the playback still in use at exit.
+
+
+## Mono 48 kHz samples from this player, straight from the Opus decoder.
+func push_voice(samples: PackedFloat32Array) -> void:
+	if _voice == null:
+		return
+	var room := mini(samples.size(), _voice.get_frames_available())
+	if room <= 0:
+		return
+	var frames := PackedVector2Array()
+	frames.resize(room)
+	for i in room:
+		frames[i] = Vector2(samples[i], samples[i])
+	_voice.push_buffer(frames)
 
 
 func set_label(text: String) -> void:
