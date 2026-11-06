@@ -1,85 +1,108 @@
 # Hearth
 
-A minimal social VR space: a QUIC relay server and a Godot 4 VR client, both in
-Rust over one shared wire protocol.
+A small social VR space. Run a server, everyone joins it, and you see each
+other's head and hands move in real time.
 
-Two or more people put on a headset, join the same server and see each other's
-head and hands move in real time.
+Rust and Godot 4, QUIC over the wire, under 1500 lines all in.
 
-- **Server** — `server/hearth-server`, a QUIC relay for one room (16 players by
-  default). It validates every message and rate-limits each client.
-- **Client** — `client/hearth-client`, a Godot 4 GDExtension exposing a
-  `HearthClient` node, plus the Godot project in `client/godot`.
-- **Protocol** — `server/hearth-protocol`, used by both sides. Byte-level spec in
-  [protocol/PROTOCOL.md](protocol/PROTOCOL.md).
+## Host a server
 
-Poses are 33 bytes (head + both hands, quantized) sent as unreliable datagrams at
-20 Hz; joins and leaves go over a reliable QUIC stream.
+On Windows, double-click **`start.bat`**. It builds the server the first time,
+then opens this:
 
-## Requirements
+```
+┌─ Hearth Server ──────────────────┐
+│  Listening on 0.0.0.0:7777       │
+│  Friends connect to              │
+│      192.168.1.20:7777  [copy]   │
+│                                  │
+│  Port          [ 7777 ]          │
+│  Max players   [   16 ]          │
+│  Data folder   [ data  ]         │
+│                                  │
+│  [ Start ]  [ Save config ]      │
+│  ────────────────────────────    │
+│  Players (2/16)                  │
+│  1  Ada                          │
+│  2  Bob                          │
+└──────────────────────────────────┘
+```
 
-- Rust 1.94+ (`rustup`)
-- Godot 4.7 (for the client)
-- A headset with an OpenXR runtime (SteamVR, Oculus, Virtual Desktop, Monado…).
-  Without one, the client runs in a flat-screen fallback mode.
+Press **Start**, then give your friends the address next to *Friends connect to*.
+For them to reach you from outside your network, forward **UDP port 7777** to
+your machine.
 
-## Run the server
+No window wanted? `start.bat --noGUI` runs the same server in the console,
+reading `deploy/hearth.toml`. On Linux and macOS:
 
 ```sh
-cargo run -p hearth-server -- deploy/hearth.toml
+cargo run --release -p hearth-server -- deploy/hearth.toml
 ```
 
-It listens on UDP 7777 (IPv4). Settings are in `deploy/hearth.toml`; all keys are
-optional. `data_dir` holds the TLS certificate — keep it across restarts.
+## Join from the client
 
-## Run the client
+1. Build the extension: `client/build.ps1 -Release`
+   (Linux/macOS: `cargo build --release -p hearth-client` then copy
+   `target/release/libhearth_client.so` into `client/godot/bin/`)
+2. Open `client/godot` in Godot 4.7 and press **F5**.
+3. Type your name and the server address, click **Connect**, then put the
+   headset on.
 
-Build the extension and copy it into the Godot project:
-
-```powershell
-# Windows
-client/build.ps1            # add -Release for an optimized build
 ```
+┌─ Hearth ─────────────────┐
+│  Your name               │
+│  [ Ada               ]   │
+│  Server address          │
+│  [ 192.168.1.20:7777 ]   │
+│  [      Connect      ]   │
+└──────────────────────────┘
+```
+
+The address can be `host` or `host:port`; the port defaults to 7777, and your
+last name and address are remembered. To skip the screen entirely:
 
 ```sh
-# Linux / macOS
-cargo build --release -p hearth-client
-cp target/release/libhearth_client.so client/godot/bin/      # .dylib on macOS
+godot --path client/godot -- --server 192.168.1.20 --name Ada
 ```
 
-Then open `client/godot` in Godot and press F5, or run it directly:
+**No headset?** The client falls back to a flat window: click to capture the
+mouse, look with the mouse, move with WASD, Escape to release. Handy for testing
+two players on one machine.
+
+## What you need
+
+- Rust 1.95+ ([rustup](https://rustup.rs))
+- [Godot 4.7](https://godotengine.org) for the client
+- A headset with any OpenXR runtime (SteamVR, Oculus, Virtual Desktop, Monado…)
+
+## How it works
+
+| Piece | Where |
+|---|---|
+| Relay server, one room | `server/hearth-server` |
+| Server window | `server/hearth-server-gui` |
+| Wire protocol, used by both sides | `server/hearth-protocol` |
+| Godot extension (`HearthClient` node) | `client/hearth-client` |
+| The VR scene and its scripts | `client/godot` |
+
+A pose is head + both hands quantized into 33 bytes, sent as an unreliable QUIC
+datagram 20 times a second; joins and leaves go over a reliable stream. The
+server validates and rate-limits everything it forwards. The byte-level spec is
+[protocol/PROTOCOL.md](protocol/PROTOCOL.md), and the reasoning behind the design
+is in [docs/decisions.md](docs/decisions.md).
 
 ```sh
-godot --path client/godot -- --server 192.168.1.20 --port 7777 --name Ada
+cargo test --workspace   # protocol, quantization, and real clients against a real server
 ```
 
-Arguments after `--` are optional (defaults: `127.0.0.1`, `7777`, a random name).
-The same flags work in the editor under *Project → Project Settings → Run → Main
-Run Args*.
+## Heads up
 
-Controls: VR headsets track head and hands with no setup. Without a headset, click
-to capture the mouse, look with the mouse, move with WASD, release with Escape.
+The client **does not verify the server's certificate**, so somebody on the path
+could read or change the traffic. Keep it to a LAN, a VPN or a tunnel you trust
+until certificate pinning lands (decisions D3).
 
-## Security
-
-The client **accepts any server certificate**, so a man-in-the-middle can read and
-alter traffic. Use it on a LAN or over a VPN/tunnel you trust, not on the open
-internet, until trust-on-first-use pinning lands (see
-[docs/decisions.md](docs/decisions.md) D3).
-
-## Not implemented yet
-
-Voice (the protocol carries it, neither side captures or plays audio), more than
-one room, avatars beyond head and hands, and certificate pinning.
-
-## Tests
-
-```sh
-cargo test --workspace
-```
-
-Covers the wire format (including a fuzz-ish garbage pass), quantization error
-bounds, and both the hand-rolled and the real client against an in-process server.
+Not there yet: voice (the protocol carries it, nothing captures audio), more than
+one room, and avatars with more than a head and two hands.
 
 ## License
 
