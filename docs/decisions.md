@@ -160,3 +160,19 @@ which happens before any of our code runs.
 The join button is not one fixed binding either. The default OpenXR action map
 binds controllers differently per vendor, so trigger, grip and the face buttons
 all count.
+
+## D19 — The launcher keeps a running SteamVR, and locomotion is stick-based
+
+Creating an OpenXR instance on a different runtime makes an already-running
+SteamVR drop its session and shut down, which looks like Hearth closing SteamVR.
+`play.bat` therefore checks for `vrmonitor.exe` and points `XR_RUNTIME_JSON` at
+Steam's runtime when it finds it. The check has to live in the launcher, because
+the loader reads that variable while the engine starts. Starting the exe
+directly keeps the plain system behaviour.
+
+Movement is the conventional pair: left stick walks relative to where you look,
+right stick turns smoothly about the head rather than about the play-space
+origin, so the view does not swing. Both read `primary` and fall back to
+`secondary`, which is where the default action map puts a trackpad. Teleport and
+snap turning are the comfort options to add next if smooth turning makes anyone
+sick.

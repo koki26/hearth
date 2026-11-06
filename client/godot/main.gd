@@ -10,6 +10,9 @@ const FLAG_RIGHT := 4
 const FLAT_EYE_HEIGHT := 1.7
 const FLAT_SPEED := 3.0
 const MOUSE_SENSITIVITY := 0.003
+const VR_SPEED := 2.5
+const VR_TURN_DEG := 100.0
+const STICK_DEADZONE := 0.15
 
 @export var avatar_scene: PackedScene
 
@@ -46,6 +49,8 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	if _in_vr:
+		_vr_move(delta)
 	if not _joined:
 		_offer_vr(delta)
 		return
@@ -169,6 +174,32 @@ func _unhandled_input(event: InputEvent) -> void:
 		var camera: XRCamera3D = $XROrigin3D/Camera
 		camera.rotation.y -= event.relative.x * MOUSE_SENSITIVITY
 		camera.rotation.x = clampf(camera.rotation.x - event.relative.y * MOUSE_SENSITIVITY, -1.5, 1.5)
+
+
+## Left stick walks where you are looking, right stick turns smoothly around
+## your head so the view does not swing around the play space origin.
+func _vr_move(delta: float) -> void:
+	var origin: XROrigin3D = $XROrigin3D
+	var camera: XRCamera3D = $XROrigin3D/Camera
+
+	var stick := _stick($XROrigin3D/LeftHand)
+	if stick.length() > STICK_DEADZONE:
+		var move: Vector3 = camera.global_transform.basis * Vector3(stick.x, 0.0, -stick.y)
+		move.y = 0.0
+		if move.length() > 0.001:
+			origin.position += move.normalized() * minf(stick.length(), 1.0) * VR_SPEED * delta
+
+	var turn := _stick($XROrigin3D/RightHand).x
+	if absf(turn) > STICK_DEADZONE:
+		var spin := Basis(Vector3.UP, -turn * deg_to_rad(VR_TURN_DEG) * delta)
+		var head := camera.global_position
+		origin.global_transform = Transform3D(spin, head - spin * head) * origin.global_transform
+
+
+## Thumbstick, or the trackpad on controllers that have one instead.
+func _stick(hand: XRController3D) -> Vector2:
+	var stick: Vector2 = hand.get_vector2("primary")
+	return stick if stick.length() > STICK_DEADZONE else hand.get_vector2("secondary")
 
 
 func _flat_move(delta: float) -> void:

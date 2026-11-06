@@ -70,14 +70,15 @@ buttons work too) to join in VR with the name and address on the screen. **Play
 in VR** does the same from the monitor, and says so when no runtime answers. A
 headset that only shows up later is picked up within a second.
 
-Any OpenXR runtime works — SteamVR, Oculus, Virtual Desktop, Monado — and the
-client uses whichever one Windows currently has set as *the* OpenXR runtime.
-Virtual Desktop takes that slot while its streamer runs, so to insist on
-SteamVR:
+In VR the **left stick walks** you where you are looking and the **right stick
+turns** you smoothly around your own head. On the desktop it is WASD and the
+mouse.
 
-```
-play.bat --steamvr
-```
+Any OpenXR runtime works — SteamVR, Oculus, Virtual Desktop, Monado. `play.bat`
+picks SteamVR when SteamVR is already running, so starting Hearth never pulls
+the headset out of it; otherwise it takes whatever Windows has set as *the*
+OpenXR runtime. `play.bat --steamvr` insists on SteamVR even when it is not
+running yet. (Starting `dist\Hearth.exe` straight does no such detection.)
 
 **Play on desktop** keeps you in the window: click to capture the mouse, look
 with the mouse, move with WASD, Escape to release. Two desktop clients on one
