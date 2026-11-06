@@ -14,18 +14,18 @@ const MOUSE_SENSITIVITY := 0.003
 @export var avatar_scene: PackedScene
 
 var _xr: XRInterface
-var _want_vr := false
 var _in_vr := false
 var _joined := false
+var _xr_retry := 0.0
 var _peers := {}
 
 
 func _ready() -> void:
 	_xr = XRServer.find_interface("OpenXR")
-	if _xr and not _xr.is_initialized():
-		_xr = null
 	$XROrigin3D/Camera.position.y = FLAT_EYE_HEIGHT
-	$Connect.set_vr_available(_xr != null)
+	# Render to the headset right away, so you can pick VR while wearing it.
+	if _enter_vr():
+		_status("Pull a trigger to join as %s" % $Connect.summary())
 
 	$Connect.connect_requested.connect(_on_connect_requested)
 	$Client.connected.connect(_on_connected)
@@ -47,6 +47,7 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	if not _joined:
+		_offer_vr(delta)
 		return
 	if not _in_vr:
 		_flat_move(delta)
@@ -61,35 +62,70 @@ func _process(delta: float) -> void:
 
 
 func _on_connect_requested(host: String, port: int, player_name: String, use_vr: bool) -> void:
-	_want_vr = use_vr and _xr != null
+	if use_vr:
+		if not _enter_vr():
+			$Connect.failed("No headset found. Is your OpenXR runtime running?")
+			return
+	else:
+		_leave_vr()
 	$Client.connect_to_server(host, port, player_name)
 
 
 func _on_connected(your_id: int, _tick_hz: int) -> void:
 	_joined = true
 	$Connect.hide()
-	if _want_vr:
-		get_viewport().use_xr = true
-		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
-		$XROrigin3D/Camera.position.y = 0.0
-		_in_vr = true
-		_status("You are player %d. Put the headset on." % your_id)
+	if _in_vr:
+		_status("You are player %d." % your_id)
 	else:
-		_status("You are player %d. No headset: click to look, WASD to move." % your_id)
+		_status("You are player %d. Click to look, WASD to move." % your_id)
 
 
 func _failed(reason: String) -> void:
 	_joined = false
 	for id: int in _peers.keys():
 		_on_peer_left(id)
-	if _in_vr:
-		get_viewport().use_xr = false
-		$XROrigin3D/Camera.position.y = FLAT_EYE_HEIGHT
-		_in_vr = false
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	$Connect.failed(reason)
 	$Connect.show()
 	print(reason)
+
+
+## Rendering to the headset. A runtime can show up long after launch, so this
+## is retried while the connect screen is open.
+func _enter_vr() -> bool:
+	if _in_vr:
+		return true
+	if _xr == null or (not _xr.is_initialized() and not _xr.initialize()):
+		return false
+	get_viewport().use_xr = true
+	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
+	$XROrigin3D/Camera.position.y = 0.0
+	_in_vr = true
+	return true
+
+
+func _leave_vr() -> void:
+	if not _in_vr:
+		return
+	get_viewport().use_xr = false
+	$XROrigin3D/Camera.position.y = FLAT_EYE_HEIGHT
+	_in_vr = false
+
+
+## In the headset there is no mouse, so a trigger pull joins with whatever the
+## connect screen holds.
+func _offer_vr(delta: float) -> void:
+	if not _in_vr:
+		_xr_retry -= delta
+		if _xr_retry <= 0.0:
+			_xr_retry = 1.0
+			if _enter_vr():
+				_status("Pull a trigger to join as %s" % $Connect.summary())
+		return
+	for hand: XRController3D in [$XROrigin3D/LeftHand, $XROrigin3D/RightHand]:
+		if hand.is_button_pressed("trigger_click") or hand.get_float("trigger") > 0.6:
+			$Connect.join_in_vr()
+			return
 
 
 func _on_peer_joined(id: int, peer_name: String) -> void:

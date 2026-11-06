@@ -134,3 +134,14 @@ headset runtime may wake up even for a desktop player.
 
 The client ships as a single `dist/Hearth.exe` with the pack embedded, built by
 `client/build.ps1 -Export`, so sharing it is one file plus an address.
+
+## D17 — Render to the headset before joining, and let a trigger join
+
+`use_xr` used to be switched on only after the join succeeded, so the headset
+stayed black while the desktop window already showed the head tracking: the room
+was being rendered to the window, not to the HMD. It is now switched on as soon
+as a runtime answers — retried once a second while the connect screen is open,
+because a runtime often starts after the game does — and the headset shows the
+room with a prompt in front of you. Pulling either trigger joins with whatever
+the screen holds, so a mode can be picked with the headset on. Typing a new name
+or address still needs the monitor; the saved ones cover every later launch.

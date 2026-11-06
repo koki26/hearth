@@ -64,9 +64,11 @@ Run it, and it asks how you want to play:
 └────────────────────────────────────┘
 ```
 
-**Play in VR** needs a headset with any OpenXR runtime running (SteamVR, Oculus,
-Virtual Desktop, Monado…); the button is greyed out when none is found. Put the
-headset on after you click — the screen itself lives on the monitor.
+The headset starts showing the room as soon as a runtime answers, even before
+you join, so you can keep it on: **pull either trigger** to join in VR with the
+name and address on the screen. **Play in VR** does the same from the monitor,
+and says so if no OpenXR runtime (SteamVR, Oculus, Virtual Desktop, Monado…) is
+running. A headset that only appears later is picked up within a second.
 
 **Play on desktop** keeps you in the window: click to capture the mouse, look
 with the mouse, move with WASD, Escape to release. Two desktop clients on one

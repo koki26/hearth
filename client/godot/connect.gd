@@ -7,8 +7,6 @@ signal connect_requested(host: String, port: int, player_name: String, use_vr: b
 
 const SETTINGS_PATH := "user://settings.cfg"
 
-var _vr_available := false
-
 
 func _ready() -> void:
 	var settings := ConfigFile.new()
@@ -17,8 +15,8 @@ func _ready() -> void:
 	%PlayerName.text = settings.get_value("last", "name", "Player%d" % (randi() % 1000))
 	%JoinVR.pressed.connect(_on_join.bind(true))
 	%JoinDesktop.pressed.connect(_on_join.bind(false))
-	%Address.text_submitted.connect(func(_text: String) -> void: _on_join(_vr_available))
-	%PlayerName.text_submitted.connect(func(_text: String) -> void: _on_join(_vr_available))
+	%Address.text_submitted.connect(func(_text: String) -> void: _on_join(true))
+	%PlayerName.text_submitted.connect(func(_text: String) -> void: _on_join(true))
 
 
 func fill(host: String, port: int, player_name: String) -> void:
@@ -26,11 +24,15 @@ func fill(host: String, port: int, player_name: String) -> void:
 	%PlayerName.text = player_name
 
 
-func set_vr_available(available: bool) -> void:
-	_vr_available = available
-	%JoinVR.disabled = not available
-	%Message.text = "" if available else "No headset found - desktop only."
-	(%JoinVR if available else %JoinDesktop).grab_focus()
+## The headset may only show up later, so the VR button stays live and says so
+## when there is nothing to join with.
+func join_in_vr() -> void:
+	if not %JoinVR.disabled:
+		_on_join(true)
+
+
+func summary() -> String:
+	return "%s at %s" % [%PlayerName.text.strip_edges(), %Address.text.strip_edges()]
 
 
 func busy(text: String) -> void:
@@ -40,7 +42,7 @@ func busy(text: String) -> void:
 
 
 func failed(reason: String) -> void:
-	%JoinVR.disabled = not _vr_available
+	%JoinVR.disabled = false
 	%JoinDesktop.disabled = false
 	%Message.text = reason
 
