@@ -101,6 +101,19 @@ pub struct Account {
     /// a fast hash is enough; argon2 is for things people choose.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub recovery: Vec<String>,
+    /// When the terms and privacy notice were accepted, as proof of it.
+    /// 0 for accounts made before sign-up asked.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub terms_accepted: u64,
+    /// Asked for an email when the terms or privacy notice change. Off until
+    /// turned on, off again whenever they like, and only ever sent to a
+    /// confirmed address.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub policy_emails: bool,
+}
+
+fn is_zero(n: &u64) -> bool {
+    *n == 0
 }
 
 /// An address and whether its owner has clicked the link sent to it. Nothing
@@ -212,6 +225,8 @@ impl Accounts {
                 outgoing: Vec::new(),
                 email: None,
                 recovery: Vec::new(),
+                terms_accepted: now,
+                policy_emails: false,
             },
         );
         self.save();
@@ -298,6 +313,25 @@ impl Accounts {
         account.share_location = on;
         self.save();
         Ok(())
+    }
+
+    pub fn set_policy_emails(&mut self, me: u64, on: bool) -> Result<(), Refused> {
+        let account = self.by_id.get_mut(&me).ok_or(Refused::NoSuchAccount)?;
+        if account.policy_emails != on {
+            account.policy_emails = on;
+            self.save();
+        }
+        Ok(())
+    }
+
+    /// Handle and confirmed address of everybody who asked to hear about
+    /// changes to the terms or privacy notice.
+    pub fn policy_recipients(&self) -> Vec<(String, String)> {
+        self.by_id
+            .values()
+            .filter(|a| a.policy_emails)
+            .filter_map(|a| a.email.as_ref().filter(|e| e.verified).map(|e| (a.handle.clone(), e.address.clone())))
+            .collect()
     }
 
     pub fn set_display_name(&mut self, me: u64, name: &str) -> Result<(), Refused> {
@@ -465,6 +499,40 @@ pub fn password_is_usable(password: &str) -> bool {
     (MIN_PASSWORD..=MAX_PASSWORD).contains(&password.len())
 }
 
+/// Whole years between a `YYYY-MM-DD` birth date and `now` (UTC seconds),
+/// or `None` for a date that is malformed, not real, in the future or over
+/// 130 years ago. Only ever used to answer "old enough?": never stored.
+pub fn age_from_birthdate(birthdate: &str, now: u64) -> Option<u32> {
+    let mut parts = birthdate.trim().splitn(3, '-');
+    let mut next = |len: usize| parts.next().filter(|p| p.len() == len && p.bytes().all(|b| b.is_ascii_digit()));
+    let (y, m, d): (u32, u32, u32) = (next(4)?.parse().ok()?, next(2)?.parse().ok()?, next(2)?.parse().ok()?);
+    let leap = (y % 4 == 0 && y % 100 != 0) || y % 400 == 0;
+    let days_in = [31, if leap { 29 } else { 28 }, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    if !(1..=12).contains(&m) || d == 0 || d > days_in[m as usize - 1] {
+        return None;
+    }
+    let (ty, tm, td) = civil_date(now);
+    if (y, m, d) > (ty, tm, td) {
+        return None;
+    }
+    let age = ty - y - u32::from((m, d) > (tm, td));
+    (age <= 130).then_some(age)
+}
+
+/// Year, month and day of a Unix time in UTC (Howard Hinnant's algorithm).
+fn civil_date(now: u64) -> (u32, u32, u32) {
+    let z = (now / 86_400) as i64 + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = (doy - (153 * mp + 2) / 5 + 1) as u32;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 } as u32;
+    let y = (yoe + era * 400 + i64::from(m <= 2)) as u32;
+    (y, m, d)
+}
+
 /// How many recovery codes an account holds when they are (re)made.
 pub const RECOVERY_CODES: usize = 8;
 
@@ -498,6 +566,27 @@ pub fn hash_recovery(code: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn age_turns_over_on_the_birthday_and_not_a_day_before() {
+        let day = |y: i64, m: i64, d: i64| {
+            // Days from 1970-01-01, counted the slow way, as an independent check.
+            let leap = |y: i64| (y % 4 == 0 && y % 100 != 0) || y % 400 == 0;
+            let mut n = (1970..y).map(|y| if leap(y) { 366 } else { 365 }).sum::<i64>();
+            let months = [31, if leap(y) { 29 } else { 28 }, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+            n += months[..(m - 1) as usize].iter().sum::<i64>() + d - 1;
+            (n * 86_400 + 3600) as u64
+        };
+        assert_eq!(civil_date(day(2026, 11, 16)), (2026, 11, 16));
+        assert_eq!(civil_date(day(2024, 2, 29)), (2024, 2, 29));
+        assert_eq!(age_from_birthdate("2010-11-16", day(2026, 11, 16)), Some(16));
+        assert_eq!(age_from_birthdate("2010-11-17", day(2026, 11, 16)), Some(15));
+        assert_eq!(age_from_birthdate("2008-02-29", day(2026, 2, 28)), Some(17));
+        assert_eq!(age_from_birthdate("2008-02-29", day(2026, 3, 1)), Some(18));
+        for wrong in ["", "2010-1-16", "2010-13-01", "2011-02-29", "2010-04-31", "2030-01-01", "1800-01-01", "abcd-ef-gh"] {
+            assert_eq!(age_from_birthdate(wrong, day(2026, 11, 16)), None, "{wrong}");
+        }
+    }
 
     fn temp(who: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!("hearth-fireplace-{}-{who}", std::process::id()));

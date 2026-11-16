@@ -114,3 +114,34 @@ compromised, `people.json` or a backup leaked, the SMTP account taken over.
   ([ORACLE.md](ORACLE.md), step 7).
 * No analytics, no third-party fonts or scripts, no cookies. Keep it that
   way and you need no cookie banner and no consent records.
+
+## Changing the terms or the privacy notice
+
+The pages are built from `fireplace.toml` and the code, so a change ships
+with a release. When it matters to people (new data, a new purpose, a new
+processor, a shorter retention), tell the ones who asked:
+
+1. Write the letter: first line the subject, then the body in plain words --
+   what changed, from when, and that the full text is on `/terms` and
+   `/privacy` (the email links both and says how to stop these emails).
+
+   ```text
+   The privacy notice changes on 1 March
+   From 1 March, emails go through a new provider, Example Mail s.r.o. ...
+   ```
+
+2. Send it, from where `fireplace.toml` is:
+
+   ```sh
+   cd /opt/fireplace && sudo -u hearth ./fireplace admin policy-mail letter.txt
+   ```
+
+   It goes only to accounts that ticked *email me when the terms or privacy
+   notice change* **and** have a confirmed address; it prints how many were
+   sent. Nobody else is written to, and nothing else may be sent this way:
+   no news, no marketing. That consent covers these notices and nothing more.
+3. Send it **before** the change takes effect, and keep the letter as your
+   record.
+
+Under-age sign-ups never reach you: the Fireplace refuses an account below
+`min_age` (`[operator]` in `fireplace.toml`) and keeps no birth date.

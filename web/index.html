@@ -19,13 +19,6 @@
 </head>
 <body>
 <svg class="sprite" aria-hidden="true">
-  <symbol id="i-logo" viewBox="0 0 512 512">
-    <g fill="none" stroke="currentColor" stroke-width="40" stroke-linecap="round">
-      <path d="M136 376 V240 A120 120 0 0 1 376 240 V376"/><path d="M104 396 H408"/>
-    </g>
-    <path fill="#ffb366" d="M258 172 C266 218 300 238 312 272 C326 312 300 358 254 358 C210 358 188 324 194 292 C199 264 222 250 231 224 C240 246 250 251 256 243 C263 232 256 202 258 172 Z"/>
-    <path fill="#fff3d6" d="M254 256 C276 280 287 293 287 310 C287 328 272 341 254 341 C236 341 222 328 222 310 C222 293 233 280 254 256 Z"/>
-  </symbol>
   <symbol id="i-user" viewBox="0 0 64 64"><circle cx="32" cy="22" r="10"/><path d="M13 54a19 19 0 0 1 38 0"/></symbol>
     <symbol id="i-people" viewBox="0 0 64 64"><circle cx="25" cy="22" r="9"/><path d="M10 52a15 15 0 0 1 30 0M43 15a9 9 0 0 1 0 18M44 38a15 15 0 0 1 11 14"/></symbol>
     <symbol id="i-lock" viewBox="0 0 64 64"><rect x="14" y="29" width="36" height="26" rx="5"/><path d="M23 29v-8a9 9 0 0 1 18 0v8"/></symbol>
@@ -42,26 +35,61 @@
 <div class="auth" id="auth">
   <aside class="hero" aria-hidden="true">
     <div class="embers"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-    <svg class="hero-mark" viewBox="0 0 512 512">
-      <defs>
-        <linearGradient id="fire" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#ffe3b0"/><stop offset=".55" stop-color="#ffb366"/><stop offset="1" stop-color="#ff7a2f"/>
-        </linearGradient>
-      </defs>
-      <g fill="none" stroke="currentColor" stroke-width="28" stroke-linecap="round">
-        <path d="M136 376 V240 A120 120 0 0 1 376 240 V376"/><path d="M104 396 H408"/>
-      </g>
-      <g class="fire">
-        <path fill="url(#fire)" d="M258 172 C266 218 300 238 312 272 C326 312 300 358 254 358 C210 358 188 324 194 292 C199 264 222 250 231 224 C240 246 250 251 256 243 C263 232 256 202 258 172 Z"/>
-        <path class="core" fill="#fff3d6" d="M254 256 C276 280 287 293 287 310 C287 328 272 341 254 341 C236 341 222 328 222 310 C222 293 233 280 254 256 Z"/>
-      </g>
-    </svg>
+    <svg class="hero-mark" viewBox="70 90 372 360"><defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1d2456"/>
+      <stop offset="1" stop-color="#0b0e22"/>
+    </linearGradient>
+    <linearGradient id="stone" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#d4defe"/>
+      <stop offset="1" stop-color="#8a9de0"/>
+    </linearGradient>
+    <radialGradient id="box" cx="0.5" cy="0.82" r="0.75">
+      <stop offset="0" stop-color="#7a2c14"/>
+      <stop offset="0.45" stop-color="#3a1a22"/>
+      <stop offset="1" stop-color="#140f26"/>
+    </radialGradient>
+    <radialGradient id="spill" cx="0.5" cy="0.8" r="0.5">
+      <stop offset="0" stop-color="#ff8a3d" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#ff8a3d" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="outer" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffb04a"/>
+      <stop offset="1" stop-color="#f0491c"/>
+    </linearGradient>
+    <linearGradient id="inner" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffe08a"/>
+      <stop offset="1" stop-color="#ff9a2e"/>
+    </linearGradient>
+  </defs>
+
+  
+  <path d="M146 392V258a110 110 0 0 1 220 0v134z" fill="url(#box)"/>
+  <path d="M146 392V258a110 110 0 0 1 220 0v134" fill="none" stroke="url(#stone)" stroke-width="38"/>
+  <path d="M229 124h54l-8 52h-38z" fill="#eef2ff" stroke="#1a2050" stroke-width="5" stroke-linejoin="round"/>
+  <rect x="104" y="386" width="304" height="40" rx="14" fill="url(#stone)"/>
+
+  
+  <g fill="#6b3a26" stroke="#2a1410" stroke-width="5">
+    <rect x="186" y="356" width="140" height="22" rx="11" transform="rotate(-9 256 367)"/>
+    <rect x="186" y="356" width="140" height="22" rx="11" transform="rotate(9 256 367)"/>
+  </g>
+
+  
+  <g class="fire"><path d="M256 186c16 46 66 70 66 128c0 40-30 62-66 62s-66-22-66-62c0-32 18-52 34-72c3 20 11 32 22 36c-8-32-4-62 10-92z" fill="url(#outer)"/>
+  <path d="M260 246c9 30 40 46 40 80c0 28-20 44-44 44s-44-16-44-42c0-22 14-36 26-50c2 14 8 22 15 24c-4-20-2-38 7-56z" fill="url(#inner)"/>
+  <path d="M256 304c14 18 24 30 24 44c0 15-11 24-24 24s-24-9-24-24c0-14 10-26 24-44z" fill="#fff4d8"/></g>
+  <g class="sparks" fill="#ffc46b">
+    <circle cx="314" cy="208" r="6"/>
+    <circle cx="204" cy="230" r="4.5"/>
+    <circle cx="292" cy="170" r="3.5"/>
+  </g></svg>
     <p class="hero-line">Your name, your friends,<br>and a seat by every fire.</p>
     <p class="hero-small">One account for every Hearth server.</p>
   </aside>
   <main class="auth-side">
     <div class="auth-card">
-      <div class="brand"><svg class="brand-mark"><use href="#i-logo"/></svg><span>Hearth</span></div>
+      <div class="brand"><img class="brand-mark" src="favicon.svg" alt=""><span>Hearth</span></div>
       <h1 id="whoami">Welcome back</h1>
       <div class="tabs" role="tablist">
         <button role="tab" aria-selected="true" id="tab-in">Sign in</button>
@@ -74,10 +102,19 @@
         <label for="password">Password</label>
         <div class="field"><svg class="ic"><use href="#i-lock"/></svg>
           <input id="password" type="password" autocomplete="current-password" required minlength="8" maxlength="128"></div>
+        <div id="new-only" hidden>
+          <label for="birthdate">Date of birth</label>
+          <input id="birthdate" type="date" min="1900-01-01" aria-describedby="birth-why">
+          <p class="note" id="birth-why">Only to check you are at least <span id="min-age">16</span>. It is not stored.</p>
+          <label class="tick"><input type="checkbox" id="accept-terms">
+            <span>I accept the <a href="/terms" target="_blank">terms</a> and have read the
+              <a href="/privacy" target="_blank">privacy notice</a>.</span></label>
+          <label class="tick" id="policy-new-row"><input type="checkbox" id="policy-emails-new">
+            <span>Email me when the terms or privacy notice change. <small>Optional, needs a confirmed
+              email, and you can turn it off any time.</small></span></label>
+        </div>
         <button class="main wide" id="auth-go">Sign in</button>
         <p class="msg" id="auth-msg" role="status"></p>
-        <p class="note" id="new-terms" hidden>Making an account means you accept the <a href="/terms">terms</a>
-          and are at least <span id="min-age">16</span>. What is stored and why: <a href="/privacy">privacy</a>.</p>
         <p class="note"><a href="/reset">Forgot your password?</a></p>
       </form>
     </div>
@@ -99,7 +136,7 @@
 <!-- Signed in -->
 <div class="app" id="signed-in" hidden>
   <nav class="side" aria-label="Account">
-    <div class="brand"><svg class="brand-mark"><use href="#i-logo"/></svg><span>Hearth</span></div>
+    <div class="brand"><img class="brand-mark" src="favicon.svg" alt=""><span>Hearth</span></div>
     <ul class="nav">
       <li><button data-view="profile" aria-current="page"><svg class="ic"><use href="#i-user"/></svg>Profile</button></li>
       <li><button data-view="friends"><svg class="ic"><use href="#i-people"/></svg>Friends<b class="count" id="incoming-count" hidden></b></button></li>
@@ -182,7 +219,14 @@
 
     <section class="view" id="view-email" hidden>
       <header><h1>Email <span class="pill">optional</span></h1>
-        <p>Only for resetting your password and a short notice when your password or email changes. Never anything else.</p></header>
+        <p>For resetting your password, a short notice when your password or email changes, and, only if you
+          ask, word of changes to the terms or privacy notice. Never marketing.</p></header>
+      <div class="card">
+        <label class="switch"><input type="checkbox" id="policy-emails" role="switch"><span class="track"></span>
+          <span><b>Tell me when the terms or privacy notice change</b><small>Sent only to a confirmed address.
+            Turn it off whenever you like.</small></span></label>
+        <p class="msg" id="policy-msg" role="status"></p>
+      </div>
       <div class="card" id="email-box">
         <p class="state" id="email-state"></p>
         <form id="email-form" class="stack">

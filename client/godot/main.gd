@@ -149,6 +149,10 @@ var _fireplace: FireplaceClient
 ## else: it is never saved, and never leaves this file except to be sent.
 var _handle_typed := ""
 var _password_typed := ""
+## Only for making an account: sent once, and the Fireplace does not keep it.
+var _birthday_typed := ""
+var _accept_terms := false
+var _policy_emails := false
 ## What is typed into "Add a friend" on the People page.
 var _friend_typed := ""
 ## The address typed on the account page, before it is saved.
@@ -518,9 +522,18 @@ func _account_rows() -> Array:
 			"icon": "res://icons/lock.svg"},
 		{"label": ""},
 		{"id": "signin", "label": "Sign in", "button": true},
+		{"label": "New here? Also fill in:"},
+		{"id": "birthday", "label": "Birthday YYYY-MM-DD", "text": _birthday_typed, "icon": "res://icons/user.svg"},
+		{"id": "accept_terms", "label": "I accept terms & privacy", "toggle": _accept_terms,
+			"icon": "res://icons/check.svg"},
+	]
+	if bool(_fireplace.features.get("email", false)):
+		rows.append({"id": "policy_emails", "label": "Email me policy changes", "toggle": _policy_emails,
+			"icon": "res://icons/globe.svg"})
+	rows.append_array([
 		{"id": "signup", "label": "Create an account", "icon": "res://icons/plus.svg"},
 		{"id": "back", "label": "Play without one", "icon": "res://icons/back.svg"},
-	]
+	])
 	# Opened in the system browser: the reset form and the policies are web
 	# pages the Fireplace serves, and they are read once, not played in.
 	if _fireplace.can_reset():
@@ -529,7 +542,7 @@ func _account_rows() -> Array:
 		{"label": ""},
 		{"label": "An account is for friends and for finding"},
 		{"label": "them. A Flame never sees your password."},
-		{"label": "Making one means you accept the terms."},
+		{"label": "Your birthday only checks your age."},
 		{"id": "privacy", "label": "Privacy", "more": true},
 		{"id": "terms", "label": "Terms", "more": true},
 		{"label": _message, "warn": true} if _message != "" else {"label": ""},
@@ -663,8 +676,18 @@ func _on_panel_chosen(id: String) -> void:
 			_fireplace.sign_in(_handle_typed, _password_typed)
 			_refresh_panel()
 		"signup":
-			_message = "Making an account..."
-			_fireplace.create_account(_handle_typed, _password_typed)
+			if not _accept_terms:
+				_message = "Accept the terms and privacy first."
+			else:
+				_message = "Making an account..."
+				_fireplace.create_account(_handle_typed, _password_typed, _birthday_typed.strip_edges(),
+					_accept_terms, _policy_emails)
+			_refresh_panel()
+		"accept_terms":
+			_accept_terms = not _accept_terms
+			_refresh_panel()
+		"policy_emails":
+			_policy_emails = not _policy_emails
 			_refresh_panel()
 		"forgot":
 			OS.shell_open(_fireplace.page_url("reset"))
@@ -743,6 +766,8 @@ func _on_typed(text: String) -> void:
 		_ember_name = text
 	elif _editing == "handle":
 		_handle_typed = text
+	elif _editing == "birthday":
+		_birthday_typed = text
 	elif _editing == "password":
 		# Never saved and never written to the settings file: it goes to the
 		# Fireplace and nowhere else.

@@ -212,12 +212,43 @@ struct SignIn {
     password: String,
 }
 
+#[derive(serde::Deserialize)]
+struct NewAccount {
+    handle: String,
+    password: String,
+    /// `YYYY-MM-DD`. Checked against `min_age` and dropped: never stored or
+    /// logged (GDPR Art. 5(1)(c) and 8). Defaulted so that a client that
+    /// does not send it hears why, not a parse error.
+    #[serde(default)]
+    birthdate: String,
+    /// The terms and privacy notice: must be true.
+    #[serde(default)]
+    accept_terms: bool,
+    /// Optional: an email when the terms or privacy notice change.
+    #[serde(default)]
+    policy_emails: bool,
+}
+
 async fn create_account(
     State(state): State<Arc<Fireplace>>,
     Caller(from): Caller,
-    Json(body): Json<SignIn>,
+    Json(body): Json<NewAccount>,
 ) -> Result<Response, ApiError> {
     let now = token::now();
+    let min_age = state.config.operator.min_age;
+    match accounts::age_from_birthdate(&body.birthdate, now) {
+        None => return Err(bad("enter your date of birth as YYYY-MM-DD")),
+        Some(age) if age < u32::from(min_age) => {
+            return Err(ApiError::new(
+                StatusCode::FORBIDDEN,
+                &format!("you must be at least {min_age} to make an account here"),
+            ));
+        }
+        Some(_) => {}
+    }
+    if !body.accept_terms {
+        return Err(bad("accept the terms and the privacy notice to make an account"));
+    }
     let handle = body.handle.trim().to_owned();
     // Shape first, and the handle looked up before anything is hashed: a
     // typo must not cost an hour of the quota, and a name that is taken must
@@ -242,6 +273,7 @@ async fn create_account(
         let mut accounts = state.accounts.lock().unwrap();
         let id = accounts.create(&handle, hashed, now, state.max_accounts)?;
         accounts.set_recovery(id, hashes)?;
+        accounts.set_policy_emails(id, body.policy_emails)?;
         (id, accounts.get(id).expect("just made").token_epoch)
     };
     tracing::info!(id, %handle, "a new account");
@@ -345,6 +377,7 @@ async fn me(State(state): State<Arc<Fireplace>>, headers: HeaderMap) -> Result<J
         "email": account.email.as_ref().map(|e| &e.address),
         "email_verified": account.email.as_ref().is_some_and(|e| e.verified),
         "recovery_codes_left": account.recovery.len(),
+        "policy_emails": account.policy_emails,
     })))
 }
 
@@ -374,6 +407,8 @@ async fn export(State(state): State<Arc<Fireplace>>, headers: HeaderMap) -> Resu
         "outgoing": people(&account.outgoing),
         "email": account.email,
         "recovery_codes_left": account.recovery.len(),
+        "terms_accepted": account.terms_accepted,
+        "policy_emails": account.policy_emails,
         "password": "stored only as an argon2id hash, which is not included",
         "presence_in_memory": seen.map(|w| json!({
             "flame": w.flame, "ember": w.ember, "ember_name": w.ember_name, "world": w.world, "at": w.at,
@@ -450,7 +485,8 @@ async fn new_recovery_codes(
 
 #[derive(serde::Deserialize)]
 struct Sharing {
-    share_location: bool,
+    share_location: Option<bool>,
+    policy_emails: Option<bool>,
 }
 
 async fn settings(
@@ -459,13 +495,20 @@ async fn settings(
     Json(body): Json<Sharing>,
 ) -> Result<Json<Value>, ApiError> {
     let id = signed_in(&state, &headers)?;
-    state.accounts.lock().unwrap().set_sharing(id, body.share_location)?;
-    // Off means off: what was already reported stops being visible at once,
-    // rather than lingering until its heartbeat runs out.
-    if !body.share_location {
-        state.presence.lock().unwrap().clear(id);
+    let mut accounts = state.accounts.lock().unwrap();
+    if let Some(on) = body.policy_emails {
+        accounts.set_policy_emails(id, on)?;
     }
-    Ok(Json(json!({ "share_location": body.share_location })))
+    if let Some(on) = body.share_location {
+        accounts.set_sharing(id, on)?;
+        // Off means off: what was already reported stops being visible at
+        // once, rather than lingering until its heartbeat runs out.
+        if !on {
+            state.presence.lock().unwrap().clear(id);
+        }
+    }
+    let account = accounts.get(id).ok_or_else(unauthorised)?;
+    Ok(Json(json!({ "share_location": account.share_location, "policy_emails": account.policy_emails })))
 }
 
 /// Friends, with where they are, and the requests waiting on either side.

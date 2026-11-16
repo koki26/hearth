@@ -21,6 +21,7 @@ async fn main() -> Result<()> {
         println!("fireplace [fireplace.toml]");
         println!("fireplace admin reset-password <handle> [fireplace.toml]");
         println!("fireplace admin test-mail <address> [fireplace.toml]");
+        println!("fireplace admin policy-mail <letter.txt> [fireplace.toml]");
         return Ok(());
     }
     if args.first().is_some_and(|a| a == "admin") {
@@ -82,7 +83,9 @@ fn read_config(path: &str) -> Result<Config> {
 /// in `data/`, and nothing about it is stored, so there is nothing to write.
 async fn admin(args: &[String]) -> Result<()> {
     let (Some(command), Some(what)) = (args.first(), args.get(1)) else {
-        anyhow::bail!("fireplace admin reset-password <handle> | test-mail <address> [fireplace.toml]");
+        anyhow::bail!(
+            "fireplace admin reset-password <handle> | test-mail <address> | policy-mail <letter.txt> [fireplace.toml]"
+        );
     };
     let config = read_config(args.get(2).map_or("fireplace.toml", String::as_str))?;
     match command.as_str() {
@@ -122,6 +125,36 @@ async fn admin(args: &[String]) -> Result<()> {
                     std::process::exit(1);
                 }
             }
+        }
+        // Tells everybody who asked that the terms or privacy notice changed.
+        // The file's first line is the subject, the rest the body.
+        "policy-mail" => {
+            let text = std::fs::read_to_string(what).with_context(|| format!("could not read {what}"))?;
+            let (subject, body) = text.split_once('\n').unwrap_or((&text, ""));
+            if subject.trim().is_empty() || body.trim().is_empty() {
+                anyhow::bail!("{what}: the first line is the subject, then the body; one of them is empty");
+            }
+            if !config.data_dir.join("people.json").exists() {
+                anyhow::bail!("no accounts in {}: run this where fireplace.toml is", config.data_dir.display());
+            }
+            let accounts = hearth_fireplace::accounts::Accounts::open(&config.data_dir)?;
+            let mailer = hearth_fireplace::mail::Mailer::new(&config)?;
+            let (mut sent, mut failed) = (0, 0);
+            for (handle, address) in accounts.policy_recipients() {
+                match mailer.send_now(&address, mailer.policy_letter(&handle, subject, body)).await {
+                    Ok(_) => sent += 1,
+                    Err(err) => {
+                        failed += 1;
+                        // The handle, not the address: addresses stay out of logs.
+                        eprintln!("not sent to {handle}: {err:#}");
+                    }
+                }
+            }
+            println!("sent {sent}, failed {failed}");
+            if failed > 0 {
+                std::process::exit(1);
+            }
+            Ok(())
         }
         other => anyhow::bail!("no admin command called {other:?}"),
     }

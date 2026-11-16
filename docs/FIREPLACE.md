@@ -34,7 +34,7 @@ business.
 
 | | |
 |---|---|
-| `POST /accounts` | `{"handle": "ada", "password": "..."}` → `201` |
+| `POST /accounts` | `{"handle": "ada", "password": "...", "birthdate": "1990-05-04", "accept_terms": true, "policy_emails": false}` → `201`; under `min_age` → `403` |
 | `POST /sessions` | the same body → `200` |
 | `POST /sessions/refresh` | `{"refresh": "v1...."}` → `200` |
 | `GET /me` | → `{"id", "handle", "display_name", "share_location", "friends"}` |
@@ -69,6 +69,14 @@ The first three answer with the same thing:
 ```json
 { "id": 7, "handle": "Ada", "access": "v1.…", "refresh": "v1.…", "expires_in": 3600 }
 ```
+
+A new account needs a real `birthdate` at least `min_age` years ago and
+`accept_terms: true`. The birth date is checked and dropped, never stored or
+logged; when the terms were accepted is stored, as the record of it.
+`policy_emails` is optional and off by default: it asks for an email when the
+terms or privacy notice change, sent only to a confirmed address by
+`fireplace admin policy-mail <letter.txt>` (first line the subject, the rest
+the body). `POST /settings` turns it off again.
 
 `POST /accounts` also carries `"recovery_codes"`: eight codes, shown this
 once and kept only as hashes. `GET /me` also says `email`, `email_verified`
@@ -186,7 +194,7 @@ An account may have 256 friends and 64 requests waiting.
 | | |
 |---|---|
 | `POST /presence` | `{"flame", "ember", "ember_name", "world"}`, or `{}` to clear → `204` |
-| `POST /settings` | `{"share_location": false}` → `200` |
+| `POST /settings` | `{"share_location": false}` and/or `{"policy_emails": true}` → `200` with both |
 
 **A client says where it is; a Flame never does.** A Flame that had to tell
 the Fireplace who was in it would put this server in the path of every match,

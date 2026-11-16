@@ -422,6 +422,24 @@ impl Mailer {
         }
     }
 
+    /// A change to the terms or privacy notice, in the operator's words, to
+    /// somebody who asked to hear about it. Says how to stop them.
+    pub fn policy_letter(&self, handle: &str, subject: &str, text: &str) -> Letter {
+        let url = &self.public_url;
+        Letter {
+            kind: "policy",
+            subject: format!("Hearth: {}", subject.trim()),
+            body: format!(
+                "Hello {handle},\n\n{}\n\nThe terms: {url}/terms\nThe privacy notice: {url}/privacy\n\n\
+                 -- \nYou get this because the Hearth account \"{handle}\" asked for an email when the terms or \
+                 the privacy notice change. To stop them, turn that off on your account page: {url}/\n\
+                 Tento e-mail dostáváš, protože si účet „{handle}“ vyžádal upozornění na změny podmínek nebo \
+                 zásad ochrany soukromí. Vypnout to můžeš na stránce účtu: {url}/\n",
+                text.trim()
+            ),
+        }
+    }
+
     pub fn test_letter(&self) -> Letter {
         Letter {
             kind: "test",

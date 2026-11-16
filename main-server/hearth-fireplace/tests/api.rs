@@ -46,7 +46,7 @@ async fn call(
 /// Makes an account and returns its access token.
 async fn join(app: &Router, handle: &str) -> String {
     let (status, body) =
-        call(app, "POST", "/accounts", None, json!({"handle": handle, "password": "a long one"})).await;
+        call(app, "POST", "/accounts", None, json!({"handle": handle, "password": "a long one", "birthdate": "1990-05-04", "accept_terms": true})).await;
     assert_eq!(status, StatusCode::CREATED, "{body}");
     body["access"].as_str().unwrap().to_owned()
 }
@@ -71,7 +71,7 @@ async fn the_health_check_still_answers_ok() {
 async fn an_account_is_made_signed_in_to_and_refused_twice() {
     let (app, _dir) = fireplace("accounts");
     let (status, made) =
-        call(&app, "POST", "/accounts", None, json!({"handle": "Ada", "password": "a long one"})).await;
+        call(&app, "POST", "/accounts", None, json!({"handle": "Ada", "password": "a long one", "birthdate": "1990-05-04", "accept_terms": true})).await;
     assert_eq!(status, StatusCode::CREATED);
     assert_eq!(made["handle"], "Ada");
     assert!(made["access"].as_str().unwrap().starts_with("v1."));
@@ -79,11 +79,14 @@ async fn an_account_is_made_signed_in_to_and_refused_twice() {
 
     // The same handle, in any case, is taken.
     let (status, _) =
-        call(&app, "POST", "/accounts", None, json!({"handle": "ada", "password": "another one"})).await;
+        call(&app, "POST", "/accounts", None, json!({"handle": "ada", "password": "another one", "birthdate": "1990-05-04", "accept_terms": true})).await;
     assert_eq!(status, StatusCode::CONFLICT);
     // And nonsense is refused before anything is hashed.
     for bad in
-        [json!({"handle": "a", "password": "a long one"}), json!({"handle": "ada2", "password": "short"})]
+        [
+            json!({"handle": "a", "password": "a long one", "birthdate": "1990-05-04", "accept_terms": true}),
+            json!({"handle": "ada2", "password": "short", "birthdate": "1990-05-04", "accept_terms": true}),
+        ]
     {
         let (status, _) = call(&app, "POST", "/accounts", None, bad).await;
         assert_eq!(status, StatusCode::BAD_REQUEST);
@@ -117,7 +120,7 @@ async fn signing_in_with_the_wrong_password_says_the_same_as_an_unknown_handle()
 async fn a_saved_token_buys_a_fresh_hour_and_an_access_token_does_not() {
     let (app, _dir) = fireplace("refresh");
     let (_, made) =
-        call(&app, "POST", "/accounts", None, json!({"handle": "ada", "password": "a long one"})).await;
+        call(&app, "POST", "/accounts", None, json!({"handle": "ada", "password": "a long one", "birthdate": "1990-05-04", "accept_terms": true})).await;
     let (status, fresh) =
         call(&app, "POST", "/sessions/refresh", None, json!({"refresh": made["refresh"]})).await;
     assert_eq!(status, StatusCode::OK);
@@ -448,7 +451,7 @@ fn letters(state: &Fireplace, kind: &str) -> usize {
 /// Makes an account with a confirmed address and returns what making it said.
 async fn join_with_email(app: &Router, state: &Fireplace, handle: &str, address: &str) -> Value {
     let (_, made) =
-        call(app, "POST", "/accounts", None, json!({"handle": handle, "password": "a long one"})).await;
+        call(app, "POST", "/accounts", None, json!({"handle": handle, "password": "a long one", "birthdate": "1990-05-04", "accept_terms": true})).await;
     let access = made["access"].as_str().unwrap();
     let (status, _) =
         call(app, "POST", "/me/email", Some(access), json!({"password": "a long one", "email": address}))
@@ -463,7 +466,7 @@ async fn join_with_email(app: &Router, state: &Fireplace, handle: &str, address:
 async fn email_is_optional_and_a_server_without_it_says_so_cleanly() {
     let (app, _dir) = fireplace("no-mail");
     let (status, made) =
-        call(&app, "POST", "/accounts", None, json!({"handle": "ada", "password": "a long one"})).await;
+        call(&app, "POST", "/accounts", None, json!({"handle": "ada", "password": "a long one", "birthdate": "1990-05-04", "accept_terms": true})).await;
     assert_eq!(status, StatusCode::CREATED, "a handle and a password are still all it takes");
     assert_eq!(made["recovery_codes"].as_array().unwrap().len(), 8, "and everybody gets recovery codes");
     let access = made["access"].as_str().unwrap();
@@ -500,7 +503,7 @@ async fn email_is_optional_and_a_server_without_it_says_so_cleanly() {
 async fn an_address_must_be_confirmed_before_it_can_reset_anything() {
     let (app, state) = fireplace_with_mail("verify-first");
     let (_, made) =
-        call(&app, "POST", "/accounts", None, json!({"handle": "ada", "password": "a long one"})).await;
+        call(&app, "POST", "/accounts", None, json!({"handle": "ada", "password": "a long one", "birthdate": "1990-05-04", "accept_terms": true})).await;
     let access = made["access"].as_str().unwrap();
     for (password, email, want) in [
         ("wrong one!", "ada@example.org", StatusCode::UNAUTHORIZED),
@@ -616,7 +619,7 @@ async fn reset_requests_are_limited_per_address_and_per_account() {
 async fn a_recovery_code_works_once_and_a_new_set_replaces_the_old() {
     let (app, _dir) = fireplace("recovery");
     let (_, made) =
-        call(&app, "POST", "/accounts", None, json!({"handle": "ada", "password": "a long one"})).await;
+        call(&app, "POST", "/accounts", None, json!({"handle": "ada", "password": "a long one", "birthdate": "1990-05-04", "accept_terms": true})).await;
     let codes: Vec<String> =
         made["recovery_codes"].as_array().unwrap().iter().map(|c| c.as_str().unwrap().to_owned()).collect();
     let recover = |code: &str, password: &str| {
@@ -826,4 +829,54 @@ async fn the_account_page_is_there_even_with_no_web_folder() {
     let missing =
         app.clone().oneshot(Request::builder().uri("/nope.txt").body(Body::empty()).unwrap()).await.unwrap();
     assert_eq!(missing.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn nobody_under_the_minimum_age_gets_an_account_and_the_date_is_not_kept() {
+    let (app, dir) = fireplace("age");
+    let account = |birthdate: &str| json!({"handle": "kid", "password": "a long one", "birthdate": birthdate, "accept_terms": true});
+    // Config::default() says 16, so a 2025 birthday is too young; no date, or a
+    // date that is not one, is refused before anything else.
+    let (status, body) = call(&app, "POST", "/accounts", None, account("2025-01-01")).await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
+    assert!(body["error"].as_str().unwrap().contains("16"));
+    for wrong in [json!({"handle": "kid", "password": "a long one"}), account("2009-02-30"), account("soon")] {
+        let (status, _) = call(&app, "POST", "/accounts", None, wrong).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+    let (status, _) = call(&app, "POST", "/accounts", None, account("1990-05-04")).await;
+    assert_eq!(status, StatusCode::CREATED);
+    let stored = std::fs::read_to_string(dir.join("people.json")).unwrap();
+    assert!(!stored.contains("1990"), "the birth date must not be stored");
+}
+
+#[tokio::test]
+async fn the_terms_must_be_accepted_and_policy_emails_are_a_choice_that_can_be_undone() {
+    let (app, dir) = fireplace("terms");
+    let base = json!({"handle": "ada", "password": "a long one", "birthdate": "1990-05-04"});
+    let (status, body) = call(&app, "POST", "/accounts", None, base.clone()).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+    assert!(body["error"].as_str().unwrap().contains("terms"));
+
+    let mut asked = base.clone();
+    asked["accept_terms"] = json!(true);
+    asked["policy_emails"] = json!(true);
+    let (status, made) = call(&app, "POST", "/accounts", None, asked).await;
+    assert_eq!(status, StatusCode::CREATED);
+    let access = made["access"].as_str().unwrap();
+    let (_, me) = call(&app, "GET", "/me", Some(access), Value::Null).await;
+    assert_eq!(me["policy_emails"], json!(true));
+    let (_, export) = call(&app, "GET", "/me/export", Some(access), Value::Null).await;
+    assert!(export["terms_accepted"].as_u64().unwrap() > 0, "acceptance is recorded");
+
+    // Off again, and sharing is left as it was by a body that does not mention it.
+    let (status, back) = call(&app, "POST", "/settings", Some(access), json!({"policy_emails": false})).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(back, json!({"share_location": true, "policy_emails": false}));
+
+    // Without a confirmed address there is nobody to write to anyway.
+    call(&app, "POST", "/settings", Some(access), json!({"policy_emails": true})).await;
+    drop(app);
+    let accounts = hearth_fireplace::accounts::Accounts::open(&dir).unwrap();
+    assert!(accounts.policy_recipients().is_empty());
 }

@@ -27,7 +27,7 @@ h2 { font-size: 1.15rem; margin: 0 0 12px; display: flex; align-items: center; g
 .ic { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 5.5;
       stroke-linecap: round; stroke-linejoin: round; }
 .brand { display: flex; align-items: center; gap: 10px; font: 600 1.25rem var(--serif); }
-.brand-mark { width: 30px; height: 30px; color: var(--stone); }
+.brand-mark { width: 32px; height: 32px; border-radius: 8px; }
 
 /* --- fields and buttons --------------------------------------------------- */
 label { display: block; font-size: .82rem; font-weight: 500; color: var(--dim); margin: 14px 0 6px; }
@@ -50,8 +50,7 @@ button:hover { border-color: color-mix(in srgb, var(--stone) 40%, var(--line)); 
 button:active { transform: scale(.97); }
 button:focus-visible { outline: 2px solid var(--fire); outline-offset: 2px; }
 button.main { background: var(--fire); border-color: var(--fire); color: var(--on-fire); font-weight: 600; }
-button.main:hover { background: color-mix(in srgb, var(--fire) 88%, #fff);
-                    box-shadow: 0 6px 20px -8px color-mix(in srgb, var(--ember) 80%, transparent); }
+button.main:hover { background: color-mix(in srgb, var(--fire) 88%, #fff); }
 button.danger { background: transparent; color: var(--red); border-color: color-mix(in srgb, var(--red) 50%, transparent); }
 button.danger:hover { background: color-mix(in srgb, var(--red) 12%, transparent); }
 button:disabled { opacity: .5; cursor: default; transform: none; }
@@ -81,8 +80,9 @@ button.wide { width: 100%; margin-top: 22px; padding: 12px; }
                background: radial-gradient(50% 80% at 50% 100%, rgba(255, 122, 47, .16), transparent 70%); }
 .hero-mark { width: min(300px, 60%); color: #aec2ff; position: relative; z-index: 1;
              filter: drop-shadow(0 0 40px rgba(255, 179, 102, .25)); animation: enter .9s var(--ease) both; }
-.fire { transform-origin: 254px 358px; animation: flicker 3.2s ease-in-out infinite; }
-.core { transform-origin: 254px 341px; animation: flicker 2.1s ease-in-out infinite reverse; }
+.fire { transform-origin: 256px 376px; animation: flicker 3.2s ease-in-out infinite; }
+.sparks circle { animation: twinkle 2.4s ease-in-out infinite; }
+.sparks circle:nth-child(2) { animation-delay: .8s; } .sparks circle:nth-child(3) { animation-delay: 1.6s; }
 .hero-line { font: 500 1.7rem/1.3 var(--serif); margin: 28px 0 8px; position: relative; z-index: 1;
              animation: enter .9s .12s var(--ease) both; }
 .hero-small { color: #8f97bd; margin: 0; position: relative; z-index: 1; animation: enter .9s .22s var(--ease) both; }
@@ -110,7 +110,19 @@ button.wide { width: 100%; margin-top: 22px; padding: 12px; }
 .tabs button { position: relative; background: transparent; border: 0; color: var(--dim); padding: 8px; }
 .tabs button[aria-selected="true"] { color: var(--text); }
 .tabs button:active { transform: none; }
-#new-terms:not([hidden]) { animation: rise .3s var(--ease); }
+#new-only:not([hidden]) { animation: rise .3s var(--ease); }
+#new-only .note { margin-top: 6px; }
+.tick { display: flex; gap: 10px; align-items: flex-start; margin: 14px 0 0; color: var(--text); font-size: .88rem;
+        font-weight: 400; line-height: 1.45; cursor: pointer; }
+.tick input { appearance: none; flex: none; width: 18px; height: 18px; margin: 1px 0 0; padding: 0; border-radius: 5px;
+              border: 1.5px solid var(--dim); background: var(--bg); display: grid; place-items: center; cursor: pointer;
+              transition: background .15s, border-color .15s; }
+.tick input::after { content: ""; width: 5px; height: 9px; margin-top: -2px; border: solid var(--on-fire);
+                     border-width: 0 2px 2px 0; rotate: 45deg; scale: 0; transition: scale .18s var(--ease); }
+.tick input:checked { background: var(--fire); border-color: var(--fire); }
+.tick input:checked::after { scale: 1; }
+.tick input:focus-visible { outline: 2px solid var(--fire); outline-offset: 2px; box-shadow: none; }
+.tick small { display: block; color: var(--dim); font-size: .8rem; margin-top: 2px; }
 .auth-card .note { margin-top: 14px; }
 footer { display: flex; gap: 18px; justify-content: center; margin-top: 40px; font-size: .85rem; }
 footer a { color: var(--dim); text-decoration: none; }
@@ -235,6 +247,7 @@ footer a:hover { color: var(--text); }
   50% { transform: scale(1.02, .97) skewX(1deg); }
   75% { transform: scale(.98, 1.03) skewX(-.5deg); }
 }
+@keyframes twinkle { 50% { opacity: .25; } }
 @keyframes ember {
   0% { opacity: 0; transform: translate(0, 0); }
   10% { opacity: 1; }

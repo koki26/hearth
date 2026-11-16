@@ -66,8 +66,8 @@ func _run() -> void:
 	var ada := _client(where)
 	var bob := _client(where)
 
-	ada.create_account(ada_handle, "a long enough one")
-	bob.create_account(bob_handle, "a long enough one")
+	ada.create_account(ada_handle, "a long enough one", "1990-05-04", true, false)
+	bob.create_account(bob_handle, "a long enough one", "1990-05-04", true, false)
 	await _settle()
 	_check(ada.is_signed_in() and bob.is_signed_in(), "two accounts made and signed in")
 	if not ada.is_signed_in():

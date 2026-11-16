@@ -132,8 +132,11 @@ func base_url() -> String:
 
 # --- signing in -------------------------------------------------------------
 
-func create_account(new_handle: String, password: String) -> void:
-	_send("POST", "/accounts", {"handle": new_handle, "password": password}, "signin")
+## The birth date is checked against the Fireplace's minimum age and not kept.
+func create_account(new_handle: String, password: String, birthdate: String,
+		accept_terms: bool, policy_emails: bool) -> void:
+	_send("POST", "/accounts", {"handle": new_handle, "password": password, "birthdate": birthdate,
+		"accept_terms": accept_terms, "policy_emails": policy_emails}, "signin")
 
 
 func sign_in(as_handle: String, password: String) -> void:

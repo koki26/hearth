@@ -56,7 +56,7 @@ const STYLE: &str = "
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.6 system-ui,-apple-system,'Segoe UI',sans-serif}
 main{max-width:40rem;margin:0 auto;padding:3rem 16px;animation:rise .5s cubic-bezier(.2,.7,.2,1) both}
 h1,h2{font-family:'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;font-weight:600}
-h1{font-size:1.9rem;margin:0 0 1.5rem;display:flex;align-items:center;gap:12px}h1 svg{width:34px;height:34px;flex:none;color:var(--stone)}
+h1{font-size:1.9rem;margin:0 0 1.5rem;display:flex;align-items:center;gap:12px}h1 img{width:40px;height:40px;flex:none;border-radius:10px}
 h2{font-size:1.15rem;margin:0 0 .5rem}section{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:1.2rem 1.4rem;margin:1rem 0}
 label{display:block;margin:.9rem 0 .3rem;font-size:.82rem;font-weight:500;color:var(--muted)}
 input{width:100%;padding:.7rem .8rem;font:inherit;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--fg)}
@@ -69,8 +69,8 @@ footer a{color:var(--muted);text-decoration:none}footer a:hover{color:var(--fg)}
 @keyframes rise{from{opacity:0;transform:translateY(10px)}}@media (prefers-reduced-motion:reduce){main{animation:none}}
 ";
 
-/// The logo's arch and flame, as on the account page.
-const MARK: &str = r##"<svg viewBox="0 0 512 512" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="40" stroke-linecap="round"><path d="M136 376V240a120 120 0 0 1 240 0v136"/><path d="M104 396h304"/></g><path fill="#ffb366" d="M258 172C266 218 300 238 312 272C326 312 300 358 254 358C210 358 188 324 194 292C199 264 222 250 231 224C240 246 250 251 256 243C263 232 256 202 258 172Z"/></svg>"##;
+/// The logo, which the account page serves (built in, see `api::built_in_web`).
+const MARK: &str = "<img src=\"/favicon.svg\" alt=\"\">";
 
 fn page(status: StatusCode, title: &str, body: &str) -> Response {
     let html = format!(
@@ -412,7 +412,11 @@ pub fn privacy_html(config: &crate::Config) -> String {
          <li>Your handle, display name, and when the account was made.</li>\
          <li>Your password and recovery codes, only as one-way hashes.</li>\
          <li>Your friends, friend requests, and whether friends may see which server you are on.</li>\
-         <li>Your email and whether it is confirmed, only if you add one.</li></ul>\
+         <li>Your email and whether it is confirmed, only if you add one.</li>\
+         <li>When you accepted the terms and this notice, as a record that you did.</li>\
+         <li>Whether you asked for an email when the terms or this notice change.</li></ul>\
+         <p>Your <strong>date of birth</strong> is asked once, when you make an account, only to check that \
+         you are old enough. It is used for that check and then thrown away: never stored, never logged.</p>\
          <p>Kept in memory only, and gone on restart: which server you are on (if you share it, for 2 minutes \
          after your game last said so), and counters of attempts per IP address (at most an hour) that stop \
          people guessing passwords. IP addresses are not written to disk or logs.</p>\
@@ -422,8 +426,11 @@ pub fn privacy_html(config: &crate::Config) -> String {
          for it to work.</p></section>\
          <section><h2>Why, and on what basis</h2><p>To run your account and send the emails above: performance \
          of the service you asked for (GDPR Art. 6(1)(b)). The attempt counters: our legitimate interest in \
-         keeping accounts safe (Art. 6(1)(f)). Nothing is based on consent, and nothing is decided about you \
-         automatically.</p>{email_part}</section>\
+         keeping accounts safe (Art. 6(1)(f)). The age check: keeping to the minimum age for using an online \
+         service without a parent's consent (Art. 8); below it an account is refused, not made. Emails about \
+         changes to the terms or this notice, if this server sends email: only if you ask for them (consent, \
+         Art. 6(1)(a)), and you can withdraw that on the account page at any time, as easily as you gave it. \
+         Nothing is decided about you automatically beyond the age check.</p>{email_part}</section>\
          <section><h2>How long</h2><p>Until you delete your account, which deletes it at once. Backups roll it \
          out within {days} days. Reset links last 30 minutes.</p></section>\
          <section><h2>Your rights</h2><p>You can see everything stored about you and take it with you \
@@ -448,13 +455,16 @@ async fn terms(State(state): State<Arc<Fireplace>>) -> Response {
         "terms",
         &format!(
             "<section><ul>\
-             <li>You must be at least <strong>{age}</strong> years old to make an account.</li>\
+             <li>You must be at least <strong>{age}</strong> years old to make an account. You are asked for \
+             your date of birth to check this; it is not kept.</li>\
              <li>This account server is run by {who}, free and as it is, with no promise that it will always be \
              here. Keep your recovery codes somewhere safe.</li>\
              <li>Game servers (Flames) are run by other people. What happens on one is theirs, not this server's.</li>\
              <li>Do not attack this server, make accounts in bulk, or use it to harass anybody. Accounts that do \
              may be removed.</li>\
              <li>You can delete your account whenever you like, from the account page.</li>\
+             <li>When these terms or the privacy notice change in a way that matters, they are updated here, and \
+             if you asked for it and have a confirmed email, you are told by email too.</li>\
              <li>What is stored and why: <a href=\"/privacy\">privacy</a>.</li></ul></section>",
             age = op.min_age,
         ),

@@ -7,6 +7,7 @@ const store = {
 };
 const $ = (id) => document.getElementById(id);
 let creating = false;
+let minAge = 16;
 
 async function api(method, path, body) {
   const headers = { "Content-Type": "application/json" };
@@ -49,7 +50,9 @@ function setTab(newAccount) {
   $("auth-go").textContent = newAccount ? "Create account" : "Sign in";
   $("whoami").textContent = newAccount ? "Pull up a chair" : "Welcome back";
   $("password").autocomplete = newAccount ? "new-password" : "current-password";
-  $("new-terms").hidden = !newAccount;
+  $("new-only").hidden = !newAccount;
+  $("birthdate").required = $("accept-terms").required = newAccount;
+  $("birthdate").max = new Date().toISOString().slice(0, 10);
   say("auth-msg", "", true);
 }
 $("tab-in").onclick = () => setTab(false);
@@ -58,8 +61,15 @@ $("tab-new").onclick = () => setTab(true);
 $("auth-form").onsubmit = async (e) => {
   e.preventDefault();
   try {
-    const made = await api("POST", creating ? "/accounts" : "/sessions",
-      { handle: $("handle").value.trim(), password: $("password").value });
+    const body = { handle: $("handle").value.trim(), password: $("password").value };
+    if (creating) {
+      // Checked here to answer at once; the Fireplace checks again and decides.
+      if (ageOn($("birthdate").value) < minAge) return say("auth-msg", "You must be at least " + minAge + " to make an account.");
+      Object.assign(body, { birthdate: $("birthdate").value, accept_terms: $("accept-terms").checked,
+        policy_emails: $("policy-emails-new").checked });
+    }
+    const made = await api("POST", creating ? "/accounts" : "/sessions", body);
+    $("birthdate").value = "";
     keep(made);
     $("password").value = "";
     await load();
@@ -77,6 +87,7 @@ async function load() {
   $("avatar").textContent = initial(me.display_name || me.handle);
   $("display").value = me.display_name;
   $("share").checked = me.share_location;
+  $("policy-emails").checked = me.policy_emails;
   $("email").value = me.email || "";
   $("email-state").textContent = !me.email ? "No email on this account."
     : me.email_verified ? "Confirmed." : "Waiting for you to open the link we sent.";
@@ -152,6 +163,14 @@ $("name-form").onsubmit = async (e) => {
   } catch (err) { say("name-msg", err.message); }
 };
 
+$("policy-emails").onchange = async () => {
+  const on = $("policy-emails").checked;
+  try {
+    await api("POST", "/settings", { policy_emails: on });
+    say("policy-msg", on ? "On. You will hear about changes at your confirmed address." : "Off. No more of these.", true);
+  } catch (err) { say("policy-msg", err.message); $("policy-emails").checked = !on; }
+};
+
 $("share").onchange = async () => {
   try { await api("POST", "/settings", { share_location: $("share").checked }); say("name-msg", "", true); }
   catch (err) { say("name-msg", err.message); $("share").checked = !$("share").checked; }
@@ -182,6 +201,8 @@ if (store.get("access") || store.get("refresh")) load().catch(signOut);
 
 fetch("/features").then((r) => r.json()).then((f) => {
   $("email-nav").hidden = !f.email;
+  $("policy-new-row").hidden = !f.email;
+  minAge = f.min_age;
   $("min-age").textContent = f.min_age;
 }).catch(() => {});
 
@@ -235,3 +256,10 @@ function show(view) {
   window.scrollTo(0, 0);
 }
 for (const b of document.querySelectorAll(".nav button")) b.onclick = () => show(b.dataset.view);
+
+/** Whole years from a YYYY-MM-DD date to today, in the browser's calendar. */
+function ageOn(date) {
+  const [y, m, d] = date.split("-").map(Number);
+  const now = new Date();
+  return now.getFullYear() - y - ((now.getMonth() + 1 < m || (now.getMonth() + 1 === m && now.getDate() < d)) ? 1 : 0);
+}
