@@ -523,6 +523,7 @@ func _account_rows() -> Array:
 		{"label": ""},
 		{"id": "signin", "label": "Sign in", "button": true},
 		{"label": "New here? Also fill in:"},
+		{"id": "email", "label": "Email", "text": _email_typed, "icon": "res://icons/send.svg"},
 		{"id": "birthday", "label": "Birthday YYYY-MM-DD", "text": _birthday_typed, "icon": "res://icons/user.svg"},
 		{"id": "accept_terms", "label": "I accept terms & privacy", "toggle": _accept_terms,
 			"icon": "res://icons/check.svg"},
@@ -680,8 +681,8 @@ func _on_panel_chosen(id: String) -> void:
 				_message = "Accept the terms and privacy first."
 			else:
 				_message = "Making an account..."
-				_fireplace.create_account(_handle_typed, _password_typed, _birthday_typed.strip_edges(),
-					_accept_terms, _policy_emails)
+				_fireplace.create_account(_handle_typed, _password_typed, _email_typed.strip_edges(),
+					_birthday_typed.strip_edges(), _accept_terms, _policy_emails)
 			_refresh_panel()
 		"accept_terms":
 			_accept_terms = not _accept_terms

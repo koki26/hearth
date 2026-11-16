@@ -15,13 +15,13 @@ your details is enough at this size.
 | | |
 |---|---|
 | **Controller** | `[operator] name`, `contact_email` |
-| **Purpose** | Player accounts for Hearth: signing in, friends, where friends are, getting back into an account |
+| **Purpose** | Player accounts for Hearth: signing in, friends, where friends are, getting back into an account; account security (confirming sign-ins from new IP addresses, stopping abuse) |
 | **People** | Players who make an account |
-| **Data** | handle, display name, creation time; password and recovery codes as one-way hashes; friends and requests; location-sharing setting; optional email and whether it is confirmed. In memory only: which server a friend-visible player is on (2 minutes), attempt counters keyed by IP (up to an hour) |
-| **Lawful basis** | Performance of the service, Art. 6(1)(b), for the account and its emails; legitimate interest, Art. 6(1)(f), for the attempt counters against password guessing |
-| **Recipients** | Nobody. Game servers see a display name and a per-server number. The mail provider, if any, as a processor |
+| **Data** | handle, display name, creation time, display-name change times (30 days); password and recovery codes as one-way hashes; friends and requests; location-sharing setting; email (required where email is on) and whether it is confirmed; uploaded picture (redrawn as a 256px JPEG); terms acceptance time; policy-email choice; **IP addresses signed in from, with first and last use (90 days after last use)**; account suspensions and blocked IPs, with reason, end and the admin who set them. In memory only: which server a friend-visible player is on (2 minutes), attempt counters keyed by IP (up to an hour). Date of birth: checked at sign-up, never stored |
+| **Lawful basis** | Performance of the service, Art. 6(1)(b), for the account, its email and picture; legitimate interest, Art. 6(1)(f), for sign-in IP addresses, new-place confirmation, attempt counters, display-name limits and bans; consent, Art. 6(1)(a), for policy-change emails; Art. 7(1)/6(1)(c) for the terms acceptance record |
+| **Recipients** | Nobody outside. Inside: admins see accounts, emails and sign-in IPs to stop abuse. Game servers see a display name, picture and a per-server number. The mail provider, if any, as a processor |
 | **Transfers outside the EU** | None, if the server and the mail provider are in the EU. Check both |
-| **Retention** | Until the account is deleted; unconfirmed email 7 days; backups `backup_days` (14) |
+| **Retention** | Until the account is deleted; sign-in IPs 90 days after last use; display-name change times 30 days; unconfirmed email 7 days; IP blocks until they end (or until lifted, if "for good"); backups `backup_days` (14) |
 | **Security** | TLS in front (Caddy); argon2id passwords; signed tokens; data readable by the service user only; backups encrypted off the box; SMTP password in a 0600 file |
 
 ### The mail server: yours or somebody else's
@@ -109,7 +109,14 @@ compromised, `people.json` or a backup leaked, the SMTP account taken over.
 * Logs never contain an email, password, token or reset link. There is a test
   for it (`no_address_password_or_token_ever_reaches_the_log`). Keep it
   passing.
-* IP addresses are only in memory, for rate limiting, and gone on restart.
+* IP addresses are kept per account only where a player signs in, for 90 days
+  after each was last used, and only for security. They are never written to
+  the log, and the player can see their own on the account page.
+* The legitimate-interest balance for those IPs, written down: the purpose is
+  stopping account takeover and abuse; the data is the address and two
+  times; it is visible to the player and the admins only; it goes after 90
+  days; a player can object by writing to you. Keep that reasoning with this
+  record.
 * Backups: encrypted on your own machine, the last `backup_days` only
   ([ORACLE.md](ORACLE.md), step 7).
 * No analytics, no third-party fonts or scripts, no cookies. Keep it that
@@ -145,3 +152,31 @@ processor, a shorter retention), tell the ones who asked:
 
 Under-age sign-ups never reach you: the Fireplace refuses an account below
 `min_age` (`[operator]` in `fireplace.toml`) and keeps no birth date.
+
+## Admins
+
+The first admin is made on the server, as the service user, while there is
+no admin at all:
+
+```sh
+cd /opt/fireplace && sudo -u hearth ./fireplace admin make-admin <handle>
+```
+
+It signs a 30-minute link with the server's own key and hands it to the
+running Fireplace over loopback, which only accepts it from the machine
+itself and only while nobody is an admin. If the last admin deletes their
+account (or every admin is removed), the command works again.
+
+Admins then use the **Admin** page on the account site. They can see every
+account, its email and its sign-in IP addresses; suspend an account for a
+time or for good, with a reason the person is shown; lift it; sign an
+account out everywhere; make or remove admins; delete accounts; and block or
+unblock IP addresses. A blocked address is turned away before anything else
+runs and is shown how long and why. For a flood that is really an attack,
+block it in the firewall or in Caddy as well: the Fireplace answers a
+blocked address cheaply, but it still answers.
+
+Every admin action is in the log with who did what to which account number,
+never with an IP address. Admins see personal data: give the role only to
+people you trust with it, and tell them it is for stopping abuse and nothing
+else.

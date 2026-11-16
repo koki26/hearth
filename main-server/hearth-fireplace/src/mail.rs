@@ -422,6 +422,30 @@ impl Mailer {
         }
     }
 
+    /// Somebody with the password is signing in from an address this account
+    /// has not used. Nothing happens until the owner says it was them.
+    pub fn new_place_letter(&self, handle: &str, ip: &str, link: &str) -> Letter {
+        let url = &self.public_url;
+        Letter {
+            kind: "place",
+            subject: "Hearth: was this you? / byl/a jsi to ty?".into(),
+            body: format!(
+                "Somebody just signed in to the Hearth account \"{handle}\" with the right password, from an \
+                 address it has not used before: {ip}\n\n\
+                 If it was you, confirm it here, then sign in again:\n\n{link}\n\n\
+                 The link works for 30 minutes. If it was NOT you, do not open it: change your password \
+                 at {url}/reset -- whoever it was has your password, but cannot get in without this email.\n\n\
+                 ---\n\n\
+                 Někdo se právě přihlásil k účtu Hearth „{handle}“ se správným heslem, z adresy, kterou účet \
+                 ještě nepoužil: {ip}\n\n\
+                 Pokud jsi to byl/a ty, potvrď to zde a přihlas se znovu:\n\n{link}\n\n\
+                 Odkaz platí 30 minut. Pokud jsi to NEBYL/A ty, neotvírej ho a změň si heslo na \
+                 {url}/reset -- ten někdo zná tvé heslo, ale bez tohoto e-mailu se dovnitř nedostane.\n{}",
+                footer(url)
+            ),
+        }
+    }
+
     /// A change to the terms or privacy notice, in the operator's words, to
     /// somebody who asked to hear about it. Says how to stop them.
     pub fn policy_letter(&self, handle: &str, subject: &str, text: &str) -> Letter {

@@ -17,6 +17,8 @@ path = "src/main.rs"
 anyhow.workspace = true
 argon2 = "0.6.0"
 hearth-protocol.workspace = true
+# Pictures are decoded and re-encoded, never stored as sent (src/avatar.rs).
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp", "gif"] }
 axum = "0.8.9"
 base64 = "0.23.1"
 # rustls with ring and webpki roots only: no OpenSSL, no aws-lc, no CMake, so

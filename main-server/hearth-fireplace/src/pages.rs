@@ -34,6 +34,7 @@ pub fn routes() -> Router<Arc<Fireplace>> {
         .route("/reset/{token}", get(new_password_page).post(set_new_password))
         .route("/recover", axum::routing::post(recover))
         .route("/verify/{token}", get(verify))
+        .route("/confirm-sign-in/{token}", get(confirm_sign_in))
         .route("/privacy", get(privacy))
         .route("/terms", get(terms))
 }
@@ -64,6 +65,7 @@ input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px color-m
 button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 button{margin-top:1.1rem;padding:.65rem 1.2rem;font:inherit;font-weight:600;border:0;border-radius:10px;background:var(--accent);color:var(--on);cursor:pointer;transition:transform .12s}
 button:active{transform:scale(.97)}p.muted{color:var(--muted)}a{color:var(--accent)}code{word-break:break-all}
+table{width:100%;border-collapse:collapse;font-size:.88rem;min-width:36rem}th,td{text-align:left;vertical-align:top;padding:.55rem .6rem;border-top:1px solid var(--line)}th{color:var(--muted);font-weight:500;border-top:0}.scroll{overflow-x:auto;margin:0 -.4rem}ul{padding-left:1.2rem}li{margin:.3rem 0}
 footer{margin-top:2.5rem;font-size:.85rem;display:flex;gap:18px;justify-content:center;flex-wrap:wrap}
 footer a{color:var(--muted);text-decoration:none}footer a:hover{color:var(--fg)}
 @keyframes rise{from{opacity:0;transform:translateY(10px)}}@media (prefers-reduced-motion:reduce){main{animation:none}}
@@ -366,6 +368,51 @@ async fn verify(State(state): State<Arc<Fireplace>>, Path(raw): Path<String>) ->
     }
 }
 
+// --- a new place, confirmed ---------------------------------------------------
+
+/// The owner says the new address was them: it becomes a known place.
+async fn confirm_sign_in(State(state): State<Arc<Fireplace>>, Path(raw): Path<String>) -> Response {
+    let now = token::now();
+    let confirmed = state.keys.verify_link(&raw, "place", now).is_ok_and(|claims| {
+        let mut accounts = state.accounts.lock().unwrap();
+        let current = accounts.get(claims.sub).is_some_and(|a| a.token_epoch == claims.epoch);
+        if current {
+            accounts.remember_place(claims.sub, &claims.email, now, true);
+        }
+        current
+    });
+    if confirmed {
+        said(StatusCode::OK, "sign-in confirmed", "Thank you. That place is yours now: go back and sign in again.")
+    } else {
+        said(
+            StatusCode::GONE,
+            "sign-in",
+            "This link has run out, or the password was changed since. Sign in again to get a new one.",
+        )
+    }
+}
+
+// --- banned -------------------------------------------------------------------
+
+/// What a banned address, or a suspended account, is shown: for how long and why.
+pub fn banned_page(title: &str, ban: &accounts::Ban) -> Response {
+    let until = if ban.until == 0 {
+        "<p>This is <strong>for good</strong>.</p>".to_owned()
+    } else {
+        format!("<p>Until <strong>{}</strong>.</p>", esc(&accounts::when(ban.until)))
+    };
+    page(
+        StatusCode::FORBIDDEN,
+        title,
+        &format!(
+            "<section>{until}<p class=\"muted\">Reason</p><p>{}</p></section>\
+             <section><p class=\"muted\">If you think this is a mistake, write to whoever runs this server \
+             (see <a href=\"/privacy\">privacy</a>), and say when it happened.</p></section>",
+            esc(&ban.reason)
+        ),
+    )
+}
+
 // --- what this server does with your data -------------------------------------
 
 async fn privacy(State(state): State<Arc<Fireplace>>) -> Response {
@@ -388,57 +435,99 @@ pub fn privacy_html(config: &crate::Config) -> String {
         )
     };
     let mail = &config.mail;
-    let email_part = match mail.backend {
-        Backend::None => "<p>This server sends no email and never asks for an address.</p>".to_owned(),
-        _ => format!(
-            "<p>Adding an email is <strong>optional</strong>. It is used only to send a password reset link you \
-             ask for and a short notice when your password or email changes. Never marketing, never shared. \
-             An address you do not confirm within 7 days is deleted; removing it deletes it at once.</p>\
-             <p>Emails are sent through <code>{host}</code>, {who}</p>",
-            host = esc(&mail.smtp.host),
-            who = if mail.provider.trim().is_empty() {
-                "run by the controller.".to_owned()
-            } else {
-                format!(
-                    "run by {}, which handles them on the controller's behalf as a processor (GDPR Art. 28).",
-                    esc(&mail.provider)
-                )
-            },
+    let mailing = !matches!(mail.backend, Backend::None);
+    let sender = if mail.provider.trim().is_empty() {
+        format!("through <code>{}</code>, run by the controller", esc(&mail.smtp.host))
+    } else {
+        format!(
+            "through <code>{}</code>, run by {}, which handles them for the controller as a processor (GDPR Art. 28)",
+            esc(&mail.smtp.host),
+            esc(&mail.provider)
+        )
+    };
+    // One row per thing kept: what, what for, on what basis, how long.
+    let row = |what: &str, why: &str, basis: &str, how_long: &str| {
+        format!("<tr><td>{what}</td><td>{why}</td><td>{basis}</td><td>{how_long}</td></tr>")
+    };
+    let contract = "Contract: running the account you asked for (Art. 6(1)(b))";
+    let security = "Legitimate interest in keeping accounts safe (Art. 6(1)(f))";
+    let until_deleted = "Until you delete your account";
+    let mut rows = vec![
+        row("Handle, display name, when the account was made", "Your account, and what other players see", contract, until_deleted),
+        row("Password and recovery codes, only as one-way hashes", "Signing in, and getting back in", contract, until_deleted),
+        row("Friends, friend requests, whether friends may see which server you are on", "Friends", contract, until_deleted),
+        row("When you last changed your display name (the last 30 days)", "Display names change at most twice a month, so nobody can hide behind a new one every day", security, "30 days"),
+        row("Your picture, if you upload one", "Shown to other players next to your name; anyone with its link can see it", contract, "Until you remove it or delete your account"),
+        row("When you accepted the terms and this notice", "A record that you did", "Legal obligation to be able to show it (Art. 6(1)(c), 7(1))", until_deleted),
+        row(
+            "<strong>IP addresses you signed in from</strong>, with when each was first and last used",
+            "Security: a sign-in from an address you have not used makes us email you to confirm it was you, \
+             so a stolen password alone is not enough. Also to stop attacks on the server",
+            security,
+            "90 days after the address was last used",
         ),
+    ];
+    if mailing {
+        rows.push(row(
+            "<strong>Your email address</strong>, and whether you confirmed it (required)",
+            "Confirming it is you on a new address, password reset links you ask for, and short notices when your \
+             password or email changes. Never marketing, never shared",
+            "Contract (Art. 6(1)(b)) and security (Art. 6(1)(f))",
+            "Until you delete your account; an address you never confirm is deleted after 7 days",
+        ));
+        rows.push(row(
+            "Whether you want an email when the terms or this notice change",
+            "Telling you about those changes",
+            "Your consent (Art. 6(1)(a)): optional, off by default, withdraw it on the account page any time",
+            "Until you turn it off or delete your account",
+        ));
+    }
+    let email_note = if mailing {
+        format!("<p>Emails are sent {sender}.</p>")
+    } else {
+        "<p>This server sends no email and never asks for an address.</p>".to_owned()
     };
     format!(
         "<section><h2>Who</h2><p>{controller}</p><p>Where the data is kept: {hosting}.</p></section>\
-         <section><h2>What is stored</h2><ul>\
-         <li>Your handle, display name, and when the account was made.</li>\
-         <li>Your password and recovery codes, only as one-way hashes.</li>\
-         <li>Your friends, friend requests, and whether friends may see which server you are on.</li>\
-         <li>Your email and whether it is confirmed, only if you add one.</li>\
-         <li>When you accepted the terms and this notice, as a record that you did.</li>\
-         <li>Whether you asked for an email when the terms or this notice change.</li></ul>\
-         <p>Your <strong>date of birth</strong> is asked once, when you make an account, only to check that \
-         you are old enough. It is used for that check and then thrown away: never stored, never logged.</p>\
-         <p>Kept in memory only, and gone on restart: which server you are on (if you share it, for 2 minutes \
-         after your game last said so), and counters of attempts per IP address (at most an hour) that stop \
-         people guessing passwords. IP addresses are not written to disk or logs.</p>\
+         <section><h2>What is kept, what for, and why</h2>\
+         <p>Everything this server keeps about you is in this table. Nothing is hidden, and you can download \
+         all of it yourself (<em>Download my data</em> on the account page).</p>\
+         <div class=\"scroll\"><table><thead><tr><th>What</th><th>What for</th><th>Legal basis (GDPR)</th>\
+         <th>How long</th></tr></thead><tbody>{rows}</tbody></table></div>{email_note}</section>\
+         <section><h2>Not kept</h2><ul>\
+         <li>Your <strong>date of birth</strong>: asked once, when you make an account, only to check you are \
+         at least {age} (Art. 8). Used for that check and thrown away: never stored, never logged.</li>\
+         <li>Which server you are on: kept in memory only, if you share it, for 2 minutes after your game last \
+         said so, and gone on restart.</li>\
+         <li>Counters of attempts per IP address, which stop people guessing passwords: memory only, at most \
+         an hour.</li>\
+         <li>IP addresses are never written to the server's logs.</li>\
+         <li>No analytics, no advertising, no tracking cookies, nothing loaded from anywhere else. The account \
+         page keeps your sign-in in the browser tab's session storage, which it needs to work.</li></ul>\
          <p>A game server you join learns only your display name and a number that means something on that \
-         server alone. No analytics, no advertising, no tracking cookies, nothing loaded from anywhere else. \
-         The account page keeps your sign-in in the browser tab's session storage, which is strictly needed \
-         for it to work.</p></section>\
-         <section><h2>Why, and on what basis</h2><p>To run your account and send the emails above: performance \
-         of the service you asked for (GDPR Art. 6(1)(b)). The attempt counters: our legitimate interest in \
-         keeping accounts safe (Art. 6(1)(f)). The age check: keeping to the minimum age for using an online \
-         service without a parent's consent (Art. 8); below it an account is refused, not made. Emails about \
-         changes to the terms or this notice, if this server sends email: only if you ask for them (consent, \
-         Art. 6(1)(a)), and you can withdraw that on the account page at any time, as easily as you gave it. \
-         Nothing is decided about you automatically beyond the age check.</p>{email_part}</section>\
-         <section><h2>How long</h2><p>Until you delete your account, which deletes it at once. Backups roll it \
-         out within {days} days. Reset links last 30 minutes.</p></section>\
-         <section><h2>Your rights</h2><p>You can see everything stored about you and take it with you \
-         (access and portability: <em>Download my data</em> on the account page, or <code>GET /me/export</code>), \
-         correct it (rectification: change your display name or email yourself), delete it (erasure: \
-         <em>Delete account</em>), and object to or ask to restrict its use, by writing to the contact above. \
-         You may also complain to {authority}.</p></section>\
+         server alone: not your IP address as kept here, not your email.</p></section>\
+         <section><h2>Who can see it</h2><ul>\
+         <li><strong>You</strong>: all of it, including every IP address you signed in from (account page, \
+         <em>Security</em>).</li>\
+         <li><strong>This server's admins</strong>: the people the controller trusts to run it can see accounts, \
+         emails and sign-in IP addresses, to stop abuse. They can suspend an account or block an address, \
+         always with a reason and an end date or \"for good\", and the person is shown both.</li>\
+         <li><strong>Other players</strong>: your handle, display name and picture; your friends also see \
+         whether you are online and, if you allow it, on which server.</li>\
+         <li>Nobody else. Nothing is sold or shared.</li></ul></section>\
+         <section><h2>Decisions made automatically</h2><p>Only two, both simple rules: an account is refused \
+         below the minimum age, and a sign-in from a new IP address waits until you confirm it by email. \
+         Neither is profiling.</p></section>\
+         <section><h2>How long, in general</h2><p>Deleting your account deletes all of it at once, picture \
+         included. Backups roll it out within {days} days. Links in emails last 30 minutes (confirming an \
+         address: 7 days).</p></section>\
+         <section><h2>Your rights</h2><p>You can see everything kept about you and take it with you (access \
+         and portability: <em>Download my data</em>, or <code>GET /me/export</code>), correct it \
+         (rectification: change your display name or email yourself), delete it (erasure: <em>Delete \
+         account</em>), and object to or ask to restrict its use, including the IP address check, by writing \
+         to the contact above. You may also complain to {authority}.</p></section>\
          <section><h2>Age</h2><p>You must be at least {age} to make an account (<a href=\"/terms\">terms</a>).</p></section>",
+        rows = rows.concat(),
         hosting = or(&op.hosting, "not stated by the operator"),
         days = op.backup_days,
         authority =
@@ -460,8 +549,13 @@ async fn terms(State(state): State<Arc<Fireplace>>) -> Response {
              <li>This account server is run by {who}, free and as it is, with no promise that it will always be \
              here. Keep your recovery codes somewhere safe.</li>\
              <li>Game servers (Flames) are run by other people. What happens on one is theirs, not this server's.</li>\
-             <li>Do not attack this server, make accounts in bulk, or use it to harass anybody. Accounts that do \
-             may be removed.</li>\
+             <li>Where this server sends email, an account needs a confirmed email address, and a sign-in from \
+             an IP address the account has not used waits until you confirm it by email.</li>\
+             <li>A display name can change at most twice in 30 days.</li>\
+             <li>Do not attack this server, make accounts in bulk, cheat, upload pictures that are illegal or \
+             hurtful, or use it to harass anybody. Admins may suspend an account or block an IP address for \
+             that, for a set time or for good; you are always shown how long and why, and can write to the \
+             operator if you think it is a mistake.</li>\
              <li>You can delete your account whenever you like, from the account page.</li>\
              <li>When these terms or the privacy notice change in a way that matters, they are updated here, and \
              if you asked for it and have a confirmed email, you are told by email too.</li>\

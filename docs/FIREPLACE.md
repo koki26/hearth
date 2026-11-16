@@ -78,6 +78,15 @@ terms or privacy notice change, sent only to a confirmed address by
 `fireplace admin policy-mail <letter.txt>` (first line the subject, the rest
 the body). `POST /settings` turns it off again.
 
+Where the Fireplace sends email, a new account also needs an `email`; it is
+sent a link, and until it is confirmed the account can sign in but cannot
+`/join` a Flame or make friends. A sign-in with the right password from an IP
+address the account has not used answers `403` and emails a link to confirm
+the place; after that it signs in as usual. A suspended account's sign-in
+answers `403` with `"banned": {"until", "until_text", "reason"}`, and a
+blocked IP gets the same shape (or a page, to a browser) for every request.
+A display name changes at most twice in 30 days (`429` after that).
+
 `POST /accounts` also carries `"recovery_codes"`: eight codes, shown this
 once and kept only as hashes. `GET /me` also says `email`, `email_verified`
 and `recovery_codes_left`.
@@ -195,6 +204,14 @@ An account may have 256 friends and 64 requests waiting.
 |---|---|
 | `POST /presence` | `{"flame", "ember", "ember_name", "world"}`, or `{}` to clear → `204` |
 | `POST /settings` | `{"share_location": false}` and/or `{"policy_emails": true}` → `200` with both |
+| `POST /me/avatar` | the picture itself (PNG, JPEG, WebP or GIF, at most 2 MiB) → `200 {"avatar": <version>}`; redrawn as a 256px JPEG |
+| `POST /me/avatar/delete` | → `200`, picture deleted |
+| `GET /avatars/<id>.jpg` | the picture, `image/jpeg`, `nosniff` |
+| `GET /admin/accounts`, `GET /admin/bans` | admins only: every account with its sign-in IPs; blocked IPs |
+| `POST /admin/ban` | `{"handle", "minutes" (0 = for good), "reason"}`: suspends and signs out |
+| `POST /admin/unban`, `/admin/sign-out`, `/admin/delete` | `{"handle"}` |
+| `POST /admin/set-admin` | `{"handle", "admin": true}` |
+| `POST /admin/ban-ip`, `/admin/unban-ip` | `{"ip", "minutes", "reason"}` / `{"ip"}` |
 
 **A client says where it is; a Flame never does.** A Flame that had to tell
 the Fireplace who was in it would put this server in the path of every match,
@@ -259,7 +276,9 @@ which is a way to be attacked rather than a defence.
 data/
   key.pk8        the Ed25519 signing key, 0600, made on first run
   pid.key        the secret per-Flame player ids are derived with, 0600
-  people.json    every account and every friendship, and any email address
+  people.json    every account and every friendship, emails, sign-in IPs
+  bans.json      blocked IP addresses, with reason and end
+  avatars/       one <account id>.jpg per uploaded picture
 ```
 
 Because it can hold email addresses, a backup of `data/` is personal data:

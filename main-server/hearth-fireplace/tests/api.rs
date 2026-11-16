@@ -46,7 +46,7 @@ async fn call(
 /// Makes an account and returns its access token.
 async fn join(app: &Router, handle: &str) -> String {
     let (status, body) =
-        call(app, "POST", "/accounts", None, json!({"handle": handle, "password": "a long one", "birthdate": "1990-05-04", "accept_terms": true})).await;
+        call(app, "POST", "/accounts", None, json!({"handle": handle, "password": "a long one", "birthdate": "1990-05-04", "accept_terms": true, "email": "someone@example.org"})).await;
     assert_eq!(status, StatusCode::CREATED, "{body}");
     body["access"].as_str().unwrap().to_owned()
 }
@@ -71,7 +71,7 @@ async fn the_health_check_still_answers_ok() {
 async fn an_account_is_made_signed_in_to_and_refused_twice() {
     let (app, _dir) = fireplace("accounts");
     let (status, made) =
-        call(&app, "POST", "/accounts", None, json!({"handle": "Ada", "password": "a long one", "birthdate": "1990-05-04", "accept_terms": true})).await;
+        call(&app, "POST", "/accounts", None, json!({"handle": "Ada", "password": "a long one", "birthdate": "1990-05-04", "accept_terms": true, "email": "someone@example.org"})).await;
     assert_eq!(status, StatusCode::CREATED);
     assert_eq!(made["handle"], "Ada");
     assert!(made["access"].as_str().unwrap().starts_with("v1."));
@@ -79,13 +79,13 @@ async fn an_account_is_made_signed_in_to_and_refused_twice() {
 
     // The same handle, in any case, is taken.
     let (status, _) =
-        call(&app, "POST", "/accounts", None, json!({"handle": "ada", "password": "another one", "birthdate": "1990-05-04", "accept_terms": true})).await;
+        call(&app, "POST", "/accounts", None, json!({"handle": "ada", "password": "another one", "birthdate": "1990-05-04", "accept_terms": true, "email": "someone@example.org"})).await;
     assert_eq!(status, StatusCode::CONFLICT);
     // And nonsense is refused before anything is hashed.
     for bad in
         [
-            json!({"handle": "a", "password": "a long one", "birthdate": "1990-05-04", "accept_terms": true}),
-            json!({"handle": "ada2", "password": "short", "birthdate": "1990-05-04", "accept_terms": true}),
+            json!({"handle": "a", "password": "a long one", "birthdate": "1990-05-04", "accept_terms": true, "email": "someone@example.org"}),
+            json!({"handle": "ada2", "password": "short", "birthdate": "1990-05-04", "accept_terms": true, "email": "someone@example.org"}),
         ]
     {
         let (status, _) = call(&app, "POST", "/accounts", None, bad).await;
@@ -120,7 +120,7 @@ async fn signing_in_with_the_wrong_password_says_the_same_as_an_unknown_handle()
 async fn a_saved_token_buys_a_fresh_hour_and_an_access_token_does_not() {
     let (app, _dir) = fireplace("refresh");
     let (_, made) =
-        call(&app, "POST", "/accounts", None, json!({"handle": "ada", "password": "a long one", "birthdate": "1990-05-04", "accept_terms": true})).await;
+        call(&app, "POST", "/accounts", None, json!({"handle": "ada", "password": "a long one", "birthdate": "1990-05-04", "accept_terms": true, "email": "someone@example.org"})).await;
     let (status, fresh) =
         call(&app, "POST", "/sessions/refresh", None, json!({"refresh": made["refresh"]})).await;
     assert_eq!(status, StatusCode::OK);
@@ -451,12 +451,8 @@ fn letters(state: &Fireplace, kind: &str) -> usize {
 /// Makes an account with a confirmed address and returns what making it said.
 async fn join_with_email(app: &Router, state: &Fireplace, handle: &str, address: &str) -> Value {
     let (_, made) =
-        call(app, "POST", "/accounts", None, json!({"handle": handle, "password": "a long one", "birthdate": "1990-05-04", "accept_terms": true})).await;
-    let access = made["access"].as_str().unwrap();
-    let (status, _) =
-        call(app, "POST", "/me/email", Some(access), json!({"password": "a long one", "email": address}))
-            .await;
-    assert_eq!(status, StatusCode::OK);
+        call(app, "POST", "/accounts", None, json!({"handle": handle, "password": "a long one", "birthdate": "1990-05-04", "accept_terms": true, "email": address})).await;
+    assert!(made["access"].is_string(), "{made}");
     let (status, _) = get_page(app, &link_in(state, "verify")).await;
     assert_eq!(status, StatusCode::OK);
     made
@@ -466,7 +462,7 @@ async fn join_with_email(app: &Router, state: &Fireplace, handle: &str, address:
 async fn email_is_optional_and_a_server_without_it_says_so_cleanly() {
     let (app, _dir) = fireplace("no-mail");
     let (status, made) =
-        call(&app, "POST", "/accounts", None, json!({"handle": "ada", "password": "a long one", "birthdate": "1990-05-04", "accept_terms": true})).await;
+        call(&app, "POST", "/accounts", None, json!({"handle": "ada", "password": "a long one", "birthdate": "1990-05-04", "accept_terms": true, "email": "someone@example.org"})).await;
     assert_eq!(status, StatusCode::CREATED, "a handle and a password are still all it takes");
     assert_eq!(made["recovery_codes"].as_array().unwrap().len(), 8, "and everybody gets recovery codes");
     let access = made["access"].as_str().unwrap();
@@ -503,7 +499,7 @@ async fn email_is_optional_and_a_server_without_it_says_so_cleanly() {
 async fn an_address_must_be_confirmed_before_it_can_reset_anything() {
     let (app, state) = fireplace_with_mail("verify-first");
     let (_, made) =
-        call(&app, "POST", "/accounts", None, json!({"handle": "ada", "password": "a long one", "birthdate": "1990-05-04", "accept_terms": true})).await;
+        call(&app, "POST", "/accounts", None, json!({"handle": "ada", "password": "a long one", "birthdate": "1990-05-04", "accept_terms": true, "email": "someone@example.org"})).await;
     let access = made["access"].as_str().unwrap();
     for (password, email, want) in [
         ("wrong one!", "ada@example.org", StatusCode::UNAUTHORIZED),
@@ -515,7 +511,7 @@ async fn an_address_must_be_confirmed_before_it_can_reset_anything() {
                 .await;
         assert_eq!(status, want, "{email}");
     }
-    assert_eq!(state.mail.sent()[0].to, "ada@example.org", "the link goes to the new address");
+    assert_eq!(state.mail.sent().last().unwrap().to, "ada@example.org", "the link goes to the new address");
 
     form(&app, "/reset", "1.1.1.1", &[("email", "ada@example.org")]).await;
     assert_eq!(letters(&state, "reset"), 0, "an address nobody confirmed resets nothing");
@@ -619,7 +615,7 @@ async fn reset_requests_are_limited_per_address_and_per_account() {
 async fn a_recovery_code_works_once_and_a_new_set_replaces_the_old() {
     let (app, _dir) = fireplace("recovery");
     let (_, made) =
-        call(&app, "POST", "/accounts", None, json!({"handle": "ada", "password": "a long one", "birthdate": "1990-05-04", "accept_terms": true})).await;
+        call(&app, "POST", "/accounts", None, json!({"handle": "ada", "password": "a long one", "birthdate": "1990-05-04", "accept_terms": true, "email": "someone@example.org"})).await;
     let codes: Vec<String> =
         made["recovery_codes"].as_array().unwrap().iter().map(|c| c.as_str().unwrap().to_owned()).collect();
     let recover = |code: &str, password: &str| {
@@ -672,14 +668,16 @@ async fn changing_or_removing_the_address_tells_the_old_one() {
         (Some("new@example.org"), Some(false))
     );
 
-    // Removing an unconfirmed address tells nobody, and deletes it at once.
+    // An address is required where email is on: it can change, not go.
     let remove = json!({"password": "a long one", "email": ""});
-    assert_eq!(call(&app, "POST", "/me/email", Some(access), remove).await.0, StatusCode::OK);
+    assert_eq!(call(&app, "POST", "/me/email", Some(access), remove).await.0, StatusCode::BAD_REQUEST);
+    // Changing an unconfirmed address tells nobody, and the link sent to it
+    // is worth nothing afterwards.
+    let stale = link_in(&state, "verify");
+    let again = json!({"password": "a long one", "email": "newer@example.org"});
+    assert_eq!(call(&app, "POST", "/me/email", Some(access), again).await.0, StatusCode::OK);
     assert_eq!(letters(&state, "email-changed"), 1);
-    let (_, me) = call(&app, "GET", "/me", Some(access), Value::Null).await;
-    assert_eq!(me["email"], Value::Null);
-    // The confirmation link sent to it is worth nothing now.
-    assert_eq!(get_page(&app, &link_in(&state, "verify")).await.0, StatusCode::GONE);
+    assert_eq!(get_page(&app, &stale).await.0, StatusCode::GONE);
 }
 
 #[tokio::test]
@@ -834,7 +832,7 @@ async fn the_account_page_is_there_even_with_no_web_folder() {
 #[tokio::test]
 async fn nobody_under_the_minimum_age_gets_an_account_and_the_date_is_not_kept() {
     let (app, dir) = fireplace("age");
-    let account = |birthdate: &str| json!({"handle": "kid", "password": "a long one", "birthdate": birthdate, "accept_terms": true});
+    let account = |birthdate: &str| json!({"handle": "kid", "password": "a long one", "birthdate": birthdate, "accept_terms": true, "email": "someone@example.org"});
     // Config::default() says 16, so a 2025 birthday is too young; no date, or a
     // date that is not one, is refused before anything else.
     let (status, body) = call(&app, "POST", "/accounts", None, account("2025-01-01")).await;
@@ -879,4 +877,235 @@ async fn the_terms_must_be_accepted_and_policy_emails_are_a_choice_that_can_be_u
     drop(app);
     let accounts = hearth_fireplace::accounts::Accounts::open(&dir).unwrap();
     assert!(accounts.policy_recipients().is_empty());
+}
+
+// --- places, names, pictures, bans and admins --------------------------------
+
+/// `call`, from a given address (the proxy's X-Forwarded-For).
+async fn call_from(
+    app: &Router,
+    ip: &str,
+    method: &str,
+    path: &str,
+    token: Option<&str>,
+    body: Value,
+) -> (StatusCode, Value) {
+    let mut request = Request::builder()
+        .method(method)
+        .uri(path)
+        .header("content-type", "application/json")
+        .header("x-forwarded-for", ip);
+    if let Some(token) = token {
+        request = request.header("authorization", format!("Bearer {token}"));
+    }
+    let body = if body.is_null() { Body::empty() } else { Body::from(serde_json::to_vec(&body).unwrap()) };
+    let response = app.clone().oneshot(request.body(body).unwrap()).await.unwrap();
+    let status = response.status();
+    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    (status, serde_json::from_slice(&bytes).unwrap_or(Value::Null))
+}
+
+fn sign_in_as(handle: &str) -> Value {
+    json!({"handle": handle, "password": "a long one"})
+}
+
+#[tokio::test]
+async fn a_new_place_has_to_be_confirmed_by_email_before_it_gets_in() {
+    let (app, state) = fireplace_with_mail("places");
+    join_with_email(&app, &state, "ada", "ada@example.org").await;
+    // Made from "unknown" (no proxy header in `call`), so that place is known.
+    assert_eq!(call(&app, "POST", "/sessions", None, sign_in_as("ada")).await.0, StatusCode::OK);
+
+    let (status, said) = call_from(&app, "203.0.113.7", "POST", "/sessions", None, sign_in_as("ada")).await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "{said}");
+    assert_eq!(letters(&state, "place"), 1);
+    let letter = state.mail.sent().into_iter().rev().find(|s| s.letter.kind == "place").unwrap();
+    assert_eq!(letter.to, "ada@example.org");
+    assert!(letter.letter.body.contains("203.0.113.7"), "the letter says where from");
+
+    // A wrong password from there sends nothing: only the password-holder is asked about.
+    let wrong = json!({"handle": "ada", "password": "not it at all"});
+    call_from(&app, "203.0.113.8", "POST", "/sessions", None, wrong).await;
+    assert_eq!(letters(&state, "place"), 1);
+
+    let (status, _) = get_page(&app, &link_in(&state, "place")).await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, tokens) = call_from(&app, "203.0.113.7", "POST", "/sessions", None, sign_in_as("ada")).await;
+    assert_eq!(status, StatusCode::OK, "confirmed, so in");
+    let (_, me) = call(&app, "GET", "/me", tokens["access"].as_str(), Value::Null).await;
+    let places: Vec<&str> = me["places"].as_array().unwrap().iter().map(|p| p["ip"].as_str().unwrap()).collect();
+    assert!(places.contains(&"203.0.113.7"), "you can see where you signed in from: {places:?}");
+}
+
+#[tokio::test]
+async fn an_unconfirmed_email_cannot_play_or_make_friends() {
+    let (app, _state) = fireplace_with_mail("unconfirmed");
+    let access = join(&app, "ada").await;
+    let flame = "ab".repeat(32);
+    let (status, said) = call(&app, "POST", "/join", Some(&access), json!({"flame": flame})).await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "{said}");
+    let (status, _) = call(&app, "POST", "/friends/add", Some(&access), json!({"handle": "bob"})).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    let no_email = json!({"handle": "bob", "password": "a long one", "birthdate": "1990-05-04", "accept_terms": true});
+    assert_eq!(call(&app, "POST", "/accounts", None, no_email).await.0, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn a_display_name_changes_twice_a_month_at_most() {
+    let (app, _dir) = fireplace("renames");
+    let access = join(&app, "ada").await;
+    let name = |n: &str| json!({ "display_name": n });
+    assert_eq!(call(&app, "POST", "/me/name", Some(&access), name("Ada")).await.0, StatusCode::OK);
+    assert_eq!(call(&app, "POST", "/me/name", Some(&access), name("Ada")).await.0, StatusCode::OK, "the same is free");
+    assert_eq!(call(&app, "POST", "/me/name", Some(&access), name("Lady Ada")).await.0, StatusCode::OK);
+    let (status, said) = call(&app, "POST", "/me/name", Some(&access), name("Countess")).await;
+    assert_eq!(status, StatusCode::TOO_MANY_REQUESTS, "{said}");
+    let (_, me) = call(&app, "GET", "/me", Some(&access), Value::Null).await;
+    assert_eq!((me["display_name"].as_str(), me["renames_left"].as_u64()), (Some("Lady Ada"), Some(0)));
+    assert!(me["next_rename"].as_u64().is_some());
+}
+
+async fn upload(app: &Router, access: &str, bytes: Vec<u8>) -> (StatusCode, Value) {
+    let request = Request::builder()
+        .method("POST")
+        .uri("/me/avatar")
+        .header("content-type", "application/octet-stream")
+        .header("authorization", format!("Bearer {access}"))
+        .body(Body::from(bytes))
+        .unwrap();
+    let response = app.clone().oneshot(request).await.unwrap();
+    let status = response.status();
+    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    (status, serde_json::from_slice(&bytes).unwrap_or(Value::Null))
+}
+
+#[tokio::test]
+async fn a_picture_is_redrawn_small_and_anything_else_is_refused() {
+    let (app, dir) = fireplace("avatar");
+    let access = join(&app, "ada").await;
+    let mut png = Vec::new();
+    image::RgbImage::from_pixel(900, 600, image::Rgb([10, 120, 200]))
+        .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
+        .unwrap();
+    let (status, said) = upload(&app, &access, png).await;
+    assert_eq!(status, StatusCode::OK, "{said}");
+    let (_, me) = call(&app, "GET", "/me", Some(&access), Value::Null).await;
+    let response = app
+        .clone()
+        .oneshot(Request::builder().uri(format!("/avatars/{}.jpg", me["id"])).body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(response.headers()["content-type"], "image/jpeg");
+    assert_eq!(response.headers()["x-content-type-options"], "nosniff");
+    let jpeg = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    assert!(jpeg.len() < 60_000, "small: {} bytes", jpeg.len());
+
+    let (status, _) = upload(&app, &access, b"<html><script>alert(1)</script></html>".to_vec()).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    let (status, _) = upload(&app, &access, vec![0u8; 3 * 1024 * 1024]).await;
+    assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
+
+    // Deleting the account takes the picture with it.
+    call(&app, "POST", "/me/delete", Some(&access), json!({"password": "a long one"})).await;
+    assert!(!dir.join("avatars").join(format!("{}.jpg", me["id"])).exists());
+}
+
+/// The first admin, the way `fireplace admin make-admin` does it.
+async fn claim(app: &Router, state: &Fireplace, handle: &str) -> StatusCode {
+    let (id, epoch) = {
+        let accounts = state.accounts.lock().unwrap();
+        let a = accounts.by_handle(handle).unwrap();
+        (a.id, a.token_epoch)
+    };
+    let link = state.keys.mint_link("admin", id, epoch, "", token::now());
+    call_from(app, "127.0.0.1", "POST", "/admin/claim", None, json!({ "link": link })).await.0
+}
+
+fn fireplace_state(who: &str) -> (Router, Arc<Fireplace>) {
+    let dir = std::env::temp_dir().join(format!("hearth-fireplace-api-{}-{who}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let state = Arc::new(Fireplace::open(&Config { data_dir: dir, ..Config::default() }).unwrap());
+    (api::router(state.clone()), state)
+}
+
+#[tokio::test]
+async fn the_first_admin_is_made_once_and_again_only_when_there_is_none() {
+    let (app, state) = fireplace_state("admin-claim");
+    let root = join(&app, "root").await;
+    let other = join(&app, "other").await;
+    assert_eq!(call(&app, "GET", "/admin/accounts", Some(&root), Value::Null).await.0, StatusCode::FORBIDDEN);
+
+    // Not from outside, and not with a link anybody could make.
+    let (id, epoch) = {
+        let a = state.accounts.lock().unwrap();
+        let r = a.by_handle("root").unwrap();
+        (r.id, r.token_epoch)
+    };
+    let link = state.keys.mint_link("admin", id, epoch, "", token::now());
+    let outside = call_from(&app, "203.0.113.1", "POST", "/admin/claim", None, json!({ "link": link })).await.0;
+    assert_eq!(outside, StatusCode::FORBIDDEN);
+    let forged = call_from(&app, "127.0.0.1", "POST", "/admin/claim", None, json!({"link": "x.y"})).await.0;
+    assert_eq!(forged, StatusCode::FORBIDDEN);
+
+    assert_eq!(claim(&app, &state, "root").await, StatusCode::OK);
+    assert_eq!(claim(&app, &state, "other").await, StatusCode::CONFLICT, "once there is one, no more");
+    let (status, list) = call(&app, "GET", "/admin/accounts", Some(&root), Value::Null).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(list.as_array().unwrap().len(), 2);
+    assert!(list[0]["places"].is_array(), "admins see where everybody signed in from");
+
+    // The last admin leaves: the door opens again.
+    call(&app, "POST", "/me/delete", Some(&root), json!({"password": "a long one"})).await;
+    assert_eq!(claim(&app, &state, "other").await, StatusCode::OK);
+    let _ = other;
+}
+
+#[tokio::test]
+async fn a_banned_account_is_told_for_how_long_and_why_and_comes_back_when_unbanned() {
+    let (app, state) = fireplace_state("ban-account");
+    let root = join(&app, "root").await;
+    let bob = join(&app, "bob").await;
+    claim(&app, &state, "root").await;
+
+    let ban = json!({"handle": "bob", "minutes": 60, "reason": "cheating"});
+    assert_eq!(call(&app, "POST", "/admin/ban", Some(&root), ban).await.0, StatusCode::OK);
+    assert_eq!(call(&app, "GET", "/me", Some(&bob), Value::Null).await.0, StatusCode::UNAUTHORIZED, "signed out");
+    let (status, said) = call(&app, "POST", "/sessions", None, sign_in_as("bob")).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert_eq!(said["banned"]["reason"], "cheating");
+    assert!(said["banned"]["until"].as_u64().unwrap() > token::now());
+    // Bob is not an admin, and an admin cannot ban themselves.
+    let (status, _) = call(&app, "POST", "/admin/ban", Some(&root), json!({"handle": "root", "reason": "x"})).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+
+    assert_eq!(call(&app, "POST", "/admin/unban", Some(&root), json!({"handle": "bob"})).await.0, StatusCode::OK);
+    assert_eq!(call(&app, "POST", "/sessions", None, sign_in_as("bob")).await.0, StatusCode::OK);
+}
+
+#[tokio::test]
+async fn a_banned_address_gets_the_banned_page_and_nothing_else() {
+    let (app, state) = fireplace_state("ban-ip");
+    let root = join(&app, "root").await;
+    claim(&app, &state, "root").await;
+    let ban = json!({"ip": "198.51.100.23", "minutes": 0, "reason": "flooding"});
+    assert_eq!(call(&app, "POST", "/admin/ban-ip", Some(&root), ban).await.0, StatusCode::OK);
+
+    let page = Request::builder().uri("/").header("x-forwarded-for", "198.51.100.23").header("accept", "text/html");
+    let response = app.clone().oneshot(page.body(Body::empty()).unwrap()).await.unwrap();
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    let html = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let html = String::from_utf8_lossy(&html);
+    assert!(html.contains("flooding") && html.contains("for good"), "{html}");
+
+    let (status, said) = call_from(&app, "198.51.100.23", "POST", "/sessions", None, sign_in_as("root")).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert_eq!(said["banned"]["reason"], "flooding");
+    assert_eq!(call_from(&app, "198.51.100.24", "GET", "/health", None, Value::Null).await.0, StatusCode::OK);
+
+    let (_, bans) = call(&app, "GET", "/admin/bans", Some(&root), Value::Null).await;
+    assert_eq!(bans[0]["ip"], "198.51.100.23");
+    let unban = json!({"ip": "198.51.100.23"});
+    assert_eq!(call(&app, "POST", "/admin/unban-ip", Some(&root), unban).await.0, StatusCode::OK);
+    assert_eq!(call_from(&app, "198.51.100.23", "GET", "/health", None, Value::Null).await.0, StatusCode::OK);
 }

@@ -23,6 +23,8 @@
 
 pub mod accounts;
 pub mod api;
+pub mod avatar;
+pub mod bans;
 pub mod limit;
 pub mod mail;
 pub mod pages;
@@ -130,6 +132,8 @@ impl Config {
 pub struct Fireplace {
     pub accounts: Mutex<accounts::Accounts>,
     pub presence: Mutex<presence::Presence>,
+    /// Checked first on every request (`api::refuse_banned`).
+    pub ip_bans: Mutex<bans::IpBans>,
     pub limits: Mutex<limit::Limiter>,
     pub keys: token::Keys,
     pub max_accounts: usize,
@@ -155,6 +159,7 @@ impl Fireplace {
                 accounts
             }),
             presence: Mutex::new(presence::Presence::default()),
+            ip_bans: Mutex::new(bans::IpBans::open(&config.data_dir)?),
             limits: Mutex::new(limit::Limiter::default()),
             keys: token::Keys::open(&config.data_dir)?,
             max_accounts: config.max_accounts,

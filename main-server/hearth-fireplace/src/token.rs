@@ -201,7 +201,7 @@ impl Keys {
             email: email.to_owned(),
             nonce: BASE64.encode(nonce),
             iat: now,
-            exp: now + if typ == "reset" { RESET_SECONDS } else { VERIFY_SECONDS },
+            exp: now + if typ == "verify" { VERIFY_SECONDS } else { RESET_SECONDS },
         };
         self.sign(&serde_json::to_vec(&claims).expect("claims are plain data"))
     }

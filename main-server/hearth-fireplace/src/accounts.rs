@@ -110,7 +110,57 @@ pub struct Account {
     /// confirmed address.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub policy_emails: bool,
+    /// Where it signed in from, for security: a new place has to be confirmed
+    /// by email. Each entry is forgotten [`PLACE_DAYS`] after it was last seen.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub seen: Vec<Seen>,
+    /// When the display name was changed, within the last [`RENAME_WINDOW`].
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub renamed: Vec<u64>,
+    /// When the uploaded picture was set, which is also its cache key. 0: none.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub avatar: u64,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub admin: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ban: Option<Ban>,
 }
+
+/// One place an account signed in from.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Seen {
+    pub ip: String,
+    pub first: u64,
+    pub last: u64,
+    /// Confirmed by the owner, by the link sent to their email, or the place
+    /// the account was made from.
+    pub confirmed: bool,
+}
+
+/// A ban on an account or an address. `until` 0 is for good.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Ban {
+    pub until: u64,
+    pub reason: String,
+    /// The admin's handle.
+    pub by: String,
+    pub at: u64,
+}
+
+impl Ban {
+    pub fn active(&self, now: u64) -> bool {
+        self.until == 0 || now < self.until
+    }
+}
+
+/// How long a sign-in place is kept after it was last used.
+pub const PLACE_DAYS: u64 = 90;
+const PLACE_SECONDS: u64 = PLACE_DAYS * 24 * 60 * 60;
+/// At most this many places per account; the oldest goes first.
+const MAX_PLACES: usize = 30;
+/// Display names change at most [`RENAMES`] times in this long.
+pub const RENAME_WINDOW: u64 = 30 * 24 * 60 * 60;
+pub const RENAMES: usize = 2;
 
 fn is_zero(n: &u64) -> bool {
     *n == 0
@@ -227,6 +277,11 @@ impl Accounts {
                 recovery: Vec::new(),
                 terms_accepted: now,
                 policy_emails: false,
+                seen: Vec::new(),
+                renamed: Vec::new(),
+                avatar: 0,
+                admin: false,
+                ban: None,
             },
         );
         self.save();
@@ -405,10 +460,98 @@ impl Accounts {
                 account.email = None;
                 changed = true;
             }
+            let places = account.seen.len();
+            account.seen.retain(|s| now.saturating_sub(s.last) <= PLACE_SECONDS);
+            changed |= account.seen.len() != places;
         }
         if changed {
             self.save();
         }
+    }
+
+    /// Whether `ip` is a place this account may sign in from without asking:
+    /// one it confirmed, or any place at all while it has none confirmed yet
+    /// (accounts from before places were kept).
+    pub fn place_is_known(&self, me: u64, ip: &str) -> bool {
+        self.by_id.get(&me).is_some_and(|a| {
+            !a.seen.iter().any(|s| s.confirmed) || a.seen.iter().any(|s| s.confirmed && s.ip == ip)
+        })
+    }
+
+    /// Notes a sign-in from `ip`; `confirmed` marks it as the owner's.
+    pub fn remember_place(&mut self, me: u64, ip: &str, now: u64, confirmed: bool) {
+        let Some(account) = self.by_id.get_mut(&me) else {
+            return;
+        };
+        match account.seen.iter_mut().find(|s| s.ip == ip) {
+            Some(place) => {
+                place.last = now;
+                place.confirmed |= confirmed;
+            }
+            None => account.seen.push(Seen { ip: ip.to_owned(), first: now, last: now, confirmed }),
+        }
+        account.seen.sort_by_key(|s| std::cmp::Reverse(s.last));
+        account.seen.truncate(MAX_PLACES);
+        self.save();
+    }
+
+    /// How many display name changes are left now, and when the next one
+    /// frees up if none are.
+    pub fn renames_left(&self, me: u64, now: u64) -> (usize, Option<u64>) {
+        let Some(account) = self.by_id.get(&me) else {
+            return (0, None);
+        };
+        let recent: Vec<u64> =
+            account.renamed.iter().copied().filter(|t| now.saturating_sub(*t) < RENAME_WINDOW).collect();
+        let left = RENAMES.saturating_sub(recent.len());
+        (left, (left == 0).then(|| recent.iter().min().map_or(now, |t| t + RENAME_WINDOW)))
+    }
+
+    /// Counts one display name change against the monthly allowance.
+    pub fn count_rename(&mut self, me: u64, now: u64) {
+        if let Some(account) = self.by_id.get_mut(&me) {
+            account.renamed.retain(|t| now.saturating_sub(*t) < RENAME_WINDOW);
+            account.renamed.push(now);
+            self.save();
+        }
+    }
+
+    pub fn set_avatar(&mut self, me: u64, version: u64) -> Result<(), Refused> {
+        self.by_id.get_mut(&me).ok_or(Refused::NoSuchAccount)?.avatar = version;
+        self.save();
+        Ok(())
+    }
+
+    pub fn set_admin(&mut self, me: u64, on: bool) -> Result<(), Refused> {
+        self.by_id.get_mut(&me).ok_or(Refused::NoSuchAccount)?.admin = on;
+        self.save();
+        Ok(())
+    }
+
+    pub fn any_admin(&self) -> bool {
+        self.by_id.values().any(|a| a.admin)
+    }
+
+    /// Bans (or with `None` unbans) and, banning, signs it out everywhere.
+    pub fn set_ban(&mut self, me: u64, ban: Option<Ban>) -> Result<(), Refused> {
+        let account = self.by_id.get_mut(&me).ok_or(Refused::NoSuchAccount)?;
+        if ban.is_some() {
+            account.token_epoch += 1;
+        }
+        account.ban = ban;
+        self.save();
+        Ok(())
+    }
+
+    /// Every token issued so far stops working.
+    pub fn sign_out_everywhere(&mut self, me: u64) -> Result<(), Refused> {
+        self.by_id.get_mut(&me).ok_or(Refused::NoSuchAccount)?.token_epoch += 1;
+        self.save();
+        Ok(())
+    }
+
+    pub fn all(&self) -> impl Iterator<Item = &Account> {
+        self.by_id.values()
     }
 
     /// Replaces every recovery code with these hashes.
@@ -517,6 +660,12 @@ pub fn age_from_birthdate(birthdate: &str, now: u64) -> Option<u32> {
     }
     let age = ty - y - u32::from((m, d) > (tm, td));
     (age <= 130).then_some(age)
+}
+
+/// A Unix time as people read it: `2026-11-16 14:05 UTC`.
+pub fn when(at: u64) -> String {
+    let (y, m, d) = civil_date(at);
+    format!("{y}-{m:02}-{d:02} {:02}:{:02} UTC", at % 86_400 / 3600, at % 3600 / 60)
 }
 
 /// Year, month and day of a Unix time in UTC (Howard Hinnant's algorithm).

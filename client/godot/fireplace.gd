@@ -133,10 +133,12 @@ func base_url() -> String:
 # --- signing in -------------------------------------------------------------
 
 ## The birth date is checked against the Fireplace's minimum age and not kept.
-func create_account(new_handle: String, password: String, birthdate: String,
+## Where the Fireplace sends email, `address` is required and gets a link to
+## confirm it; until then the account can sign in but not join a server.
+func create_account(new_handle: String, password: String, address: String, birthdate: String,
 		accept_terms: bool, policy_emails: bool) -> void:
-	_send("POST", "/accounts", {"handle": new_handle, "password": password, "birthdate": birthdate,
-		"accept_terms": accept_terms, "policy_emails": policy_emails}, "signin")
+	_send("POST", "/accounts", {"handle": new_handle, "password": password, "email": address,
+		"birthdate": birthdate, "accept_terms": accept_terms, "policy_emails": policy_emails}, "signin")
 
 
 func sign_in(as_handle: String, password: String) -> void:

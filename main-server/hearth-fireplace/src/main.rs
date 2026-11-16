@@ -22,6 +22,7 @@ async fn main() -> Result<()> {
         println!("fireplace admin reset-password <handle> [fireplace.toml]");
         println!("fireplace admin test-mail <address> [fireplace.toml]");
         println!("fireplace admin policy-mail <letter.txt> [fireplace.toml]");
+        println!("fireplace admin make-admin <handle> [fireplace.toml]");
         return Ok(());
     }
     if args.first().is_some_and(|a| a == "admin") {
@@ -84,7 +85,7 @@ fn read_config(path: &str) -> Result<Config> {
 async fn admin(args: &[String]) -> Result<()> {
     let (Some(command), Some(what)) = (args.first(), args.get(1)) else {
         anyhow::bail!(
-            "fireplace admin reset-password <handle> | test-mail <address> | policy-mail <letter.txt> [fireplace.toml]"
+            "fireplace admin reset-password <handle> | test-mail <address> | policy-mail <letter.txt> | make-admin <handle> [fireplace.toml]"
         );
     };
     let config = read_config(args.get(2).map_or("fireplace.toml", String::as_str))?;
@@ -126,6 +127,40 @@ async fn admin(args: &[String]) -> Result<()> {
                 }
             }
         }
+        // The first admin. Works only while there is none: once one exists,
+        // admins make admins on the account page, and if the last admin goes
+        // (deletes their account), this works again.
+        "make-admin" => {
+            if !config.data_dir.join("people.json").exists()
+                || !hearth_fireplace::token::key_path(&config.data_dir).exists()
+            {
+                anyhow::bail!("no accounts in {}: run this where fireplace.toml is", config.data_dir.display());
+            }
+            let accounts = hearth_fireplace::accounts::Accounts::open(&config.data_dir)?;
+            if accounts.any_admin() {
+                anyhow::bail!("there is already an admin: they can make more on the account page");
+            }
+            let account = accounts.by_handle(what).with_context(|| format!("nobody here goes by {what:?}"))?;
+            let (id, handle, epoch) = (account.id, account.handle.clone(), account.token_epoch);
+            drop(accounts);
+            // A link only this server's key can sign, handed to the running
+            // server over loopback, so its copy of the accounts is the one
+            // that changes. Not running: the file is ours to change.
+            let keys = hearth_fireplace::token::Keys::open(&config.data_dir)?;
+            let link = keys.mint_link("admin", id, epoch, "", hearth_fireplace::token::now());
+            let port = config.port;
+            match claim_over_loopback(port, &link).await {
+                Ok((200, _)) => println!("{handle} is now an admin."),
+                Ok((status, said)) => anyhow::bail!("the Fireplace said no ({status}): {said}"),
+                Err(err) if err.kind() == std::io::ErrorKind::ConnectionRefused => {
+                    let mut accounts = hearth_fireplace::accounts::Accounts::open(&config.data_dir)?;
+                    accounts.set_admin(id, true).map_err(|refused| anyhow::anyhow!("{refused}"))?;
+                    println!("{handle} is now an admin (the Fireplace was not running).");
+                }
+                Err(err) => return Err(err).context("could not reach the Fireplace on this machine"),
+            }
+            Ok(())
+        }
         // Tells everybody who asked that the terms or privacy notice changed.
         // The file's first line is the subject, the rest the body.
         "policy-mail" => {
@@ -158,6 +193,29 @@ async fn admin(args: &[String]) -> Result<()> {
         }
         other => anyhow::bail!("no admin command called {other:?}"),
     }
+}
+
+/// `POST /admin/claim` to the Fireplace on this machine, by hand: one request
+/// is not worth an HTTP client. Returns the status and the body.
+async fn claim_over_loopback(port: u16, link: &str) -> std::io::Result<(u16, String)> {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let body = serde_json::json!({ "link": link }).to_string();
+    let mut stream = tokio::net::TcpStream::connect(("127.0.0.1", port)).await?;
+    stream
+        .write_all(
+            format!(
+                "POST /admin/claim HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\n\
+                 Content-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            )
+            .as_bytes(),
+        )
+        .await?;
+    let mut answer = String::new();
+    stream.read_to_string(&mut answer).await?;
+    let status = answer.split_whitespace().nth(1).and_then(|s| s.parse().ok()).unwrap_or(0);
+    let said = answer.split("\r\n\r\n").nth(1).unwrap_or("").to_owned();
+    Ok((status, said))
 }
 
 /// Ctrl-C at a console, or SIGTERM from a service manager. Both mean stop,

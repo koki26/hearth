@@ -11,14 +11,15 @@ use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 
 use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
-use axum::extract::{ConnectInfo, DefaultBodyLimit, FromRequestParts, State};
+use axum::extract::{ConnectInfo, DefaultBodyLimit, FromRequestParts, Path, State};
 use axum::http::{HeaderMap, StatusCode, request::Parts};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde_json::{Value, json};
 
-use crate::accounts::{self, Refused};
+use crate::accounts::{self, Ban, Refused};
+use crate::avatar;
 use crate::presence::{self, Where};
 use crate::{Fireplace, limit, token};
 
@@ -53,6 +54,19 @@ pub fn router(state: Arc<Fireplace>) -> Router {
         .route("/friends/accept", post(accept_friend))
         .route("/friends/remove", post(remove_friend))
         .route("/presence", post(report_presence))
+        .route("/me/avatar", post(upload_avatar).layer(DefaultBodyLimit::max(avatar::MAX_UPLOAD)))
+        .route("/me/avatar/delete", post(delete_avatar))
+        .route("/avatars/{file}", get(avatar_file))
+        .route("/admin/claim", post(admin_claim))
+        .route("/admin/accounts", get(admin_accounts))
+        .route("/admin/bans", get(admin_bans))
+        .route("/admin/ban", post(admin_ban))
+        .route("/admin/unban", post(admin_unban))
+        .route("/admin/ban-ip", post(admin_ban_ip))
+        .route("/admin/unban-ip", post(admin_unban_ip))
+        .route("/admin/delete", post(admin_delete))
+        .route("/admin/set-admin", post(admin_set_admin))
+        .route("/admin/sign-out", post(admin_sign_out))
         .merge(crate::pages::routes())
         // Anything that is not a route is a file from the web folder: the
         // account page, its stylesheet and script, and whatever else a host
@@ -68,6 +82,9 @@ pub fn router(state: Arc<Fireplace>) -> Router {
             std::time::Duration::from_secs(TIMEOUT_SECONDS),
         ))
         .layer(DefaultBodyLimit::max(MAX_BODY))
+        // Outermost, so a banned address is turned away before its body is
+        // read or anything else is done for it.
+        .layer(axum::middleware::from_fn_with_state(state.clone(), refuse_banned))
         .with_state(state)
 }
 
@@ -82,6 +99,17 @@ async fn built_in_web(uri: axum::http::Uri) -> Response {
         _ => return StatusCode::NOT_FOUND.into_response(),
     };
     ([(axum::http::header::CONTENT_TYPE, kind)], body).into_response()
+}
+
+/// The confirmed address to ask, when `ip` is a place this account has not
+/// signed in from. Otherwise the place is noted and `None`: so also for an
+/// account with no confirmed address to ask, or a Fireplace with no email.
+fn new_place(state: &Fireplace, id: u64, ip: &str, now: u64) -> Option<String> {
+    let mut accounts = state.accounts.lock().unwrap();
+    let address = accounts.get(id)?.email.as_ref().filter(|e| e.verified).map(|e| e.address.clone());
+    let ask = state.mail.enabled() && address.is_some() && !accounts.place_is_known(id, ip);
+    accounts.remember_place(id, ip, now, !ask);
+    if ask { address } else { None }
 }
 
 // --- what comes back when something will not be done ------------------------
@@ -142,20 +170,74 @@ impl<S: Send + Sync> FromRequestParts<S> for Caller {
     type Rejection = std::convert::Infallible;
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        let peer = parts.extensions.get::<ConnectInfo<SocketAddr>>().map(|info| info.0.ip());
-        let behind_proxy = peer.is_none_or(|ip| ip.is_loopback());
-        let forwarded = parts
-            .headers
-            .get("x-forwarded-for")
-            .and_then(|value| value.to_str().ok())
-            .and_then(|list| list.rsplit(',').next())
-            .map(str::trim)
-            .filter(|one| !one.is_empty() && one.parse::<IpAddr>().is_ok());
-        Ok(Self(match (behind_proxy, forwarded) {
-            (true, Some(real)) => real.to_owned(),
-            _ => peer.map(|ip| ip.to_string()).unwrap_or_else(|| "unknown".into()),
-        }))
+        Ok(Self(ip_of(&parts.extensions, &parts.headers)))
     }
+}
+
+fn ip_of(extensions: &axum::http::Extensions, headers: &HeaderMap) -> String {
+    let peer = extensions.get::<ConnectInfo<SocketAddr>>().map(|info| info.0.ip());
+    let behind_proxy = peer.is_none_or(|ip| ip.is_loopback());
+    let forwarded = headers
+        .get("x-forwarded-for")
+        .and_then(|value| value.to_str().ok())
+        .and_then(|list| list.rsplit(',').next())
+        .map(str::trim)
+        .and_then(|one| one.parse::<IpAddr>().ok());
+    match (behind_proxy, forwarded) {
+        (true, Some(real)) => real.to_string(),
+        _ => peer.map(|ip| ip.to_string()).unwrap_or_else(|| "unknown".into()),
+    }
+}
+
+/// A banned address gets a page saying so and nothing else: one map lookup,
+/// before the body is read or any route runs.
+async fn refuse_banned(
+    State(state): State<Arc<Fireplace>>,
+    request: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> Response {
+    let ip = ip_of(request.extensions(), request.headers());
+    let Some(ban) = state.ip_bans.lock().unwrap().of(&ip, token::now()).cloned() else {
+        return next.run(request).await;
+    };
+    let wants_page = request
+        .headers()
+        .get(axum::http::header::ACCEPT)
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|a| a.contains("text/html"));
+    if wants_page {
+        return crate::pages::banned_page("This address is blocked", &ban);
+    }
+    let error = format!("this address is blocked {}: {}", until_text(&ban), ban.reason);
+    (StatusCode::FORBIDDEN, Json(json!({ "error": error, "banned": ban_json(&ban) }))).into_response()
+}
+
+pub fn until_text(ban: &Ban) -> String {
+    if ban.until == 0 { "for good".into() } else { format!("until {}", accounts::when(ban.until)) }
+}
+
+fn ban_json(ban: &Ban) -> Value {
+    json!({ "until": ban.until, "until_text": until_text(ban), "reason": ban.reason, "at": ban.at })
+}
+
+/// A suspended account, answered with when and why, so the page can say so.
+fn suspended(ban: &Ban) -> Response {
+    let error = format!("this account is suspended {}: {}", until_text(ban), ban.reason);
+    (StatusCode::FORBIDDEN, Json(json!({ "error": error, "banned": ban_json(ban) }))).into_response()
+}
+
+/// Where email is on it is required, and confirmed before an account plays
+/// or makes friends.
+fn must_be_confirmed(state: &Fireplace, id: u64) -> Result<(), ApiError> {
+    let confirmed =
+        state.accounts.lock().unwrap().get(id).is_some_and(|a| a.email.as_ref().is_some_and(|e| e.verified));
+    if state.mail.enabled() && !confirmed {
+        return Err(ApiError::new(
+            StatusCode::FORBIDDEN,
+            "confirm your email first: open the link we sent you, or add an address on your account page",
+        ));
+    }
+    Ok(())
 }
 
 /// Which account this request is from, or 401.
@@ -197,6 +279,8 @@ async fn features(State(state): State<Arc<Fireplace>>) -> Json<Value> {
         "privacy": "/privacy",
         "terms": "/terms",
         "min_age": state.config.operator.min_age,
+        "email_required": state.mail.enabled(),
+        "renames": accounts::RENAMES,
     }))
 }
 
@@ -227,6 +311,9 @@ struct NewAccount {
     /// Optional: an email when the terms or privacy notice change.
     #[serde(default)]
     policy_emails: bool,
+    /// Required where this Fireplace sends email, and confirmed by a link.
+    #[serde(default)]
+    email: String,
 }
 
 async fn create_account(
@@ -241,13 +328,17 @@ async fn create_account(
         Some(age) if age < u32::from(min_age) => {
             return Err(ApiError::new(
                 StatusCode::FORBIDDEN,
-                &format!("you must be at least {min_age} to make an account here"),
+                format!("you must be at least {min_age} to make an account here"),
             ));
         }
         Some(_) => {}
     }
     if !body.accept_terms {
         return Err(bad("accept the terms and the privacy notice to make an account"));
+    }
+    let address = body.email.trim().to_owned();
+    if state.mail.enabled() && !crate::mail::address_is_usable(&address) {
+        return Err(bad("an email address is needed to make an account here"));
     }
     let handle = body.handle.trim().to_owned();
     // Shape first, and the handle looked up before anything is hashed: a
@@ -274,8 +365,18 @@ async fn create_account(
         let id = accounts.create(&handle, hashed, now, state.max_accounts)?;
         accounts.set_recovery(id, hashes)?;
         accounts.set_policy_emails(id, body.policy_emails)?;
+        // Where it was made from is its first known place.
+        accounts.remember_place(id, &from, now, true);
+        if state.mail.enabled() {
+            accounts.set_email(id, Some(&address), now)?;
+        }
         (id, accounts.get(id).expect("just made").token_epoch)
     };
+    if state.mail.enabled() {
+        let link =
+            format!("{}/verify/{}", state.mail.public_url, state.keys.mint_link("verify", id, epoch, &address, now));
+        state.mail.send(&address, state.mail.verify_letter(&handle, &link));
+    }
     tracing::info!(id, %handle, "a new account");
     // The codes are shown this once and never again: only their hashes stay.
     let mut answer = tokens_for(&state, id, &handle, epoch, now);
@@ -287,7 +388,7 @@ async fn sign_in(
     State(state): State<Arc<Fireplace>>,
     Caller(from): Caller,
     Json(body): Json<SignIn>,
-) -> Result<Json<Value>, ApiError> {
+) -> Result<Response, ApiError> {
     let now = token::now();
     let handle = body.handle.trim().to_lowercase();
     {
@@ -318,9 +419,29 @@ async fn sign_in(
         // account here.
         return Err(ApiError::new(StatusCode::UNAUTHORIZED, "that handle and password do not go together"));
     }
+    // Only told to whoever has the password: a ban is nobody else's business.
+    let ban = state.accounts.lock().unwrap().get(id).and_then(|a| a.ban.clone()).filter(|b| b.active(now));
+    if let Some(ban) = ban {
+        return Ok(suspended(&ban));
+    }
+    if let Some(address) = new_place(&state, id, &from, now) {
+        if state.limits.lock().unwrap().allow(&format!("place@{id}"), 3, limit::HOUR, now) {
+            let link = format!(
+                "{}/confirm-sign-in/{}",
+                state.mail.public_url,
+                state.keys.mint_link("place", id, epoch, &from, now)
+            );
+            state.mail.send(&address, state.mail.new_place_letter(&handle, &from, &link));
+        }
+        tracing::info!(id, "asked to confirm a new place");
+        return Err(ApiError::new(
+            StatusCode::FORBIDDEN,
+            "you are signing in from somewhere new: we emailed you a link to confirm it is you, then sign in again",
+        ));
+    }
     state.presence.lock().unwrap().sweep(now);
     tracing::info!(id, %handle, "signed in");
-    Ok(Json(tokens_for(&state, id, &handle, epoch, now)))
+    Ok(Json(tokens_for(&state, id, &handle, epoch, now)).into_response())
 }
 
 #[derive(serde::Deserialize)]
@@ -368,6 +489,7 @@ async fn me(State(state): State<Arc<Fireplace>>, headers: HeaderMap) -> Result<J
     let id = signed_in(&state, &headers)?;
     let accounts = state.accounts.lock().unwrap();
     let account = accounts.get(id).ok_or_else(unauthorised)?;
+    let renames = accounts.renames_left(id, token::now());
     Ok(Json(json!({
         "id": account.id,
         "handle": account.handle,
@@ -378,6 +500,11 @@ async fn me(State(state): State<Arc<Fireplace>>, headers: HeaderMap) -> Result<J
         "email_verified": account.email.as_ref().is_some_and(|e| e.verified),
         "recovery_codes_left": account.recovery.len(),
         "policy_emails": account.policy_emails,
+        "avatar": account.avatar,
+        "admin": account.admin,
+        "renames_left": renames.0,
+        "next_rename": renames.1,
+        "places": account.seen,
     })))
 }
 
@@ -409,6 +536,11 @@ async fn export(State(state): State<Arc<Fireplace>>, headers: HeaderMap) -> Resu
         "recovery_codes_left": account.recovery.len(),
         "terms_accepted": account.terms_accepted,
         "policy_emails": account.policy_emails,
+        "places_signed_in_from": account.seen,
+        "display_name_changes": account.renamed,
+        "picture": (account.avatar > 0).then(|| format!("/avatars/{}.jpg", account.id)),
+        "admin": account.admin,
+        "ban": account.ban,
         "password": "stored only as an argon2id hash, which is not included",
         "presence_in_memory": seen.map(|w| json!({
             "flame": w.flame, "ember": w.ember, "ember_name": w.ember_name, "world": w.world, "at": w.at,
@@ -436,7 +568,10 @@ async fn set_email(
         return Err(ApiError::new(StatusCode::NOT_FOUND, "this Fireplace does not send email"));
     }
     let address = body.email.trim();
-    if !address.is_empty() && !crate::mail::address_is_usable(address) {
+    if address.is_empty() {
+        return Err(bad("an email is needed here: you can change it, but not remove it"));
+    }
+    if !crate::mail::address_is_usable(address) {
         return Err(bad("that is not an email address"));
     }
     let (hashed, handle) = password_of(&state, id)?;
@@ -533,6 +668,7 @@ async fn friends(State(state): State<Arc<Fireplace>>, headers: HeaderMap) -> Res
             "id": account.id,
             "handle": account.handle,
             "display_name": account.display(),
+            "avatar": account.avatar,
             "online": seen.is_some(),
             "flame": seen.map(|w| w.flame.clone()),
             "ember": seen.map(|w| w.ember),
@@ -543,7 +679,7 @@ async fn friends(State(state): State<Arc<Fireplace>>, headers: HeaderMap) -> Res
     let names = |ids: &Vec<u64>| -> Vec<Value> {
         ids.iter()
             .filter_map(|id| accounts.get(*id))
-            .map(|a| json!({ "id": a.id, "handle": a.handle, "display_name": a.display() }))
+            .map(|a| json!({ "id": a.id, "handle": a.handle, "display_name": a.display(), "avatar": a.avatar }))
             .collect()
     };
     Ok(Json(json!({
@@ -564,9 +700,24 @@ async fn set_name(
     Json(body): Json<DisplayName>,
 ) -> Result<Json<Value>, ApiError> {
     let id = signed_in(&state, &headers)?;
+    let now = token::now();
     let mut accounts = state.accounts.lock().unwrap();
-    accounts.set_display_name(id, &body.display_name)?;
-    Ok(Json(json!({ "display_name": accounts.get(id).map(|a| a.display()) })))
+    let same = accounts.get(id).is_some_and(|a| a.display_name == body.display_name.trim());
+    if !same {
+        if let (0, next) = accounts.renames_left(id, now) {
+            return Err(too_many(&format!(
+                "a display name can change {} times in 30 days; the next change is free from {}",
+                accounts::RENAMES,
+                accounts::when(next.unwrap_or(now))
+            )));
+        }
+        accounts.set_display_name(id, &body.display_name)?;
+        accounts.count_rename(id, now);
+    }
+    Ok(Json(json!({
+        "display_name": accounts.get(id).map(|a| a.display()),
+        "renames_left": accounts.renames_left(id, now).0,
+    })))
 }
 
 #[derive(serde::Deserialize)]
@@ -617,6 +768,7 @@ async fn delete_account(
     }
     state.accounts.lock().unwrap().delete(id)?;
     state.presence.lock().unwrap().clear(id);
+    avatar::remove(&state.config.data_dir, id);
     tracing::info!(id, %handle, "deleted their account");
     Ok(StatusCode::NO_CONTENT)
 }
@@ -644,6 +796,7 @@ async fn join(
     Json(body): Json<Join>,
 ) -> Result<Json<Value>, ApiError> {
     let id = signed_in(&state, &headers)?;
+    must_be_confirmed(&state, id)?;
     let flame = body.flame.trim();
     if flame.len() != 64 || !flame.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
         return Err(bad("that is not a certificate hash"));
@@ -669,6 +822,7 @@ async fn add_friend(
     Json(body): Json<ByHandle>,
 ) -> Result<Json<Value>, ApiError> {
     let id = signed_in(&state, &headers)?;
+    must_be_confirmed(&state, id)?;
     if !state.limits.lock().unwrap().allow(
         &format!("ask:{id}"),
         limit::REQUESTS_PER_HOUR,
@@ -691,6 +845,7 @@ async fn accept_friend(
     Json(body): Json<ByHandle>,
 ) -> Result<Json<Value>, ApiError> {
     let id = signed_in(&state, &headers)?;
+    must_be_confirmed(&state, id)?;
     let mut accounts = state.accounts.lock().unwrap();
     let them = accounts.by_handle(body.handle.trim()).map(|a| a.id).ok_or(Refused::NoSuchAccount)?;
     accounts.accept(id, them)?;
@@ -783,4 +938,294 @@ pub(crate) async fn check_password(hashed: String, password: String) -> bool {
     })
     .await
     .unwrap_or(false)
+}
+
+// --- pictures -----------------------------------------------------------------
+
+/// The body is the picture itself. It is decoded and redrawn small on a
+/// blocking thread (`avatar::shrink`); only that copy is kept.
+async fn upload_avatar(
+    State(state): State<Arc<Fireplace>>,
+    headers: HeaderMap,
+    body: axum::body::Bytes,
+) -> Result<Json<Value>, ApiError> {
+    let id = signed_in(&state, &headers)?;
+    must_be_confirmed(&state, id)?;
+    let now = token::now();
+    if !state.limits.lock().unwrap().allow(&format!("avatar@{id}"), avatar::PER_HOUR, limit::HOUR, now) {
+        return Err(too_many("that is a lot of pictures: try again in an hour"));
+    }
+    let jpeg = tokio::task::spawn_blocking(move || avatar::shrink(&body))
+        .await
+        .map_err(|_| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "that did not work, try again"))?
+        .map_err(|err| bad(&err.to_string()))?;
+    avatar::save(&state.config.data_dir, id, &jpeg).map_err(|err| {
+        tracing::error!(id, "could not save a picture: {err:#}");
+        ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "could not save that picture")
+    })?;
+    state.accounts.lock().unwrap().set_avatar(id, now)?;
+    Ok(Json(json!({ "avatar": now })))
+}
+
+async fn delete_avatar(State(state): State<Arc<Fireplace>>, headers: HeaderMap) -> Result<Json<Value>, ApiError> {
+    let id = signed_in(&state, &headers)?;
+    avatar::remove(&state.config.data_dir, id);
+    state.accounts.lock().unwrap().set_avatar(id, 0)?;
+    Ok(Json(json!({ "avatar": 0 })))
+}
+
+/// `/avatars/<id>.jpg`. Only ever a JPEG this server drew, served so that a
+/// browser cannot take it for anything else.
+async fn avatar_file(State(state): State<Arc<Fireplace>>, Path(file): Path<String>) -> Response {
+    let id = file.strip_suffix(".jpg").and_then(|id| id.parse::<u64>().ok());
+    let has = id.is_some_and(|id| state.accounts.lock().unwrap().get(id).is_some_and(|a| a.avatar > 0));
+    let (Some(id), true) = (id, has) else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+    match tokio::fs::read(avatar::path(&state.config.data_dir, id)).await {
+        Ok(bytes) => (
+            [
+                (axum::http::header::CONTENT_TYPE, "image/jpeg"),
+                (axum::http::header::X_CONTENT_TYPE_OPTIONS, "nosniff"),
+                (axum::http::header::CONTENT_SECURITY_POLICY, "default-src 'none'"),
+                // The page asks for ?v=<when it was set>, so a new one is a new URL.
+                (axum::http::header::CACHE_CONTROL, "public, max-age=604800"),
+            ],
+            bytes,
+        )
+            .into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+// --- admins -------------------------------------------------------------------
+//
+// The first admin is made with `fireplace admin make-admin <handle>` on the
+// server itself; after that, admins make admins. Every action is logged with
+// who did it to whom -- by account number and handle, never an address.
+
+/// The admin asking, or 403.
+fn admin_of(state: &Fireplace, headers: &HeaderMap) -> Result<(u64, String), ApiError> {
+    let id = signed_in(state, headers)?;
+    let accounts = state.accounts.lock().unwrap();
+    match accounts.get(id) {
+        Some(account) if account.admin => Ok((id, account.handle.clone())),
+        _ => Err(ApiError::new(StatusCode::FORBIDDEN, "that is for admins")),
+    }
+}
+
+/// Another account, by handle. An admin acts on others; their own account
+/// goes through the ordinary pages, with their password.
+fn target(state: &Fireplace, me: u64, handle: &str) -> Result<u64, ApiError> {
+    let id = state.accounts.lock().unwrap().by_handle(handle.trim()).map(|a| a.id).ok_or(Refused::NoSuchAccount)?;
+    if id == me {
+        return Err(bad("not on your own account"));
+    }
+    Ok(id)
+}
+
+#[derive(serde::Deserialize)]
+struct Claim {
+    link: String,
+}
+
+/// The one-time door: a link only the server's own key can sign, from the
+/// server's own machine, and only while there is no admin at all.
+async fn admin_claim(
+    State(state): State<Arc<Fireplace>>,
+    Caller(from): Caller,
+    Json(body): Json<Claim>,
+) -> Result<Json<Value>, ApiError> {
+    if !from.parse::<IpAddr>().is_ok_and(|ip| ip.is_loopback()) {
+        return Err(ApiError::new(StatusCode::FORBIDDEN, "only from the server itself"));
+    }
+    let claims = state
+        .keys
+        .verify_link(body.link.trim(), "admin", token::now())
+        .map_err(|_| ApiError::new(StatusCode::FORBIDDEN, "that link is not good"))?;
+    let mut accounts = state.accounts.lock().unwrap();
+    if accounts.any_admin() {
+        return Err(ApiError::new(StatusCode::CONFLICT, "there is already an admin"));
+    }
+    let account = accounts.get(claims.sub).filter(|a| a.token_epoch == claims.epoch).ok_or(Refused::NoSuchAccount)?;
+    let handle = account.handle.clone();
+    accounts.set_admin(claims.sub, true)?;
+    tracing::info!(id = claims.sub, %handle, "is the first admin");
+    Ok(Json(json!({ "admin": handle })))
+}
+
+/// Every account, with everything kept about it, sign-in addresses included.
+async fn admin_accounts(State(state): State<Arc<Fireplace>>, headers: HeaderMap) -> Result<Json<Value>, ApiError> {
+    admin_of(&state, &headers)?;
+    let now = token::now();
+    let accounts = state.accounts.lock().unwrap();
+    let mut list: Vec<&accounts::Account> = accounts.all().collect();
+    list.sort_by_key(|a| a.id);
+    Ok(Json(json!(list
+        .into_iter()
+        .map(|a| json!({
+            "id": a.id,
+            "handle": a.handle,
+            "display_name": a.display(),
+            "created": a.created,
+            "email": a.email.as_ref().map(|e| &e.address),
+            "email_verified": a.email.as_ref().is_some_and(|e| e.verified),
+            "admin": a.admin,
+            "avatar": a.avatar,
+            "friends": a.friends.len(),
+            "ban": a.ban.as_ref().filter(|b| b.active(now)).map(ban_json),
+            "places": a.seen,
+        }))
+        .collect::<Vec<_>>())))
+}
+
+async fn admin_bans(State(state): State<Arc<Fireplace>>, headers: HeaderMap) -> Result<Json<Value>, ApiError> {
+    admin_of(&state, &headers)?;
+    let mut bans = state.ip_bans.lock().unwrap();
+    Ok(Json(json!(bans
+        .list(token::now())
+        .iter()
+        .map(|(ip, ban)| json!({ "ip": ip, "by": ban.by, "ban": ban_json(ban) }))
+        .collect::<Vec<_>>())))
+}
+
+#[derive(serde::Deserialize)]
+struct BanBody {
+    #[serde(default)]
+    handle: String,
+    #[serde(default)]
+    ip: String,
+    /// 0 is for good.
+    #[serde(default)]
+    minutes: u64,
+    #[serde(default)]
+    reason: String,
+}
+
+fn make_ban(body: &BanBody, by: &str, now: u64) -> Result<Ban, ApiError> {
+    let reason = body.reason.trim();
+    if reason.is_empty() || reason.len() > 300 || reason.chars().any(char::is_control) {
+        return Err(bad("give a reason, up to 300 characters: the person banned is shown it"));
+    }
+    let until = if body.minutes == 0 { 0 } else { now.saturating_add(body.minutes.saturating_mul(60)) };
+    Ok(Ban { until, reason: reason.to_owned(), by: by.to_owned(), at: now })
+}
+
+async fn admin_ban(
+    State(state): State<Arc<Fireplace>>,
+    headers: HeaderMap,
+    Json(body): Json<BanBody>,
+) -> Result<Json<Value>, ApiError> {
+    let (me, by) = admin_of(&state, &headers)?;
+    let id = target(&state, me, &body.handle)?;
+    let ban = make_ban(&body, &by, token::now())?;
+    {
+        let mut accounts = state.accounts.lock().unwrap();
+        if accounts.get(id).is_some_and(|a| a.admin) {
+            return Err(bad("take their admin away first"));
+        }
+        accounts.set_ban(id, Some(ban.clone()))?;
+    }
+    state.presence.lock().unwrap().clear(id);
+    tracing::info!(admin = me, target = id, until = ban.until, "banned an account");
+    Ok(Json(json!({ "ban": ban_json(&ban) })))
+}
+
+async fn admin_unban(
+    State(state): State<Arc<Fireplace>>,
+    headers: HeaderMap,
+    Json(body): Json<ByHandle>,
+) -> Result<Json<Value>, ApiError> {
+    let (me, _) = admin_of(&state, &headers)?;
+    let id = target(&state, me, &body.handle)?;
+    state.accounts.lock().unwrap().set_ban(id, None)?;
+    tracing::info!(admin = me, target = id, "unbanned an account");
+    Ok(Json(json!({ "ban": null })))
+}
+
+async fn admin_ban_ip(
+    State(state): State<Arc<Fireplace>>,
+    headers: HeaderMap,
+    Caller(from): Caller,
+    Json(body): Json<BanBody>,
+) -> Result<Json<Value>, ApiError> {
+    let (me, by) = admin_of(&state, &headers)?;
+    let ip: IpAddr = body.ip.trim().parse().map_err(|_| bad("that is not an IP address"))?;
+    if ip.is_loopback() || ip.is_unspecified() {
+        return Err(bad("not this server's own address"));
+    }
+    if ip.to_string() == from {
+        return Err(bad("that is the address you are using: you would lock yourself out"));
+    }
+    let ban = make_ban(&body, &by, token::now())?;
+    state.ip_bans.lock().unwrap().set(&ip.to_string(), ban.clone());
+    tracing::info!(admin = me, until = ban.until, "banned an address");
+    Ok(Json(json!({ "ip": ip.to_string(), "ban": ban_json(&ban) })))
+}
+
+#[derive(serde::Deserialize)]
+struct ByIp {
+    ip: String,
+}
+
+async fn admin_unban_ip(
+    State(state): State<Arc<Fireplace>>,
+    headers: HeaderMap,
+    Json(body): Json<ByIp>,
+) -> Result<Json<Value>, ApiError> {
+    let (me, _) = admin_of(&state, &headers)?;
+    let ip = body.ip.trim().parse::<IpAddr>().map(|ip| ip.to_string()).unwrap_or_else(|_| body.ip.trim().to_owned());
+    if !state.ip_bans.lock().unwrap().remove(&ip) {
+        return Err(ApiError::new(StatusCode::NOT_FOUND, "that address is not banned"));
+    }
+    tracing::info!(admin = me, "unbanned an address");
+    Ok(Json(json!({ "ip": ip })))
+}
+
+async fn admin_delete(
+    State(state): State<Arc<Fireplace>>,
+    headers: HeaderMap,
+    Json(body): Json<ByHandle>,
+) -> Result<StatusCode, ApiError> {
+    let (me, _) = admin_of(&state, &headers)?;
+    let id = target(&state, me, &body.handle)?;
+    state.accounts.lock().unwrap().delete(id)?;
+    state.presence.lock().unwrap().clear(id);
+    avatar::remove(&state.config.data_dir, id);
+    tracing::info!(admin = me, target = id, "deleted an account");
+    Ok(StatusCode::NO_CONTENT)
+}
+
+#[derive(serde::Deserialize)]
+struct SetAdmin {
+    handle: String,
+    admin: bool,
+}
+
+async fn admin_set_admin(
+    State(state): State<Arc<Fireplace>>,
+    headers: HeaderMap,
+    Json(body): Json<SetAdmin>,
+) -> Result<Json<Value>, ApiError> {
+    let (me, _) = admin_of(&state, &headers)?;
+    let id = target(&state, me, &body.handle)?;
+    let mut accounts = state.accounts.lock().unwrap();
+    if body.admin && accounts.get(id).is_some_and(|a| a.ban.is_some()) {
+        return Err(bad("unban them first"));
+    }
+    accounts.set_admin(id, body.admin)?;
+    tracing::info!(admin = me, target = id, on = body.admin, "changed who is an admin");
+    Ok(Json(json!({ "admin": body.admin })))
+}
+
+async fn admin_sign_out(
+    State(state): State<Arc<Fireplace>>,
+    headers: HeaderMap,
+    Json(body): Json<ByHandle>,
+) -> Result<StatusCode, ApiError> {
+    let (me, _) = admin_of(&state, &headers)?;
+    let id = target(&state, me, &body.handle)?;
+    state.accounts.lock().unwrap().sign_out_everywhere(id)?;
+    tracing::info!(admin = me, target = id, "signed an account out everywhere");
+    Ok(StatusCode::NO_CONTENT)
 }

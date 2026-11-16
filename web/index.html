@@ -20,15 +20,17 @@
 <body>
 <svg class="sprite" aria-hidden="true">
   <symbol id="i-user" viewBox="0 0 64 64"><circle cx="32" cy="22" r="10"/><path d="M13 54a19 19 0 0 1 38 0"/></symbol>
-    <symbol id="i-people" viewBox="0 0 64 64"><circle cx="25" cy="22" r="9"/><path d="M10 52a15 15 0 0 1 30 0M43 15a9 9 0 0 1 0 18M44 38a15 15 0 0 1 11 14"/></symbol>
-    <symbol id="i-lock" viewBox="0 0 64 64"><rect x="14" y="29" width="36" height="26" rx="5"/><path d="M23 29v-8a9 9 0 0 1 18 0v8"/></symbol>
-    <symbol id="i-send" viewBox="0 0 64 64"><path d="M10 30L54 10 40 54 30 36zM30 36l24-26"/></symbol>
-    <symbol id="i-folder" viewBox="0 0 64 64"><path d="M8 18a5 5 0 0 1 5-5h12l6 7h20a5 5 0 0 1 5 5v22a5 5 0 0 1-5 5H13a5 5 0 0 1-5-5z"/></symbol>
-    <symbol id="i-exit" viewBox="0 0 64 64"><path d="M36 12H15v40h21M30 32h22M43 23l9 9l-9 9"/></symbol>
-    <symbol id="i-plus" viewBox="0 0 64 64"><path d="M32 14v36M14 32h36"/></symbol>
-    <symbol id="i-check" viewBox="0 0 64 64"><path d="M14 33l12 12 24-26"/></symbol>
-    <symbol id="i-globe" viewBox="0 0 64 64"><circle cx="32" cy="32" r="23"/><path d="M9 32h46M32 9c7 7 7 39 0 46c-7-7-7-39 0-46"/></symbol>
-    <symbol id="i-chevron" viewBox="0 0 64 64"><path d="M26 14l18 18-18 18"/></symbol>
+  <symbol id="i-people" viewBox="0 0 64 64"><circle cx="25" cy="22" r="9"/><path d="M10 52a15 15 0 0 1 30 0M43 15a9 9 0 0 1 0 18M44 38a15 15 0 0 1 11 14"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 64 64"><rect x="14" y="29" width="36" height="26" rx="5"/><path d="M23 29v-8a9 9 0 0 1 18 0v8"/></symbol>
+  <symbol id="i-send" viewBox="0 0 64 64"><path d="M10 30L54 10 40 54 30 36zM30 36l24-26"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 64 64"><path d="M8 18a5 5 0 0 1 5-5h12l6 7h20a5 5 0 0 1 5 5v22a5 5 0 0 1-5 5H13a5 5 0 0 1-5-5z"/></symbol>
+  <symbol id="i-exit" viewBox="0 0 64 64"><path d="M36 12H15v40h21M30 32h22M43 23l9 9l-9 9"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 64 64"><path d="M32 14v36M14 32h36"/></symbol>
+  <symbol id="i-check" viewBox="0 0 64 64"><path d="M14 33l12 12 24-26"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 64 64"><circle cx="32" cy="32" r="23"/><path d="M9 32h46M32 9c7 7 7 39 0 46c-7-7-7-39 0-46"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 64 64"><circle cx="32" cy="32" r="10"/><path d="M32 6v9M32 49v9M6 32h9M49 32h9M14 14l6 6M44 44l6 6M50 14l-6 6M20 44l-6 6"/></symbol>
+  <symbol id="i-close" viewBox="0 0 64 64"><path d="M18 18l28 28M46 18L18 46"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 64 64"><path d="M8 22a5 5 0 0 1 5-5h8l4-6h14l4 6h8a5 5 0 0 1 5 5v24a5 5 0 0 1-5 5H13a5 5 0 0 1-5-5z"/><circle cx="32" cy="33" r="10"/></symbol>
 </svg>
 
 <!-- Signed out -->
@@ -88,7 +90,7 @@
     <p class="hero-small">One account for every Hearth server.</p>
   </aside>
   <main class="auth-side">
-    <div class="auth-card">
+    <div class="auth-card" id="auth-card">
       <div class="brand"><img class="brand-mark" src="favicon.svg" alt=""><span>Hearth</span></div>
       <h1 id="whoami">Welcome back</h1>
       <div class="tabs" role="tablist">
@@ -103,6 +105,12 @@
         <div class="field"><svg class="ic"><use href="#i-lock"/></svg>
           <input id="password" type="password" autocomplete="current-password" required minlength="8" maxlength="128"></div>
         <div id="new-only" hidden>
+          <div id="new-email-row" hidden>
+            <label for="new-email">Email</label>
+            <div class="field"><svg class="ic"><use href="#i-send"/></svg>
+              <input id="new-email" type="email" autocomplete="email" maxlength="254"></div>
+            <p class="note">We send a link to confirm it is yours. Used for security and resets, never marketing.</p>
+          </div>
           <label for="birthdate">Date of birth</label>
           <input id="birthdate" type="date" min="1900-01-01" aria-describedby="birth-why">
           <p class="note" id="birth-why">Only to check you are at least <span id="min-age">16</span>. It is not stored.</p>
@@ -110,13 +118,25 @@
             <span>I accept the <a href="/terms" target="_blank">terms</a> and have read the
               <a href="/privacy" target="_blank">privacy notice</a>.</span></label>
           <label class="tick" id="policy-new-row"><input type="checkbox" id="policy-emails-new">
-            <span>Email me when the terms or privacy notice change. <small>Optional, needs a confirmed
-              email, and you can turn it off any time.</small></span></label>
+            <span>Email me when the terms or privacy notice change. <small>Optional, and you can turn it
+              off any time.</small></span></label>
         </div>
         <button class="main wide" id="auth-go">Sign in</button>
         <p class="msg" id="auth-msg" role="status"></p>
         <p class="note"><a href="/reset">Forgot your password?</a></p>
       </form>
+    </div>
+
+    <!-- A suspended account, after the right password: how long, and why. -->
+    <div class="auth-card banned" id="banned" hidden>
+      <span class="banned-mark"><svg class="ic"><use href="#i-lock"/></svg></span>
+      <h1>This account is suspended</h1>
+      <p class="banned-until" id="banned-until"></p>
+      <p class="note">Reason</p>
+      <p class="banned-reason" id="banned-reason"></p>
+      <p class="note">If you think this is a mistake, write to whoever runs this server
+        (see <a href="/privacy">privacy</a>), and say when it happened.</p>
+      <button class="wide" id="banned-back">Back</button>
     </div>
     <footer><a href="/privacy">Privacy</a><a href="/terms">Terms</a></footer>
   </main>
@@ -141,21 +161,43 @@
       <li><button data-view="profile" aria-current="page"><svg class="ic"><use href="#i-user"/></svg>Profile</button></li>
       <li><button data-view="friends"><svg class="ic"><use href="#i-people"/></svg>Friends<b class="count" id="incoming-count" hidden></b></button></li>
       <li><button data-view="security"><svg class="ic"><use href="#i-lock"/></svg>Security</button></li>
-      <li id="email-nav" hidden><button data-view="email"><svg class="ic"><use href="#i-send"/></svg>Email</button></li>
+      <li id="email-nav" hidden><button data-view="email"><svg class="ic"><use href="#i-send"/></svg>Email<b class="count warn" id="email-flag" hidden>!</b></button></li>
       <li><button data-view="data"><svg class="ic"><use href="#i-folder"/></svg>Your data</button></li>
+      <li id="admin-nav" hidden><button data-view="admin"><svg class="ic"><use href="#i-gear"/></svg>Admin</button></li>
     </ul>
     <div class="me">
-      <span class="avatar" id="avatar">?</span>
+      <span class="face" id="me-face"></span>
       <div class="me-text"><b id="me-name"></b><small id="me-handle"></small></div>
       <button class="icon-btn" id="signout" title="Sign out" aria-label="Sign out"><svg class="ic"><use href="#i-exit"/></svg></button>
     </div>
   </nav>
 
   <main class="content">
+    <div class="banner" id="confirm-banner" hidden>
+      <svg class="ic"><use href="#i-send"/></svg>
+      <span>Confirm your email to play with this account and make friends. Open the link we sent to
+        <b id="confirm-to"></b>.</span>
+      <button data-view="email" class="go-email">Email settings</button>
+    </div>
+
     <section class="view" id="view-profile">
       <header><h1>Profile</h1><p>How you show up to other players.</p></header>
+      <div class="card picture">
+        <span class="face big" id="pic-face"></span>
+        <div class="grow">
+          <h2>Picture</h2>
+          <p class="note">PNG, JPEG, WebP or GIF. It is cropped square and made small; nothing else from the
+            file is kept. Other players see it.</p>
+          <div class="row">
+            <label class="button main" for="pic-file"><svg class="ic"><use href="#i-camera"/></svg>Upload a picture</label>
+            <input type="file" id="pic-file" accept="image/png,image/jpeg,image/webp,image/gif" class="visually-hidden">
+            <button id="pic-remove" hidden>Remove</button>
+          </div>
+          <p class="msg" id="pic-msg" role="status"></p>
+        </div>
+      </div>
       <div class="card">
-        <h2>Display name</h2>
+        <h2>Display name <span class="pill" id="renames-left"></span></h2>
         <form class="row" id="name-form">
           <input id="display" maxlength="32" aria-label="Display name" required>
           <button class="main">Save</button>
@@ -193,7 +235,13 @@
     </section>
 
     <section class="view" id="view-security" hidden>
-      <header><h1>Security</h1><p>Your password, and the codes that get you back in without it.</p></header>
+      <header><h1>Security</h1><p>Your password, your recovery codes, and everywhere you signed in from.</p></header>
+      <div class="card">
+        <h2>Where you signed in from</h2>
+        <p class="note">Kept for 90 days after each was last used, only for security: a new address has to
+          be confirmed by email. Not you? Change your password below.</p>
+        <ul class="places" id="places"></ul>
+      </div>
       <div class="card">
         <h2>Change password</h2>
         <form id="pw-form" class="stack">
@@ -218,38 +266,40 @@
     </section>
 
     <section class="view" id="view-email" hidden>
-      <header><h1>Email <span class="pill">optional</span></h1>
-        <p>For resetting your password, a short notice when your password or email changes, and, only if you
-          ask, word of changes to the terms or privacy notice. Never marketing.</p></header>
-      <div class="card">
-        <label class="switch"><input type="checkbox" id="policy-emails" role="switch"><span class="track"></span>
-          <span><b>Tell me when the terms or privacy notice change</b><small>Sent only to a confirmed address.
-            Turn it off whenever you like.</small></span></label>
-        <p class="msg" id="policy-msg" role="status"></p>
-      </div>
+      <header><h1>Email</h1>
+        <p>Needed to confirm sign-ins from new places and for password resets; also short notices when your
+          password or email changes, and, only if you ask, word of changes to the terms or privacy notice.
+          Never marketing.</p></header>
       <div class="card" id="email-box">
         <p class="state" id="email-state"></p>
         <form id="email-form" class="stack">
           <label for="email">Email address</label>
-          <input id="email" type="email" autocomplete="email" maxlength="254">
+          <input id="email" type="email" autocomplete="email" maxlength="254" required>
           <label for="email-pw">Password</label>
           <input id="email-pw" type="password" autocomplete="current-password" required>
-          <div class="actions row"><button class="main">Save email</button><button type="button" id="email-remove">Remove email</button></div>
+          <div class="actions row"><button class="main" id="email-save">Save email</button></div>
           <p class="msg" id="email-msg" role="status"></p>
         </form>
+      </div>
+      <div class="card">
+        <label class="switch"><input type="checkbox" id="policy-emails" role="switch"><span class="track"></span>
+          <span><b>Tell me when the terms or privacy notice change</b><small>Your choice, sent only to a confirmed
+            address. Turn it off whenever you like.</small></span></label>
+        <p class="msg" id="policy-msg" role="status"></p>
       </div>
     </section>
 
     <section class="view" id="view-data" hidden>
       <header><h1>Your data</h1><p>Take it with you, or take it away.</p></header>
       <div class="card split">
-        <div><h2>Download my data</h2><p class="note">Everything this server stores about your account, as a JSON file.</p></div>
+        <div><h2>Download my data</h2><p class="note">Everything this server keeps about your account, sign-in
+          addresses included, as a JSON file.</p></div>
         <button id="export"><svg class="ic"><use href="#i-folder"/></svg>Download</button>
       </div>
       <div class="card danger-zone">
         <h2>Delete account</h2>
-        <p class="note">This removes your account and your friends list for good. Servers keep nothing
-          that points back to you.</p>
+        <p class="note">This removes your account, your picture and your friends list for good. Servers keep
+          nothing that points back to you.</p>
         <form id="del-form" class="stack">
           <label for="del-pw">Password</label>
           <input id="del-pw" type="password" autocomplete="current-password" required>
@@ -259,7 +309,55 @@
       </div>
       <footer><a href="/privacy">Privacy</a><a href="/terms">Terms</a></footer>
     </section>
+
+    <section class="view" id="view-admin" hidden>
+      <header><h1>Admin</h1><p>Every account and what is kept about it. Everything you do here is logged
+        with your name.</p></header>
+      <div class="card">
+        <div class="row admin-tools">
+          <div class="field grow"><svg class="ic"><use href="#i-user"/></svg>
+            <input id="admin-search" placeholder="Search handle, name, email or IP" aria-label="Search accounts" spellcheck="false"></div>
+          <span class="pill" id="admin-count"></span>
+        </div>
+        <p class="msg" id="admin-msg" role="status"></p>
+        <ul class="accounts" id="admin-accounts"></ul>
+      </div>
+      <div class="card">
+        <h2>Blocked IP addresses</h2>
+        <p class="note">A blocked address is turned away before anything else runs, and shown a page saying
+          for how long and why.</p>
+        <form class="ban-form" id="ip-form">
+          <input id="ip-addr" placeholder="IP address" aria-label="IP address" required spellcheck="false">
+          <select id="ip-time" aria-label="For how long"></select>
+          <input id="ip-reason" placeholder="Reason, shown to them" aria-label="Reason" required maxlength="300">
+          <button class="danger">Block</button>
+        </form>
+        <p class="msg" id="ip-msg" role="status"></p>
+        <ul class="people" id="ip-bans"></ul>
+      </div>
+    </section>
   </main>
+
+  <aside class="rail" aria-label="Friends">
+    <h2>Friends <span class="pill" id="rail-online"></span></h2>
+    <ul class="rail-list" id="rail"></ul>
+    <button class="wide quiet" data-view="friends" id="rail-more"><svg class="ic"><use href="#i-plus"/></svg>Add friends</button>
+  </aside>
+</div>
+
+<!-- An admin's ban: who, for how long, why. -->
+<div class="overlay" id="ban-box" hidden>
+  <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="ban-title">
+    <h2 id="ban-title">Suspend</h2>
+    <form id="ban-form" class="stack">
+      <label for="ban-time">For how long</label>
+      <select id="ban-time"></select>
+      <label for="ban-reason">Reason <small class="note">they are shown it</small></label>
+      <input id="ban-reason" required maxlength="300">
+      <div class="actions row"><button class="danger">Suspend</button><button type="button" id="ban-cancel">Cancel</button></div>
+      <p class="msg" id="ban-msg" role="status"></p>
+    </form>
+  </section>
 </div>
 
 <script src="app.js"></script>
