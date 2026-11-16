@@ -8,8 +8,8 @@
 }
 @media (prefers-color-scheme: light) {
   :root {
-    --bg: #f4f1ea; --side: #ebe6dc; --panel: #fffdf8; --raise: #f4efe6; --line: #ddd5c6;
-    --text: #1a1f3a; --dim: #626987; --stone: #3d4f9c; --fire: #c4601a; --ember: #a8460c;
+    --bg: #eceef5; --side: #e2e5ef; --panel: #ffffff; --raise: #f3f4f9; --line: #d3d8e6;
+    --text: #1a1f3a; --dim: #565d7c; --stone: #3d4f9c; --fire: #ad500f; --ember: #8c3d08;
     --on-fire: #fff; --red: #b33a2e; --green: #2a7d4c;
   }
 }
@@ -121,10 +121,7 @@ footer a:hover { color: var(--text); }
            background: rgba(5, 6, 16, .7); backdrop-filter: blur(4px); animation: fade .25s both; }
 .sheet { width: 100%; max-width: 440px; background: var(--panel); border: 1px solid var(--line); border-radius: 18px;
          padding: 28px; box-shadow: 0 30px 80px -20px rgba(0, 0, 0, .6); animation: pop .4s var(--ease) both; }
-.badge-ic { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; margin-bottom: 14px;
-            background: color-mix(in srgb, var(--fire) 16%, transparent); color: var(--fire); }
-.badge-ic svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 5.5;
-                stroke-linecap: round; stroke-linejoin: round; }
+.sheet h2 .ic { width: 22px; height: 22px; color: var(--fire); }
 .codes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 18px 0 0; padding: 0; list-style: none;
          counter-reset: c; }
 .codes li { counter-increment: c; padding: 9px 12px; border-radius: 9px; background: var(--bg); border: 1px solid var(--line);
@@ -204,8 +201,6 @@ footer a:hover { color: var(--text); }
 .dot { position: absolute; right: -3px; bottom: -3px; width: 12px; height: 12px; border-radius: 50%;
        background: var(--dim); border: 2px solid var(--panel); }
 .dot.on { background: var(--green); }
-.dot.on::after { content: ""; position: absolute; inset: -2px; border-radius: 50%; border: 2px solid var(--green);
-                 animation: ping 2s ease-out infinite; }
 .people .row button { padding: 7px 12px; font-size: .88rem; }
 
 /* --- phones: the fire shrinks to a band, the sidebar to a bar ---------------- */
@@ -245,7 +240,6 @@ footer a:hover { color: var(--text); }
   10% { opacity: 1; }
   100% { opacity: 0; transform: translate(var(--x, 30px), -46vh); }
 }
-@keyframes ping { to { opacity: 0; transform: scale(2); } }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
   .embers { display: none; }

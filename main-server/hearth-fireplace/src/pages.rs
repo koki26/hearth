@@ -52,7 +52,7 @@ pub fn esc(text: &str) -> String {
 // The account page's palette (web/style.css): night stone and firelight.
 const STYLE: &str = "
 :root{--bg:#0d1022;--fg:#e9ecf8;--muted:#8f97bd;--card:#171c3a;--line:#2a3160;--accent:#ffb366;--stone:#aec2ff;--on:#2a1404}
-@media (prefers-color-scheme:light){:root{--bg:#f4f1ea;--fg:#1a1f3a;--muted:#626987;--card:#fffdf8;--line:#ddd5c6;--accent:#c4601a;--stone:#3d4f9c;--on:#fff}}
+@media (prefers-color-scheme:light){:root{--bg:#eceef5;--fg:#1a1f3a;--muted:#565d7c;--card:#fff;--line:#d3d8e6;--accent:#ad500f;--stone:#3d4f9c;--on:#fff}}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.6 system-ui,-apple-system,'Segoe UI',sans-serif}
 main{max-width:40rem;margin:0 auto;padding:3rem 16px;animation:rise .5s cubic-bezier(.2,.7,.2,1) both}
 h1,h2{font-family:'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;font-weight:600}
