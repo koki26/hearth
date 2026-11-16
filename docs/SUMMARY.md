@@ -7,7 +7,7 @@
 
 * [Running the servers](RUNNING.md)
 * [Operator cheatsheet](operator.md)
-* [The official Fireplace on Oracle Cloud](ORACLE.md)
+* [Host a Fireplace on a cloud server](ORACLE.md)
 * [Email on your own Fireplace](SELFHOST-MAIL.md)
 * [Running a Fireplace under GDPR](PRIVACY-OPS.md)
 

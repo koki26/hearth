@@ -13,7 +13,8 @@ What it sends, and nothing else (`docs/decisions.md` D63):
 * a notice when the password changes, or when the address changes (sent to
   the *old* address).
 
-Plain text, in English, a few lines each.
+A few lines each, in English: a designed HTML letter with the Hearth banner,
+and the same text as plain text for mail apps that want it.
 
 ## The settings
 

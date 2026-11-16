@@ -6,16 +6,13 @@ extends Node3D
 ## It does not move until you ask it to. You start in the car at the top of the
 ## shaft with the doors shut and the panel on the wall beside you; once you
 ## have picked a server, `descend` sends it down, and the doors open on the
-## world when it lands. Riding down before anybody had typed an address was a
-## four second wait for nothing.
+## world when it lands.
 ##
 ## The car carries the player: main.gd pins the play space to `car_y()` while
-## `carrying()` is true. Left to gravity and the ground ray you hung in the air
-## while the car dropped away at a constant speed, then free-fell onto it.
+## `carrying()` is true.
 ##
 ## The doors are on +X and the panel is on the -Z wall, so the one never covers
-## the other. The rails run outside the other three sides, because inside they
-## came up through the floor you were standing on.
+## the other. The rails run outside the other three sides, clear of the floor.
 
 signal arrived
 

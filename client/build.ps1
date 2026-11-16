@@ -11,7 +11,7 @@ param(
 # Native tools write progress to stderr, which "Stop" would treat as fatal.
 $ErrorActionPreference = "Continue"
 $root = Resolve-Path "$PSScriptRoot/.."
-# Fail before anything else: a missing Godot used to get as far as deleting dist/.
+# Fail before anything else, so a missing Godot never gets as far as deleting dist/.
 if (-not (Get-Command $Godot -ErrorAction SilentlyContinue)) {
 	throw "Godot not found ('$Godot'). Put it on PATH, set GODOT to the *_console.exe, or pass -Godot <path>."
 }
@@ -39,9 +39,7 @@ Write-Host "Copied the $build extension to client/godot/bin."
 
 if ($Test) {
 	# Every tests/*_test.gd, so adding a suite needs no change here.
-	# Not $test: PowerShell variables are case-insensitive, so that is the
-	# -Test switch above, and assigning a file to it silently skipped the whole
-	# loop -- which is how this stopped running the tests without saying so.
+	# Not $test: PowerShell variables are case-insensitive, so that is the -Test switch.
 	foreach ($suite in (Get-ChildItem "$PSScriptRoot/godot/tests" -Filter "*_test.gd" | Sort-Object Name)) {
 		& $Godot --headless --path "$PSScriptRoot/godot" --script "res://tests/$($suite.Name)"
 		if ($LASTEXITCODE -ne 0) { throw "$($suite.Name) failed." }

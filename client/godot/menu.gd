@@ -108,9 +108,7 @@ func is_open() -> bool:
 ## Shows the menu `DISTANCE` in front of `head`, at eye level and facing it.
 ##
 ## `head` is in this node's PARENT space, not the world. The menu hangs off the
-## play space, so it rides a descending lift and walks with you; placed in the
-## world it stayed where it was opened and the player dropped straight past it
-## at six metres a second.
+## play space, so it rides a descending lift and walks with you.
 ##
 ## Reopening with the same number of rows keeps the cursor where it was, so
 ## toggling a setting from the menu does not throw you back to the top.
@@ -241,8 +239,7 @@ func hold(by: Vector2i, delta: float) -> void:
 		_repeat = 0.0
 		return
 	if _repeat <= 0.0:
-		# No auto-repeat: one press is one step. Holding used to walk the
-		# selection along on its own, which an off-centre stick did for free.
+		# No auto-repeat: one press is one step, or an off-centre stick walks the selection.
 		_repeat = INF
 		if by.y != 0:
 			move(by.y)
@@ -364,8 +361,7 @@ func _next_pickable(from: int, by: int) -> int:
 	return clampi(_pick, 0, maxi(_rows.size() - 1, 0))
 
 
-## What goes on the left of a row. Leading spaces were how rows used to say
-## "under that heading"; headings say it themselves now.
+## What goes on the left of a row.
 func _text(row: Dictionary) -> String:
 	if row.has("heading"):
 		return str(row["heading"]).to_upper()

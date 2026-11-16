@@ -43,8 +43,7 @@ func _run() -> void:
 	await _shot("typing")
 
 	# And the settings menu, which is the other panel. Not by faking a join:
-	# that starts gravity, the player drops, and the menu is left behind where
-	# the camera used to be -- which looks like a bug in the menu and is not.
+	# that starts gravity and the player drops away from the menu.
 	var keyboard: WorldKeyboard = main.get_node("Keyboard")
 
 	# The key grid, which only the headset ever shows. Asked for directly

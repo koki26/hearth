@@ -11,8 +11,7 @@ extends Node3D
 ## and built in its place.
 ##
 ## You start in the lift, and you join from a panel on its wall: see
-## elevator.gd and keyboard.gd. There is no 2D connect screen any more, because
-## you cannot read one with a headset already on your face.
+## elevator.gd and keyboard.gd.
 
 const HUB_INSTANCE := 0
 const FLAG_VR := 1
@@ -388,9 +387,7 @@ func _process(delta: float) -> void:
 	var camera: XRCamera3D = $XROrigin3D/Camera
 	var head: Vector3 = camera.global_position
 	_elevator.check(head, delta)
-	# The car carries you down. Left to gravity and the ground ray you hung in
-	# the air while the car dropped away at a constant speed, then free-fell
-	# seven metres onto it: that was the lift "throwing" you.
+	# The car carries you down; gravity alone would leave you falling behind it.
 	if _elevator.carrying():
 		$XROrigin3D.position.y = _elevator.car_y()
 		_fall = 0.0
@@ -637,8 +634,7 @@ func _place_lift_ui() -> void:
 		if _elevator.has_car():
 			ui.global_transform = _elevator.mount_at(height)
 			continue
-		# No car to hang it on: put it in front of the player rather than leave
-		# the only way in sitting where the lift used to be.
+		# No car to hang it on: put it in front of the player.
 		var forward := -camera.global_transform.basis.z
 		forward.y = 0.0
 		forward = forward.normalized() if forward.length() > 0.01 else Vector3.FORWARD
@@ -654,10 +650,7 @@ func _join() -> void:
 	_details.save()
 	_connecting = true
 	_message = ""
-	# The lift stays put until the server answers. It used to leave the moment
-	# you picked one, so a refused or unreachable server rode you all the way
-	# down, opened the doors on the hub, and then snapped the car back to the
-	# top when the failure arrived. `_on_connected` sends it down instead.
+	# The lift stays put until the server answers: `_on_connected` sends it down.
 	_status("Connecting to %s:%d..." % [parsed["host"], int(parsed["port"])])
 	_refresh_panel()
 	# Signed in, the server is told who you are by a ticket from the
@@ -1180,9 +1173,7 @@ func _on_peer_pose(id: int, head: Transform3D, left: Transform3D, right: Transfo
 		_peers[id].set_pose(head, left, right, flags)
 
 
-## Status used to hang in the world on a Label3D, which read as a sign bolted
-## to the sky. It is a log line now; anything the player has to act on goes on
-## the lift panel instead.
+## A log line. Anything the player has to act on goes on the lift panel.
 func _status(text: String) -> void:
 	print(text)
 
@@ -2424,12 +2415,9 @@ func _carry(delta: float) -> void:
 
 ## Moves the play space sideways, stopped by whatever is in the way.
 ##
-## Walking was a straight add to the play space position, with the only
-## collision in the game being the ray that looks for the floor -- so every
-## wall, pillar and crate in every world was walk-through. This sweeps the
-## player's capsule along the step and stops at the first thing it hits, then
-## retries each axis on its own so you slide along a wall instead of sticking
-## to it.
+## Sweeps the player's capsule along the step and stops at the first thing it
+## hits, then retries each axis on its own so you slide along a wall instead of
+## sticking to it.
 func _step(move: Vector3) -> void:
 	if move.is_zero_approx():
 		return
@@ -2448,9 +2436,7 @@ func _step(move: Vector3) -> void:
 ## How much of `move` the player can actually make from `feet`.
 ##
 ## A ShapeCast3D node rather than a space-state query: `direct_space_state` is
-## only valid inside physics, and called from `_process` it quietly found
-## nothing at all -- walls with collision, and the player strolling through
-## 5.99 m of an attempted 6. The ground ray already works this way.
+## only valid inside physics, and this runs from `_process`.
 ##
 ## The node hangs off Main, which never rotates, so its local axes are the
 ## world's even when the play space has been turned.

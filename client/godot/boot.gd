@@ -17,9 +17,7 @@ extends Node
 const STICK_DEADZONE := 0.3
 ## How far in front of you the panel hangs, and how far out of place it has to
 ## get before it is put back. Both distance and angle, because the first pose
-## the headset reports is usually the origin: placed from a guessed eye height
-## the panel ended up above the view, and a check on horizontal distance alone
-## never noticed.
+## the headset reports is usually the origin, not the player's eyes.
 const DISTANCE := 1.25
 const STRAY := 0.7
 const STRAY_ANGLE := 0.6

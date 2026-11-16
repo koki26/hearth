@@ -3,9 +3,8 @@ extends SceneTree
 ## Drives the real main.tscn with real input events, without a window:
 ##   godot --headless --path client/godot --script res://tests/input_test.gd
 ##
-## This exists because "I cannot type into the panel on desktop" got shipped:
-## every piece underneath had its own test and the routing between them had
-## none. It loads the actual scene and pushes actual key presses through it.
+## Every piece underneath has its own test; this one covers the routing between
+## them, by loading the actual scene and pushing actual key presses through it.
 
 var _failed := 0
 var _checks := 0
@@ -195,9 +194,7 @@ func _stairs(main: Node3D) -> void:
 	_check(origin.position.z > 3.6, "a crate still stops you (z=%.2f)" % origin.position.z)
 
 
-## A server that never answers used to ride you all the way down, open the
-## doors on the hub, and then snap the car back to the top when the failure
-## finally arrived. Nothing should move until the server has said yes.
+## Nothing should move until the server has said yes.
 func _no_connect_keeps_the_lift_up(main: Node3D) -> void:
 	var lift = main._elevator
 	# descending() is "the doors are not open yet", which is also true of a
@@ -227,9 +224,8 @@ func _no_connect_keeps_the_lift_up(main: Node3D) -> void:
 	main._details.save()
 
 
-## Walking used to be a straight add to the play space position, so every wall
-## in every world was walk-through. The shut lift is the tightest box there is
-## to prove it against: four walls and nowhere to go.
+## Walls stop you. The shut lift is the tightest box to prove it against: four
+## walls and nowhere to go.
 func _walls_are_solid(main: Node3D) -> void:
 	var origin: Node3D = main.get_node("XROrigin3D")
 	var lift = main._elevator

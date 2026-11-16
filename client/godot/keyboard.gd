@@ -180,8 +180,7 @@ func hold(by: Vector2i, delta: float) -> void:
 		_repeat = 0.0
 		return
 	if _repeat <= 0.0:
-		# No auto-repeat: one press is one step. Holding used to walk the
-		# selection along on its own, which an off-centre stick did for free.
+		# No auto-repeat: one press is one step, or an off-centre stick walks the selection.
 		_repeat = INF
 		move(by)
 	_repeat -= delta

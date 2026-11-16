@@ -1,7 +1,9 @@
-# The official Fireplace, on Oracle Cloud Always Free
+# Host a Fireplace on a cloud server
 
-How `fireplace.example.org` is set up: one Always Free instance
-running the Fireplace, behind Caddy, with a certificate it renews itself.
+A Fireplace on a small cloud machine, behind Caddy, with a certificate it
+renews itself. The example is Oracle Cloud's Always Free tier, because it
+costs nothing; any Ubuntu server with a public IP works the same from step 2
+on. Replace `fireplace.example.org` with your own name throughout.
 
 **Only the Fireplace goes here.** A Flame — the game server — is hosted by
 anybody, including you at home, and needs no cloud at all: see
@@ -55,23 +57,20 @@ Console → **Compute → Instances → Create instance**.
 ssh ubuntu@<your-public-ip>
 ```
 
-## 2. The name, on Cloudflare
+## 2. A name for it
 
-In your DNS provider's dashboard for `example.org`, add an `A` record:
+At whoever hosts DNS for your domain, add an `A` record pointing the name
+you picked at the instance's public IP:
 
-| Type | Name | Content | Proxy |
-|---|---|---|---|
-| A | `fireplace` | your instance's public IP | **DNS only** |
+| Type | Name | Content |
+|---|---|---|
+| A | `fireplace` | your instance's public IP |
 
-**DNS only — the grey cloud, not the orange one.** A proxied record puts
-Cloudflare's edge between Let's Encrypt and your box, and the edge terminates
-TLS there, which breaks both of the challenges Caddy can use to get a
-certificate.
-
-If you later want the orange cloud for its own sake, the way through is a
-Caddy built with the Cloudflare DNS module (`xcaddy`) and an API token scoped
-to DNS edit, using the DNS-01 challenge instead. That is a variant, not the
-default, and nothing here needs it.
+**On Cloudflare, set it to DNS only** (the grey cloud, not the orange one). A
+proxied record terminates TLS at Cloudflare's edge, which breaks both of the
+challenges Caddy uses to get a certificate. If you want the proxy anyway, use
+a Caddy built with the Cloudflare DNS module (`xcaddy`) and the DNS-01
+challenge instead.
 
 ```sh
 dig +short fireplace.example.org    # your instance's IP
@@ -113,7 +112,7 @@ sudo apt install -y build-essential git
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 . "$HOME/.cargo/env"
 
-git clone <your-fork-or-this-repo> hearth
+git clone https://github.com/koki26/hearth.git
 cd hearth
 cargo build --release -p hearth-fireplace
 cargo test -p hearth-fireplace             # a few seconds, and worth it here
@@ -175,7 +174,8 @@ curl -s https://fireplace.example.org/health      # ok
 curl -s https://fireplace.example.org/key         # the signing key
 ```
 
-Then make the first account — yours, before anybody else's:
+Then make the first account — yours, before anybody else's — and make it
+the admin ([Operator cheatsheet](operator.md)):
 
 ```sh
 curl -s -XPOST https://fireplace.example.org/accounts \
@@ -278,11 +278,12 @@ A restart signs nobody out: tokens are signed, not stored, and the key stays
 on disk. Presence is forgotten, and every client says where it is again
 within a minute.
 
-**Pointing the game at it** is one line — `ConnectDetails.DEFAULT_FIREPLACE`
-in `client/godot/connect.gd`, which already reads
-`https://fireplace.example.org`. A player can point their own client
-somewhere else, behind the warning page that says what that means
-(`docs/decisions.md` D54).
+**Pointing players at it:** in the client, a player types an account server
+into the Accounts field, behind a page that says what trusting another Fireplace
+means (`docs/decisions.md` D54). For a build of your own that uses yours by
+default, change `ConnectDetails.DEFAULT_FIREPLACE` in
+`client/godot/connect.gd`, and point your Flames at it with `fireplace =` in
+their `flame.toml`.
 
 **Watch** the Always Free usage page for OCPU-hours and egress, and set a
 budget alert at $0.01, so a change in the free allowance arrives as an email

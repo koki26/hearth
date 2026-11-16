@@ -39,7 +39,7 @@ web_dir = "web"
 # "smtp" = send through an SMTP server
 # "log"  = print emails to the log (development only; refused in a release
 #          build unless FIREPLACE_DEV_MAIL=1)
-backend = "smtp"
+backend = "none"
 public_url = "https://fireplace.example.org"   # base for links in emails
 from = "Hearth <hearth@example.org>"
 reply_to = "info@example.org"                  # optional
@@ -71,6 +71,6 @@ hosting = ""         # FILL IN: provider and region, e.g. "Hetzner, Falkenstein,
 authority = ""       # FILL IN: your country's data protection authority, with a link
 # The youngest anybody may be to make an account. The built-in default is 16,
 # the GDPR default; some countries allow as low as 13.
-min_age = 15
+min_age = 16
 # How long a deleted account lives on in backups (docs/ORACLE.md, step 7).
 backup_days = 14

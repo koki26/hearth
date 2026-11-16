@@ -43,8 +43,7 @@ Write down which:
   | DPA / terms (link, date accepted) | |
   | Where it stores data | |
 
-For the official server (`mail.example.org`): fill this in with
-whoever runs that mail host. If it is a hosting company's mail service, it
+If you send through a mail host somebody else runs, fill this in for them. If it is a hosting company's mail service, it
 is a processor and its DPA is usually part of the hosting terms.
 
 ## A request to see or delete data

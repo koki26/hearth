@@ -70,5 +70,5 @@ sudo systemctl restart fireplace
 
 ## Read more
 
-* [The official Fireplace on Oracle Cloud](ORACLE.md) — the full setup, backups included
+* [Host a Fireplace on a cloud server](ORACLE.md) — the full setup, backups included
 * [Running a Fireplace under GDPR](PRIVACY-OPS.md) — what admins may and must do

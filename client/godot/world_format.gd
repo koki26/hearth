@@ -290,13 +290,9 @@ static func _shapes_of(visual: Node3D, convex: bool) -> Array[CollisionShape3D]:
 
 ## The cheapest shape that still matches the mesh.
 ##
-## This used to build a concave triangle mesh for every static object, which is
-## the most expensive shape there is. A world of a couple of hundred boxes and
-## spheres then cost about thirty seconds of five-second frames on first load,
-## which is what "it gets really laggy when connecting" was.
-##
-## A box, a sphere and a cylinder have exact primitive shapes. Anything else
-## convex gets a hull. Only a torus, a plane and a glTF model -- which can be
+## A concave triangle mesh is the most expensive shape there is, so: a box,
+## a sphere and a cylinder have exact primitive shapes, anything else convex
+## gets a hull. Only a torus, a plane and a glTF model -- which can be
 ## any shape at all, including concave -- still need the real triangles, and a
 ## grabbable never does, because you carry it rather than walk through it.
 static func _shape_for(mesh: Mesh, convex: bool) -> Shape3D:

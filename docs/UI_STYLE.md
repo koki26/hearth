@@ -25,7 +25,7 @@ towards you:
  │ (B)  Bob                 │ │ (🔈) Music   ━━━●───  60%  │ Cat  21:05             │
  │      offline             │ │ (🔈) Sound   ━━━━━●─  80%  │ on my way              │
  │ IN THIS EMBER  3 ─────── │ │ VIEW ───────────────────── │                        │
- │ (K)• Ada     you         │ │ (◐) Mirror         People ›│ ╭────────────────────╮ │
+ │ (A)• Ada     you         │ │ (◐) Mirror         People ›│ ╭────────────────────╮ │
  │ (C)• Cat     here        │ │ (⇥) Leave this flame       │ │ Say something...   │ │
  ╰──────────────────────────╯ ╰────────────────────────────╯ ╰────────────────────────╯
 ```

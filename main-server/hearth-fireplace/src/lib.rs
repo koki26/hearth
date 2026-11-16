@@ -225,11 +225,11 @@ mod tests {
     }
 
     #[test]
-    fn the_shipped_config_parses_and_says_what_the_official_server_does() {
+    fn the_shipped_config_parses_and_starts_with_nothing_to_fill_in() {
         let config = Config::parse(include_str!("../../../deploy/fireplace.toml")).unwrap();
-        assert_eq!(config.mail.backend, mail::Backend::Smtp);
+        assert_eq!(config.mail.backend, mail::Backend::None);
         assert_eq!(config.mail.smtp.port, 587);
-        assert_eq!(config.operator.min_age, 15);
+        assert_eq!(config.operator.min_age, 16);
         // A fresh self-host sends nothing until somebody sets it up.
         assert_eq!(Config::default().mail.backend, mail::Backend::None);
     }

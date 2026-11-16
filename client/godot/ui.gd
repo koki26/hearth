@@ -88,10 +88,7 @@ const CHIP := 0.084
 ## Every glyph gets a dark outline, as a fraction of its own font size: that
 ## is what makes text readable whatever ends up behind it -- a lit brazier, a
 ## white crate, somebody's avatar.
-##
-## It has to scale with the font. A fixed nine pixels is a fifth of the stroke
-## height at FONT, and at panel distance that thickness bleeds into the letters
-## and turns white text into grey mush.
+## It scales with the font: a fixed thickness bleeds into small letters.
 const OUTLINE_RATIO := 0.085
 ## Roughly how wide one character is, as a fraction of its font size in
 ## pixels. Label3D cannot be measured before it is in the tree, so text that
@@ -111,8 +108,7 @@ const LAYER_EDGE := -1
 const LAYER_TEXT := 0
 ## Draw order is global, so the layers above only order one panel against
 ## itself. A panel that must sit in front of another adds a band: without it
-## the panel behind has its text drawn over the nearer panel's background,
-## which is how the keyboard came out with the lift panel showing through it.
+## the panel behind has its text drawn over the nearer panel's background.
 const BAND := 10
 
 ## How strongly a selected row is washed with the accent. Kept low because the
@@ -399,8 +395,7 @@ static func contrast(a: Color, b: Color) -> float:
 ##
 ## The mix happens in linear space, because that is where the GPU does it.
 ## Lerping the sRGB values instead badly under-reads how bright a translucent
-## overlay comes out: a 22% accent wash measured as a dark navy and rendered as
-## a mid blue, which is how a selected row ended up with unreadable text on it.
+## overlay comes out.
 static func over(colour: Color, under: Color) -> Color:
 	return under.srgb_to_linear().lerp(colour.srgb_to_linear(), colour.a).linear_to_srgb()
 

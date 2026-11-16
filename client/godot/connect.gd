@@ -3,10 +3,7 @@ extends RefCounted
 
 ## The server address and the name you join under, and the parsing and saving
 ## that go with them.
-##
-## This used to be a 2D screen. It is plain data now, because the details are
-## typed on a panel in the lift, where a player wearing a headset can reach
-## them: see main.gd and keyboard.gd.
+## They are typed on the lift panel: see main.gd and keyboard.gd.
 
 const SETTINGS_PATH := Session.SETTINGS
 const DEFAULT_PORT := 7777
@@ -45,7 +42,6 @@ func _init() -> void:
 	# The default moved; settings saved before that still hold the old one.
 	if account_server.strip_edges() == "https://accounts.kokiland-services.eu":
 		account_server = DEFAULT_FIREPLACE
-	# A new key: the old "direct" was a placeholder that was on for everybody.
 	direct = bool(settings.get_value("advanced", "guest", false))
 	account_handle = str(settings.get_value("account", "handle", ""))
 	account_token = str(settings.get_value("account", "token", ""))
