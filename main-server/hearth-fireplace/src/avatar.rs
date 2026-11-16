@@ -20,6 +20,36 @@ pub fn path(data_dir: &Path, id: u64) -> PathBuf {
     data_dir.join("avatars").join(format!("{id}.jpg"))
 }
 
+/// A picture waiting for review.
+pub fn pending_path(data_dir: &Path, id: u64) -> PathBuf {
+    data_dir.join("avatars").join(format!("{id}.pending.jpg"))
+}
+
+/// Runs the host's checker on a redrawn picture: `<command> <file>`, and a
+/// non-zero exit refuses it. Empty: nothing to run, so it passes.
+pub fn check(command: &str, file: &Path) -> Result<()> {
+    let mut words = command.split_whitespace();
+    let Some(program) = words.next() else {
+        return Ok(());
+    };
+    let status = std::process::Command::new(program)
+        .args(words)
+        .arg(file)
+        .stdin(std::process::Stdio::null())
+        .status()
+        .with_context(|| format!("could not run the picture check {program:?}"))?;
+    if !status.success() {
+        bail!("that picture is not allowed here");
+    }
+    Ok(())
+}
+
+/// The approved picture is replaced by the one that waited.
+pub fn approve(data_dir: &Path, id: u64) -> Result<()> {
+    std::fs::rename(pending_path(data_dir, id), path(data_dir, id))?;
+    Ok(())
+}
+
 /// PNG, JPEG, WebP or GIF in; a square `SIDE`-pixel JPEG out, or why not.
 pub fn shrink(bytes: &[u8]) -> Result<Vec<u8>> {
     let mut reader = ImageReader::new(Cursor::new(bytes)).with_guessed_format()?;
@@ -49,17 +79,18 @@ pub fn shrink(bytes: &[u8]) -> Result<Vec<u8>> {
 }
 
 /// Written beside and renamed, so a picture is never half there.
-pub fn save(data_dir: &Path, id: u64, jpeg: &[u8]) -> Result<()> {
-    let path = path(data_dir, id);
+pub fn save(path: &Path, jpeg: &[u8]) -> Result<()> {
     std::fs::create_dir_all(path.parent().expect("has a folder"))?;
     let temporary = path.with_extension("tmp");
     std::fs::write(&temporary, jpeg)?;
-    std::fs::rename(&temporary, &path)?;
+    std::fs::rename(&temporary, path)?;
     Ok(())
 }
 
+/// Both pictures, the approved one and any waiting.
 pub fn remove(data_dir: &Path, id: u64) {
     let _ = std::fs::remove_file(path(data_dir, id));
+    let _ = std::fs::remove_file(pending_path(data_dir, id));
 }
 
 #[cfg(test)]

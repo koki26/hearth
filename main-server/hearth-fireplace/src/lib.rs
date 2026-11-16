@@ -26,11 +26,13 @@ pub mod api;
 pub mod avatar;
 pub mod bans;
 pub mod codes;
+pub mod flames;
 pub mod limit;
 pub mod mail;
 pub mod pages;
 pub mod presence;
 pub mod token;
+pub mod words;
 
 use std::net::{IpAddr, Ipv4Addr};
 use std::path::PathBuf;
@@ -70,6 +72,27 @@ pub struct Config {
     pub mail: mail::MailConfig,
     /// Who runs this Fireplace, for `/privacy` and `/terms`.
     pub operator: Operator,
+    /// What happens to pictures before anybody else sees them.
+    pub moderation: Moderation,
+}
+
+/// `[moderation]`.
+#[derive(Debug, Clone, serde::Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields, default)]
+pub struct Moderation {
+    /// New pictures wait for somebody with the `review` permission before
+    /// anybody else sees them.
+    pub review_pictures: bool,
+    /// A command run as `<command> <picture.jpg>` on every upload, e.g. a
+    /// local NSFW classifier; a non-zero exit refuses the picture. Empty for
+    /// none.
+    pub picture_check: String,
+}
+
+impl Default for Moderation {
+    fn default() -> Self {
+        Self { review_pictures: true, picture_check: String::new() }
+    }
 }
 
 /// `[operator]`: whoever runs this Fireplace, so its privacy page describes
@@ -116,6 +139,7 @@ impl Default for Config {
             web_dir: "web".into(),
             mail: mail::MailConfig::default(),
             operator: Operator::default(),
+            moderation: Moderation::default(),
         }
     }
 }
@@ -138,6 +162,8 @@ pub struct Fireplace {
     /// Codes waiting to be typed in (`codes`), in memory only.
     pub codes: Mutex<codes::Codes>,
     pub limits: Mutex<limit::Limiter>,
+    pub flames: Mutex<flames::Flames>,
+    pub words: words::Words,
     pub keys: token::Keys,
     pub max_accounts: usize,
     pub accounts_per_hour: u32,
@@ -194,6 +220,8 @@ impl Fireplace {
             ip_bans: Mutex::new(bans::IpBans::open(&config.data_dir)?),
             codes: Mutex::new(codes::Codes::default()),
             limits: Mutex::new(limit::Limiter::default()),
+            flames: Mutex::new(flames::Flames::default()),
+            words: words::Words::open(&config.data_dir),
             keys: token::Keys::open(&config.data_dir)?,
             max_accounts: config.max_accounts,
             accounts_per_hour: config.accounts_per_hour,

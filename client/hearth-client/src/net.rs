@@ -76,9 +76,14 @@ pub enum Event {
         flags: u8,
     },
     Rejected(RejectReason),
+    /// SHA-256 of the server's certificate, hex: what profiles are looked up
+    /// under at the Fireplace. Comes before `Connected`.
+    Certificate(String),
     PeerJoined {
         id: u16,
         name: String,
+        /// Their id on this server from their ticket; empty for a guest.
+        account: String,
     },
     PeerLeft {
         id: u16,
@@ -213,9 +218,10 @@ async fn run(
 ) -> anyhow::Result<()> {
     hearth_protocol::validate_name(&name)?;
     let (endpoint, conn) = connect(&host, port).await?;
+    let certificate = server_certificate(&conn)?;
+    send_event(events, Event::Certificate(certificate.clone()))?;
     let ticket = match account {
         Some(account) => {
-            let certificate = server_certificate(&conn)?;
             // ureq blocks, and this runtime has one thread that also drives
             // the connection, so the request goes to the blocking pool.
             tokio::task::spawn_blocking(move || ask_for_ticket(&account, &certificate))
@@ -401,7 +407,9 @@ fn handle_control(msg: Control, events: &Sender<Event>) -> anyhow::Result<bool> 
             send_event(events, Event::Rejected(reason))?;
             return Ok(false);
         }
-        Control::PeerJoined(peer) => send_event(events, Event::PeerJoined { id: peer.id, name: peer.name })?,
+        Control::PeerJoined(peer) => {
+            send_event(events, Event::PeerJoined { id: peer.id, name: peer.name, account: peer.account })?
+        }
         Control::PeerLeft { id } => send_event(events, Event::PeerLeft { id })?,
         Control::WorldAdded(world) => send_event(events, Event::WorldAdded(world))?,
         Control::InstanceAdded { instance, slug, players, name, kind } => {

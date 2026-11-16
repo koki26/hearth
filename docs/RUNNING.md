@@ -71,6 +71,20 @@ Every key it takes, with its default and what it means, is in
 argument; with no argument it looks for `flame.toml` in the directory it was
 started from, and with no file at all it runs on the defaults and says so.
 
+To appear on the list of public Flames in the game and on the Fireplace's
+**Servers** page, turn listing on (or tick it in the Flame window):
+
+```toml
+[listing]
+public = true
+name = "Ada's Flame"       # empty: the hub world's name
+address = "flame.example.org:7777"  # empty: the address the Fireplace sees you at
+```
+
+The Flame asks to be listed every minute. The Fireplace then connects back
+over QUIC itself and lists it only if that works and shows the same
+certificate, so a Flame nobody can reach never shows up.
+
 Worlds are `.hworld` files in `data/worlds` (really zips — see
 [WORLD_FORMAT.md](WORLD_FORMAT.md)). Drop one in and type `rescan`, or drag it
 onto the window.

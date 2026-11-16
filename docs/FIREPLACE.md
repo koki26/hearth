@@ -222,14 +222,39 @@ An account may have 256 friends and 64 requests waiting.
 |---|---|
 | `POST /presence` | `{"flame", "ember", "ember_name", "world"}`, or `{}` to clear → `204` |
 | `POST /settings` | `{"share_location": false}` and/or `{"policy_emails": true}` → `200` with both |
-| `POST /me/avatar` | the picture itself (PNG, JPEG, WebP or GIF, at most 2 MiB) → `200 {"avatar": <version>}`; redrawn as a 256px JPEG |
+| `POST /me/avatar` | the picture itself (PNG, JPEG, WebP or GIF, at most 2 MiB) → `200 {"avatar", "avatar_pending"}`; redrawn as a 256px JPEG. With `review_pictures` on it waits (`avatar_pending`) until a reviewer approves it |
 | `POST /me/avatar/delete` | → `200`, picture deleted |
 | `GET /avatars/<id>.jpg` | the picture, `image/jpeg`, `nosniff` |
-| `GET /admin/accounts`, `GET /admin/bans` | admins only: every account with its sign-in IPs; blocked IPs |
-| `POST /admin/ban` | `{"handle", "minutes" (0 = for good), "reason"}`: suspends and signs out |
-| `POST /admin/unban`, `/admin/sign-out`, `/admin/delete` | `{"handle"}` |
-| `POST /admin/set-admin` | `{"handle", "admin": true}` |
-| `POST /admin/ban-ip`, `/admin/unban-ip` | `{"ip", "minutes", "reason"}` / `{"ip"}` |
+| `POST /me/profile` | `{"pronouns", "bio"}` (24 and 300 bytes at most) → `200` |
+| `GET /profiles/<handle>` | anybody: `{"id", "handle", "display_name", "pronouns", "bio", "avatar", "badge", "created"}` |
+| `GET /profiles/at/<certificate>/<id>` | the same, for the player a Flame calls `<id>` (the id in `PeerJoined`); 300 per address per 10 minutes |
+| `GET /flames` | anybody: `{"flames": [{"name", "address", "certificate", "players", "max_players", "guests", "seen"}]}` |
+| `POST /flames/announce` | a Flame: `{"name", "address" (optional), "port", "certificate", "players", "max_players", "guests"}` → `202`, then the Fireplace connects to check |
+| `GET /admin/accounts` | `view`: every account with its sign-in IPs |
+| `GET /admin/bans`, `POST /admin/ban`, `/admin/unban`, `/admin/ban-ip`, `/admin/unban-ip` | `ban`: `{"handle", "minutes" (0 = for good), "reason"}` / `{"handle"}` / `{"ip", ...}` |
+| `POST /admin/sign-out`, `/admin/delete` | `sign_out`, `delete`: `{"handle"}` |
+| `POST /admin/moderate` | `moderate`: `{"handle", "clear": ["display_name", "pronouns", "bio", "avatar"]}` |
+| `GET /admin/pictures`, `GET /admin/pictures/<id>.jpg`, `POST /admin/pictures/decide` | `review`: what waits, the waiting picture, `{"handle", "approve"}` |
+| `POST /admin/flames/hide`, `/admin/flames/unhide` | `flames`: `{"certificate"}` |
+| `GET /admin/groups` | anybody in a group: `{"groups", "perms"}` |
+| `POST /admin/groups`, `/admin/set-group` | the owner only: `{"groups": [{"name", "perms"}]}` / `{"handle", "group"}` |
+
+**Owner, groups and badges.** One account is the Fireplace owner (a yellow
+crown): every permission, and the only one that makes groups and puts people
+in them. A group is a name and a set of permissions (`view`, `ban`, `delete`,
+`sign_out`, `moderate`, `review`, `flames`); its members wear its name with a
+green shield. Nobody acts on an account ranked as high as their own: the owner
+over groups, groups over everybody else.
+
+**Profiles come only from here.** A Flame passes each player's per-Flame id
+(`PeerJoined`), and the game asks the Fireplace for the profile. A Flame can
+mix up who stands where, as it always could with names, but it cannot change
+what a profile says.
+
+**Words.** Handles, display names, pronouns, bios, group names and public
+Flame names are checked against a built-in list of slurs and sexual words,
+with look-alike letters folded back. Add your own, one per line, in
+`data/blocked-words.txt`.
 
 **A client says where it is; a Flame never does.** A Flame that had to tell
 the Fireplace who was in it would put this server in the path of every match,

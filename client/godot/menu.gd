@@ -25,6 +25,7 @@ extends FlatPanel
 ## And these go on any row:
 ##   "icon": "res://icons/x.svg"   an icon on a chip before the label
 ##   "avatar": "Ada"               somebody's initial on their colour instead
+##   "face": Texture2D             with "avatar": their picture over the initial
 ##   "status": "online"            a dot on the avatar: online, offline
 ##   "sub": "in the loft"          a second, quieter line under the label
 ##   "note": "2 embers"            quiet text at the right-hand end
@@ -493,7 +494,8 @@ func _build_row(i: int) -> Dictionary:
 
 	var text_left := left
 	if row.has("avatar"):
-		_build_avatar(str(row["avatar"]), str(row.get("status", "")), Vector3(left + UiStyle.CHIP * 0.5, y, 0.0))
+		_build_avatar(str(row["avatar"]), str(row.get("status", "")), Vector3(left + UiStyle.CHIP * 0.5, y, 0.0),
+			row.get("face") as Texture2D)
 		text_left = left + UiStyle.CHIP + 0.035
 	elif row.has("icon"):
 		var chip_at := Vector3(left + UiStyle.CHIP * 0.5, y, 0.002)
@@ -666,13 +668,22 @@ func _build_button(row: Dictionary, y: float) -> void:
 
 ## Somebody's initial on their own colour, with a dot saying whether they are
 ## about.
-func _build_avatar(who: String, status: String, at: Vector3) -> void:
+func _build_avatar(who: String, status: String, at: Vector3, face: Texture2D = null) -> void:
 	var colour := UiStyle.avatar_colour(who)
 	_body.add_child(UiStyle.circle(UiStyle.CHIP, colour, at + Vector3(0, 0, 0.002), UiStyle.LAYER_FILL + band))
-	var initial := _label(who.substr(0, 1).to_upper(), UiStyle.FONT_SMALL, UiStyle.on(colour))
-	initial.outline_size = 0
-	initial.position = at + Vector3(0, 0, 0.004)
-	_body.add_child(initial)
+	if face != null:
+		var picture := Sprite3D.new()
+		picture.texture = face
+		picture.pixel_size = UiStyle.CHIP * 0.9 / float(maxi(face.get_height(), 1))
+		picture.no_depth_test = true
+		picture.render_priority = UiStyle.LAYER_TEXT + band
+		picture.position = at + Vector3(0, 0, 0.004)
+		_body.add_child(picture)
+	else:
+		var initial := _label(who.substr(0, 1).to_upper(), UiStyle.FONT_SMALL, UiStyle.on(colour))
+		initial.outline_size = 0
+		initial.position = at + Vector3(0, 0, 0.004)
+		_body.add_child(initial)
 	if status == "":
 		return
 	var dot := Vector3(UiStyle.CHIP * 0.36, -UiStyle.CHIP * 0.36, 0.005)

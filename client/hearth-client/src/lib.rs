@@ -50,6 +50,8 @@ pub struct HearthClient {
     /// Whether this server keeps what worlds store for us: we joined with an
     /// account (`welcome::SAVES`). A guest's writes go nowhere.
     saves: bool,
+    /// The connected server's certificate hash (`net::Event::Certificate`).
+    certificate: String,
 }
 
 #[godot_api]
@@ -67,6 +69,7 @@ impl INode for HearthClient {
             cache_dir: PathBuf::from("."),
             last_item: HashMap::new(),
             saves: false,
+            certificate: String::new(),
         }
     }
 
@@ -91,9 +94,12 @@ impl INode for HearthClient {
                     self.client = None;
                     self.signals().disconnected().emit(&GString::from(reason.as_str()));
                 }
-                net::Event::PeerJoined { id, name } => {
-                    self.signals().peer_joined().emit(id as i32, &GString::from(name.as_str()))
-                }
+                net::Event::Certificate(hash) => self.certificate = hash,
+                net::Event::PeerJoined { id, name, account } => self.signals().peer_joined().emit(
+                    id as i32,
+                    &GString::from(name.as_str()),
+                    &GString::from(account.as_str()),
+                ),
                 net::Event::PeerLeft { id } => {
                     self.decoders.forget(id);
                     self.signals().peer_left().emit(id as i32);
@@ -176,8 +182,10 @@ impl HearthClient {
     fn rejected(reason: GString);
     #[signal]
     fn disconnected(reason: GString);
+    /// `account` is their id on this server, for `/profiles/at/<certificate>/<account>`
+    /// at the Fireplace; empty for a guest.
     #[signal]
-    fn peer_joined(id: i32, name: GString);
+    fn peer_joined(id: i32, name: GString, account: GString);
     #[signal]
     fn peer_left(id: i32);
     /// `flags` bit 0 = peer is in VR, bits 1/2 = left/right hand tracked.
@@ -235,6 +243,13 @@ impl HearthClient {
     fn world_ready(slug: GString, path: GString);
     #[signal]
     fn world_failed(slug: GString, reason: GString);
+
+    /// SHA-256 of the connected server's certificate, hex; empty before
+    /// `connected`. Profiles of players there are looked up under it.
+    #[func]
+    fn certificate(&self) -> GString {
+        GString::from(self.certificate.as_str())
+    }
 
     /// Where downloaded worlds are kept. Set it before connecting, from
     /// `ProjectSettings.globalize_path("user://...")`.

@@ -18,6 +18,7 @@ use tracing::{debug, info, warn};
 
 pub mod command;
 pub mod log;
+pub mod public;
 pub mod store;
 pub mod ticket;
 pub mod worlds;
@@ -101,6 +102,8 @@ pub struct Config {
     pub max_instances: Limit,
     /// Instances one player may have started that are still running.
     pub max_instances_per_player: Limit,
+    /// `[listing]`: whether the Fireplace lists this Flame for everybody.
+    pub listing: public::Listing,
 }
 
 impl Default for Config {
@@ -117,6 +120,7 @@ impl Default for Config {
             max_players_per_instance: Limit::NONE,
             max_instances: Limit::of(8),
             max_instances_per_player: Limit::of(1),
+            listing: public::Listing::default(),
         }
     }
 }
@@ -154,7 +158,9 @@ impl Config {
             "port = {}\ndata_dir = {:?}\nworlds_dir = {:?}\nhub_world = {:?}\n\
              allow_guests = {}\nfireplace = {:?}\nclient_instancing = {}\n\
              # Limits: -1 means no limit.\nmax_players = {}\nmax_players_per_instance = {}\n\
-             max_instances = {}\nmax_instances_per_player = {}\n",
+             max_instances = {}\nmax_instances_per_player = {}\n\n\
+             # Ask the Fireplace to list this Flame for everybody.\n\
+             [listing]\npublic = {}\nname = {:?}\naddress = {:?}\n",
             self.port,
             self.data_dir.display().to_string(),
             self.worlds_dir().display().to_string(),
@@ -166,6 +172,9 @@ impl Config {
             self.max_players_per_instance.to_toml(),
             self.max_instances.to_toml(),
             self.max_instances_per_player.to_toml(),
+            self.listing.public,
+            self.listing.name,
+            self.listing.address,
         )
     }
 
@@ -526,6 +535,7 @@ impl Server {
             store: Mutex::new(store::Store::new(config.data_dir.join("players"))),
         });
         server.publish(&server.state.lock().unwrap());
+        public::announce(&server, &config.fireplace, &config.listing, config.port, &config.hub_world);
         server
     }
 
@@ -673,6 +683,7 @@ impl Server {
         }
         player.instance = to;
         let name = player.name.clone();
+        let account = player.account.clone().unwrap_or_default();
         state.drop_all(id, from);
         state.broadcast(Some(from), id, Control::PeerLeft { id });
         state.send(id, Control::Moved { instance: to });
@@ -680,12 +691,12 @@ impl Server {
             .players
             .iter()
             .filter(|(peer_id, p)| **peer_id != id && p.instance == to)
-            .map(|(&peer_id, p)| Peer { id: peer_id, name: p.name.clone() })
+            .map(|(&peer_id, p)| Peer { id: peer_id, name: p.name.clone(), account: p.account.clone().unwrap_or_default() })
             .collect();
         for peer in peers {
             state.send(id, Control::PeerJoined(peer));
         }
-        state.broadcast(Some(to), id, Control::PeerJoined(Peer { id, name: name.clone() }));
+        state.broadcast(Some(to), id, Control::PeerJoined(Peer { id, name: name.clone(), account }));
         state.send_held(id, to);
         info!(id, %name, from, to, "player moved");
         self.announce_counts(state, 0, &[from, to]);
@@ -882,9 +893,17 @@ async fn handle_connection(incoming: quinn::Incoming, server: Arc<Server>) -> an
                 })?;
             }
             for (&peer_id, peer) in state.players.iter().filter(|(_, p)| p.instance == HUB_INSTANCE) {
-                control_tx.try_send(Control::PeerJoined(Peer { id: peer_id, name: peer.name.clone() }))?;
+                control_tx.try_send(Control::PeerJoined(Peer {
+                    id: peer_id,
+                    name: peer.name.clone(),
+                    account: peer.account.clone().unwrap_or_default(),
+                }))?;
             }
-            state.broadcast(Some(HUB_INSTANCE), id, Control::PeerJoined(Peer { id, name: name.clone() }));
+            state.broadcast(
+                Some(HUB_INSTANCE),
+                id,
+                Control::PeerJoined(Peer { id, name: name.clone(), account: account.clone().unwrap_or_default() }),
+            );
             state.players.insert(
                 id,
                 Player {
@@ -1199,6 +1218,9 @@ mod tests {
         assert!(Config::parse("hub_world = \"Hub World\"").is_err());
         assert!(Config::parse("max_instances = 0").is_err());
         assert!(Config::parse("client_instancing = true").unwrap().client_instancing);
+        let listing = public::Listing { public: true, name: "Ada's".into(), address: "example.org".into() };
+        let listed = Config { listing, ..Config::default() };
+        assert_eq!(Config::parse(&listed.to_toml()).unwrap().listing, listed.listing, "written and read back");
     }
 
     fn with_worlds(tag: &str, worlds: &[&str]) -> (PathBuf, Arc<Server>) {

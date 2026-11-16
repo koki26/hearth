@@ -157,16 +157,21 @@ impl Keys {
 
     /// A ticket for one Flame, named by its certificate hash.
     pub fn mint_join(&self, account: u64, name: &str, flame: &str, now: u64) -> String {
-        let tag = ring::hmac::sign(&self.pid, format!("{account}:{flame}").as_bytes());
         let claims = JoinClaims {
             typ: "join".into(),
             aud: flame.to_owned(),
-            pid: tag.as_ref()[..16].iter().map(|b| format!("{b:02x}")).collect(),
+            pid: self.pid_of(account, flame),
             name: name.to_owned(),
             iat: now,
             exp: now + JOIN_SECONDS,
         };
         self.sign(&serde_json::to_vec(&claims).expect("claims are plain data"))
+    }
+
+    /// The id an account has on the Flame with this certificate hash.
+    pub fn pid_of(&self, account: u64, flame: &str) -> String {
+        let tag = ring::hmac::sign(&self.pid, format!("{account}:{flame}").as_bytes());
+        tag.as_ref()[..16].iter().map(|b| format!("{b:02x}")).collect()
     }
 
     fn sign(&self, json: &[u8]) -> String {

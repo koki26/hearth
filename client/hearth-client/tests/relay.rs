@@ -8,10 +8,13 @@ use hearth_flame::ticket::testing::Issuer;
 use hearth_flame::{Config, Limit, Roster, Server};
 use hearth_protocol::{HUB_INSTANCE, Pose, RejectReason, Transform, flags, welcome};
 
+/// The next event, past the certificate hash every connection starts with.
 async fn next_event(client: &Client) -> Event {
     for _ in 0..1500 {
-        if let Some(event) = client.poll() {
-            return event;
+        match client.poll() {
+            Some(Event::Certificate(hash)) => assert_eq!(hash.len(), 64),
+            Some(event) => return event,
+            None => {}
         }
         tokio::time::sleep(Duration::from_millis(10)).await;
     }
@@ -94,8 +97,8 @@ async fn two_clients_see_each_other_and_exchange_poses() {
 
     let bob = Client::connect("localhost".into(), h.port, "Bob".into(), None, h.dir.join("cache"));
     assert!(matches!(next_event(&bob).await, Event::Connected { your_id: 2, .. }));
-    assert!(matches!(next_interesting(&bob).await, Event::PeerJoined { id: 1, ref name } if name == "Ada"));
-    assert!(matches!(next_interesting(&ada).await, Event::PeerJoined { id: 2, ref name } if name == "Bob"));
+    assert!(matches!(next_interesting(&bob).await, Event::PeerJoined { id: 1, ref name, ref account } if name == "Ada" && account.is_empty()));
+    assert!(matches!(next_interesting(&ada).await, Event::PeerJoined { id: 2, ref name, .. } if name == "Bob"));
 
     let head = Transform::from_f32([0.0, 1.7, -0.5], [0.0, 0.0, 0.0, 1.0]);
     let sent = Pose { seq: 1, flags: flags::VR, head, left: head, right: head };

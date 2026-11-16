@@ -74,3 +74,10 @@ authority = ""       # FILL IN: your country's data protection authority, with a
 min_age = 16
 # How long a deleted account lives on in backups (docs/ORACLE.md, step 7).
 backup_days = 14
+
+# --- What happens to pictures before anybody else sees them -----------------
+[moderation]
+# New pictures wait for somebody with the `review` permission.
+review_pictures = true
+# Run as `<command> <picture.jpg>` on every upload; a non-zero exit refuses it.
+picture_check = ""

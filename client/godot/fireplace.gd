@@ -27,6 +27,13 @@ signal failed(what: String, message: String)
 signal said(message: String)
 ## What the account page shows changed: features, or the email on file.
 signal account_changed
+## A public profile came back: `key` is the per-Flame id or "@handle" it was
+## asked for under.
+signal profile_seen(key: String, profile: Dictionary)
+## A picture finished downloading (see `picture`).
+signal picture_ready(id: int, texture: Texture2D)
+## The list of public Flames changed.
+signal flames_changed
 
 ## How often we say where we are, and ask where everybody else is. The server
 ## forgets a player it has not heard from in two minutes.
@@ -58,6 +65,13 @@ var recovery_codes: Array = []
 ## The address on the account, if any, and whether its link was opened.
 var email := ""
 var email_verified := false
+## Everything `GET /me` said: display_name, pronouns, bio, avatar, badge,
+## perms. Empty while signed out.
+var me := {}
+## Public Flames, as `GET /flames` last listed them.
+var flames: Array = []
+## Pictures by "id:version", null while one is on its way.
+var _pictures := {}
 
 var _details: ConnectDetails
 var _http: HTTPRequest
@@ -85,6 +99,7 @@ func _ready() -> void:
 	_http.request_completed.connect(_on_answer)
 	add_child(_http)
 	fetch_features()
+	fetch_flames()
 	# A token saved from last time is worth a try: if it is still good, the
 	# player never sees a sign-in page at all.
 	if _details.account_refresh != "":
@@ -194,6 +209,7 @@ func sign_out() -> void:
 	recovery_codes = []
 	email = ""
 	email_verified = false
+	me = {}
 	signed_out.emit("signed out")
 
 
@@ -236,6 +252,58 @@ func clear_presence() -> void:
 	_where = {}
 	if is_signed_in():
 		_send("POST", "/presence", {}, "presence")
+
+
+# --- profiles and public Flames ---------------------------------------------
+
+## The two things on a profile besides the name and picture.
+func set_profile(pronouns: String, bio: String) -> void:
+	_send("POST", "/me/profile", {"pronouns": pronouns, "bio": bio}, "profile")
+
+
+func set_display_name(display_name: String) -> void:
+	_send("POST", "/me/name", {"display_name": display_name}, "profile")
+
+
+## Who somebody on this Flame is: `account` is the id their ticket gave them
+## here. Answered through `profile_seen`.
+func look_up(certificate: String, account: String) -> void:
+	if certificate != "" and account != "":
+		_send("GET", "/profiles/at/%s/%s" % [certificate, account], {}, "seen:" + account)
+
+
+func look_up_handle(whose: String) -> void:
+	_send("GET", "/profiles/%s" % whose.uri_encode(), {}, "seen:@" + whose)
+
+
+func fetch_flames() -> void:
+	_send("GET", "/flames", {}, "flames")
+
+
+## Somebody's picture, if it is here already; otherwise null, and it is
+## fetched and announced through `picture_ready`. `version` is the profile's
+## `avatar`: 0 means they have none.
+func picture(id: int, version: int) -> Texture2D:
+	if id <= 0 or version <= 0:
+		return null
+	var key := "%d:%d" % [id, version]
+	if _pictures.has(key):
+		return _pictures[key]
+	_pictures[key] = null
+	# A request of its own: the queue's one HTTPRequest answers in JSON.
+	var http := HTTPRequest.new()
+	http.timeout = TIMEOUT
+	add_child(http)
+	http.request_completed.connect(func(result: int, code: int, _h: PackedStringArray, body: PackedByteArray) -> void:
+		http.queue_free()
+		var image := Image.new()
+		if result != HTTPRequest.RESULT_SUCCESS or code != 200 or image.load_jpg_from_buffer(body) != OK:
+			return
+		var texture := ImageTexture.create_from_image(image)
+		_pictures[key] = texture
+		picture_ready.emit(id, texture))
+	http.request("%s/avatars/%d.jpg?v=%d" % [base_url(), id, version])
+	return null
 
 
 # --- the rows the menu draws --------------------------------------------------
@@ -334,12 +402,20 @@ func _on_answer(result: int, code: int, _headers: PackedStringArray, body: Packe
 		_next()
 		return
 	if code >= 400:
+		# Somebody without a profile here is a guest or from another
+		# Fireplace: nothing to tell the player.
+		if tag.begins_with("seen:"):
+			_next()
+			return
 		if tag == "signin" and bool(answer.get("code_needed", false)):
 			code_ticket = str(answer.get("ticket", ""))
 		failed.emit(tag, str(answer.get("error", "that did not work (%d)" % code)))
 		_next()
 		return
-	_took(tag, answer)
+	if tag.begins_with("seen:"):
+		profile_seen.emit(tag.substr(5), answer)
+	else:
+		_took(tag, answer)
 	_next()
 
 
@@ -380,9 +456,16 @@ func _took(tag: String, answer: Dictionary) -> void:
 			features = answer
 			account_changed.emit()
 		"me":
+			me = answer
 			email = str(answer.get("email", "")) if answer.get("email") != null else ""
 			email_verified = bool(answer.get("email_verified", false))
 			account_changed.emit()
+		"profile":
+			_send("GET", "/me", {}, "me")
+			said.emit("Profile saved.")
+		"flames":
+			flames = answer.get("flames", [])
+			flames_changed.emit()
 		"email":
 			_send("GET", "/me", {}, "me")
 			said.emit("Saved. Open the link we emailed to confirm it." if answer.get("email") != null

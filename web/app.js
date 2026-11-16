@@ -84,6 +84,44 @@ function face(target, p) {
   return target;
 }
 
+/** An inline icon from the page's sprite. */
+function icon(name, cls) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", "ic" + (cls ? " " + cls : ""));
+  const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
+  use.setAttribute("href", "#i-" + name);
+  svg.append(use);
+  return svg;
+}
+
+/** The owner's yellow crown or a group's green shield, with its words and a check. */
+function badge(b) {
+  if (!b) return el("span");
+  const span = el("span", "badge " + b.kind);
+  span.title = b.kind === "owner" ? "Runs this Fireplace" : "Verified by this Fireplace";
+  span.append(icon(b.kind === "owner" ? "crown" : "shield"), el("span", null, b.label), icon("check", "check"));
+  return span;
+}
+
+/** A public profile: picture, names, pronouns, badge and bio. */
+function profileCard(target, p) {
+  const about = el("div", "about");
+  const name = el("h2", null, p.display_name || p.handle);
+  name.append(badge(p.badge));
+  about.append(name, el("small", "note", "@" + p.handle + (p.pronouns ? " · " + p.pronouns : "")));
+  if (p.bio) about.append(el("p", "bio", p.bio));
+  target.replaceChildren(face(el("span", "face big"), p), about);
+}
+
+async function openProfile(handle) {
+  try {
+    profileCard($("who-card"), await api("GET", "/profiles/" + encodeURIComponent(handle)));
+    $("who-box").hidden = false;
+    $("who-close").focus();
+  } catch (err) { say("friend-msg", err.message); }
+}
+$("who-close").onclick = () => { $("who-box").hidden = true; };
+
 // --- signing in and out ------------------------------------------------------
 
 function signOut() {
@@ -174,8 +212,13 @@ async function load() {
   me = await api("GET", "/me");
   $("auth").hidden = true; $("signed-in").hidden = false;
   $("me-name").textContent = me.display_name || me.handle;
-  $("me-handle").textContent = "@" + me.handle;
+  $("me-handle").textContent = "@" + me.handle + (me.pronouns ? " · " + me.pronouns : "");
+  $("me-badge").replaceChildren(badge(me.badge));
   face($("me-face"), me);
+  profileCard($("me-card"), me);
+  $("pronouns").value = me.pronouns || "";
+  $("bio").value = me.bio || "";
+  $("pic-pending").hidden = !me.avatar_pending;
   face($("pic-face"), me);
   $("pic-remove").hidden = !me.avatar;
   $("display").value = me.display_name;
@@ -197,7 +240,7 @@ async function load() {
   $("codes-left").textContent = me.recovery_codes_left + " of 8 left";
   $("two-step-card").hidden = !features.email;
   $("two-step").checked = !!me.two_factor;
-  $("admin-nav").hidden = !me.admin;
+  $("admin-nav").hidden = !(me.perms || []).length;
   fillPlaces();
   await Promise.all([loadFriends(), loadSessions()]);
 }
@@ -228,6 +271,8 @@ function person(p, extra) {
   text.append(el("b", null, p.display_name || p.handle),
     el("small", null, "@" + p.handle + (extra && extra.where ? " · " + extra.where : "")));
   who.append(f, text);
+  who.onclick = () => openProfile(p.handle);
+  who.style.cursor = "pointer";
   const buttons = el("div", "row");
   for (const [label, route, cls] of (extra && extra.buttons) || []) {
     const b = el("button", cls, label);
@@ -298,6 +343,15 @@ $("name-form").onsubmit = async (e) => {
   } catch (err) { say("name-msg", err.message); }
 };
 
+$("profile-form").onsubmit = async (e) => {
+  e.preventDefault();
+  try {
+    await api("POST", "/me/profile", { pronouns: $("pronouns").value, bio: $("bio").value });
+    say("profile-msg", "Saved.", true);
+    await load();
+  } catch (err) { say("profile-msg", err.message); }
+};
+
 $("share").onchange = async () => {
   try { await api("POST", "/settings", { share_location: $("share").checked }); say("name-msg", "", true); }
   catch (err) { say("name-msg", err.message); $("share").checked = !$("share").checked; }
@@ -334,8 +388,8 @@ $("pic-file").onchange = async () => {
   try {
     // A picture the browser cannot read goes as it is, and the server says why it will not do.
     const blob = await squeeze(file).catch(() => file);
-    await api("POST", "/me/avatar", null, blob);
-    say("pic-msg", "Saved.", true);
+    const r = await api("POST", "/me/avatar", null, blob);
+    say("pic-msg", r.avatar_pending ? "Uploaded. A moderator looks at it before anybody else sees it." : "Saved.", true);
     await load();
   } catch (err) { say("pic-msg", err.message); }
 };
@@ -539,11 +593,139 @@ for (const select of [$("ban-time"), $("ip-time")]) {
 let accounts = [];
 let banning = null;
 
+let groups = [];
+const can = (perm) => (me.perms || []).includes(perm);
+
 async function loadAdmin() {
+  for (const [id, show] of [["admin-accounts", can("view")], ["ip-card", can("ban")], ["review-card", can("review")],
+    ["groups-card", me.owner], ["admin-flames-card", can("flames")]]) $(id).closest(".card").hidden = !show;
   try {
-    [accounts] = await Promise.all([api("GET", "/admin/accounts"), loadIpBans()]);
+    const asks = [can("view") ? api("GET", "/admin/accounts") : [], api("GET", "/admin/groups")];
+    if (can("ban")) asks.push(loadIpBans());
+    if (can("review")) asks.push(loadReview());
+    if (can("flames")) asks.push(loadAdminFlames());
+    let g;
+    [accounts, g] = await Promise.all(asks);
+    groups = g.groups;
+    perms = g.perms;
     drawAccounts();
+    drawGroups();
   } catch (err) { say("admin-msg", err.message); }
+}
+
+// --- groups: only the owner makes them -------------------------------------------
+
+let perms = [];
+const PERM_NAMES = { view: "See accounts", ban: "Ban", delete: "Delete accounts", sign_out: "Sign people out",
+  moderate: "Clear profiles", review: "Review pictures", flames: "Unlist Flames" };
+
+function drawGroups() {
+  $("groups").replaceChildren(...groups.map((g, i) => {
+    const box = el("div", "group");
+    const row = el("div", "row");
+    const name = el("input");
+    name.value = g.name; name.maxLength = 24; name.setAttribute("aria-label", "Group name");
+    name.oninput = () => { g.name = name.value.trim(); };
+    const drop = el("button", "danger", "Remove");
+    drop.type = "button";
+    drop.onclick = () => { groups.splice(i, 1); drawGroups(); };
+    row.append(name, drop);
+    const boxes = el("div", "perms");
+    for (const perm of perms) {
+      const label = el("label");
+      const tick = el("input"); tick.type = "checkbox"; tick.checked = g.perms.includes(perm);
+      tick.onchange = () => { g.perms = tick.checked ? [...g.perms, perm] : g.perms.filter((x) => x !== perm); };
+      label.append(tick, PERM_NAMES[perm] || perm);
+      boxes.append(label);
+    }
+    box.append(row, boxes);
+    return box;
+  }));
+  if (!groups.length) $("groups").append(el("p", "note", "No groups yet."));
+}
+$("group-add").onclick = () => { groups.push({ name: "Admin", perms: [...perms] }); drawGroups(); };
+$("groups-save").onclick = async () => {
+  try {
+    groups = (await api("POST", "/admin/groups", { groups })).groups;
+    say("groups-msg", "Saved.", true);
+    await loadAdmin();
+  } catch (err) { say("groups-msg", err.message); }
+};
+
+// --- pictures waiting for review -------------------------------------------------
+
+async function loadReview() {
+  const waiting = await api("GET", "/admin/pictures");
+  $("review-count").textContent = waiting.length || "";
+  const rows = await Promise.all(waiting.map(async (w) => {
+    const li = el("li");
+    const who = el("div", "who");
+    const pic = el("span", "face big has-pic");
+    // The waiting picture needs the token, so it comes as a blob, not a URL.
+    const res = await fetch("/admin/pictures/" + w.id + ".jpg", { headers: { Authorization: "Bearer " + store.get("access") } });
+    if (res.ok) { const img = el("img"); img.alt = ""; img.src = URL.createObjectURL(await res.blob()); pic.append(img); }
+    const text = el("div");
+    text.append(el("b", null, w.display_name), el("small", null, "@" + w.handle + " · " + when(w.avatar_pending)));
+    who.append(pic, text);
+    const buttons = el("div", "row");
+    for (const [label, approve, cls] of [["Approve", true, "main"], ["Reject", false, "danger"]]) {
+      const b = el("button", cls, label);
+      b.onclick = async () => {
+        b.disabled = true;
+        try {
+          await api("POST", "/admin/pictures/decide", { handle: w.handle, approve });
+          say("review-msg", (approve ? "Approved " : "Rejected ") + w.handle + "'s picture.", true);
+          await loadReview();
+        } catch (err) { say("review-msg", err.message); b.disabled = false; }
+      };
+      buttons.append(b);
+    }
+    li.append(who, buttons);
+    return li;
+  }));
+  $("review").replaceChildren(...rows);
+  if (!rows.length) $("review").append(el("li", "empty", "Nothing waiting."));
+}
+
+// --- public Flames ---------------------------------------------------------------
+
+function flameRow(f, extra) {
+  const li = el("li");
+  const text = el("div");
+  const name = el("b", null, f.name);
+  text.append(name, el("small", null, f.address + " · " + f.players + (f.max_players == null ? "" : " / " + f.max_players)
+    + " playing" + (f.guests ? " · guests welcome" : " · account needed")));
+  li.append(text);
+  if (extra) li.append(extra);
+  return li;
+}
+
+async function loadFlames() {
+  try {
+    const { flames } = await api("GET", "/flames");
+    $("flames").replaceChildren(...flames.map((f) => {
+      const copy = el("button", "", "Copy address");
+      copy.onclick = async () => {
+        try { await navigator.clipboard.writeText(f.address); say("flames-msg", "Copied " + f.address + ".", true); }
+        catch { say("flames-msg", f.address, true); }
+      };
+      return flameRow(f, copy);
+    }));
+    if (!flames.length) $("flames").append(el("li", "empty", "No public Flame is up right now."));
+  } catch (err) { say("flames-msg", err.message); }
+}
+
+async function loadAdminFlames() {
+  const { flames } = await api("GET", "/flames");
+  $("admin-flames").replaceChildren(...flames.map((f) => {
+    const hide = el("button", "danger", "Take off the list");
+    hide.onclick = async () => {
+      try { await api("POST", "/admin/flames/hide", { certificate: f.certificate }); say("admin-flames-msg", f.name + " is off the list.", true); await loadAdminFlames(); }
+      catch (err) { say("admin-flames-msg", err.message); }
+    };
+    return flameRow(f, hide);
+  }));
+  if (!flames.length) $("admin-flames").append(el("li", "empty", "None listed."));
 }
 
 function drawAccounts() {
@@ -563,7 +745,8 @@ function accountRow(a) {
   const who = el("div", "who");
   const text = el("div");
   const name = el("b", null, a.display_name);
-  if (a.admin) name.append(el("span", "pill ok", "admin"));
+  name.append(badge(a.badge));
+  if (a.avatar_pending) name.append(el("span", "pill", "picture waiting"));
   if (a.ban) name.append(el("span", "pill warn", a.ban.until ? "suspended until " + day(a.ban.until) : "suspended for good"));
   text.append(name, el("small", null, "@" + a.handle + " · " + (a.email ? a.email + (a.email_verified ? "" : " (not confirmed)") : "no email") + " · since " + day(a.created)));
   who.append(face(el("span", "face"), a), text);
@@ -576,15 +759,32 @@ function accountRow(a) {
     try { await api("POST", route, body); say("admin-msg", done, true); await loadAdmin(); }
     catch (err) { say("admin-msg", err.message); b.disabled = false; }
   };
+  // Owner 2, a group 1, anybody else 0: the server refuses anything on an equal anyway.
+  const rank = (x) => x.owner ? 2 : x.group ? 1 : 0;
   if (a.id === me.id) {
     actions.append(el("span", "note", "you"));
+  } else if (rank(a) >= rank(me)) {
+    actions.append(el("span", "note", "ranked as high as you"));
   } else {
-    if (a.ban) act("Unban", "", (b) => post(b, "/admin/unban", { handle: a.handle }, "Unbanned " + a.handle + "."));
-    else if (!a.admin) act("Suspend", "danger", () => openBan(a));
-    act("Sign out", "", (b) => post(b, "/admin/sign-out", { handle: a.handle }, a.handle + " is signed out everywhere."));
-    if (!a.ban) act(a.admin ? "Remove admin" : "Make admin", "", (b) => post(b, "/admin/set-admin", { handle: a.handle, admin: !a.admin },
-      a.admin ? a.handle + " is no longer an admin." : a.handle + " is now an admin."));
-    act("Delete", "danger", (b) => {
+    if (me.owner && !a.ban) {
+      const pick = el("select");
+      pick.setAttribute("aria-label", "Group");
+      pick.append(...[["", "No group"], ...groups.map((g) => [g.name, g.name])].map(([v, t]) => { const o = el("option", null, t); o.value = v; return o; }));
+      pick.value = a.group || "";
+      pick.onchange = async () => {
+        try { await api("POST", "/admin/set-group", { handle: a.handle, group: pick.value }); say("admin-msg", a.handle + (pick.value ? " is in " + pick.value + " now." : " is in no group now."), true); await loadAdmin(); }
+        catch (err) { say("admin-msg", err.message); }
+      };
+      actions.append(pick);
+    }
+    if (can("ban") && a.ban) act("Unban", "", (b) => post(b, "/admin/unban", { handle: a.handle }, "Unbanned " + a.handle + "."));
+    else if (can("ban")) act("Suspend", "danger", () => openBan(a));
+    if (can("sign_out")) act("Sign out", "", (b) => post(b, "/admin/sign-out", { handle: a.handle }, a.handle + " is signed out everywhere."));
+    if (can("moderate")) act("Clear profile", "", (b) => {
+      ask({ title: "Clear " + a.handle + "'s profile?", text: "Their display name goes back to their handle, and their pronouns, bio and picture are removed.", go: "Clear it", danger: true })
+        .then((yes) => { if (yes) post(b, "/admin/moderate", { handle: a.handle, clear: ["display_name", "pronouns", "bio", "avatar"] }, a.handle + "'s profile is cleared."); });
+    });
+    if (can("delete")) act("Delete", "danger", (b) => {
       ask({ title: "Delete " + a.handle + "?", text: "The account, its picture and its friends are deleted for good. This cannot be undone.", go: "Delete for good", danger: true })
         .then((yes) => { if (yes) post(b, "/admin/delete", { handle: a.handle }, a.handle + " is deleted."); });
     });
@@ -664,7 +864,8 @@ function show(view) {
   }
   for (const v of document.querySelectorAll(".view")) v.hidden = v.id !== "view-" + view;
   document.body.dataset.view = view;
-  if (view === "admin" && me && me.admin) loadAdmin();
+  if (view === "admin" && me && (me.perms || []).length) loadAdmin();
+  if (view === "servers") loadFlames();
   window.scrollTo(0, 0);
 }
 for (const b of document.querySelectorAll("[data-view]")) b.onclick = () => show(b.dataset.view);

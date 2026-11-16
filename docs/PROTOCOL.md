@@ -1,4 +1,4 @@
-# Hearth wire protocol — version 7
+# Hearth wire protocol — version 8
 
 Throughout this document **the server** means a **Flame**: one game server,
 hosted by anybody. The Fireplace -- the one server that knows who people are --
@@ -63,7 +63,7 @@ larger prefix is a protocol error.
 | `0x01` | Hello | C→S | `version u16`, `name`, `ticket` (`u16` length + ASCII, ≤ 1024; empty = guest) |
 | `0x02` | Welcome | S→C | `your_id u16`, `tick_hz u8`, `instance u16`, `flags u8` |
 | `0x03` | Reject | S→C | `reason u8`: 1 = server full, 2 = bad version, 3 = bad name, 4 = account required, 5 = bad ticket |
-| `0x04` | PeerJoined | S→C | `id u16`, `name` |
+| `0x04` | PeerJoined | S→C | `id u16`, `name`, `account` (u8 length + up to 64 lowercase hex digits: the per-Flame id from their ticket, empty for a guest) |
 | `0x05` | PeerLeft | S→C | `id u16` |
 | `0x06` | WorldAdded | S→C | `slug`, `size u32`, `sha256 32 bytes` |
 | `0x07` | InstanceAdded | S→C | `instance u16`, `slug`, `players u16`, `name`, `kind u8` |

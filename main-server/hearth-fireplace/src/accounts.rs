@@ -45,6 +45,8 @@ pub enum Refused {
     TooManyRequests,
     Full,
     BadDisplayName,
+    BadProfile,
+    BadGroups,
 }
 
 impl std::fmt::Display for Refused {
@@ -59,6 +61,8 @@ impl std::fmt::Display for Refused {
             Self::TooManyRequests => "that account has too many requests waiting",
             Self::Full => "this Fireplace is full",
             Self::BadDisplayName => "a display name is 1 to 32 bytes, with no control characters",
+            Self::BadProfile => "pronouns are up to 24 bytes and a bio up to 300, with no control characters",
+            Self::BadGroups => "a group needs a name of 1 to 24 bytes, used once, and only known permissions",
         })
     }
 }
@@ -120,8 +124,26 @@ pub struct Account {
     /// When the uploaded picture was set, which is also its cache key. 0: none.
     #[serde(default, skip_serializing_if = "is_zero")]
     pub avatar: u64,
+    /// Mirrors "is the owner or in a group", so an older binary reading this
+    /// file still knows who its admins are.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub admin: bool,
+    /// The one account that runs this Fireplace: every permission, and the
+    /// only one that makes groups and puts people in them.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub owner: bool,
+    /// The name of a group in `Book::groups`; empty for none.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub group: String,
+    /// Shown on the public profile.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub pronouns: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub bio: String,
+    /// When a picture waiting for review was uploaded; 0 for none. Nobody
+    /// else sees it until it is approved and becomes `avatar`.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub avatar_pending: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ban: Option<Ban>,
     /// Two-step sign-in: a code by email on every sign-in, not only from a
@@ -214,7 +236,25 @@ struct Book {
     version: u32,
     next_id: u64,
     accounts: Vec<Account>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    groups: Vec<Group>,
 }
+
+/// A set of permissions the owner hands out under one name, which is also
+/// the badge its members wear.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Group {
+    pub name: String,
+    #[serde(default)]
+    pub perms: Vec<String>,
+}
+
+/// Everything a group can be allowed. The owner has all of them, and alone
+/// manages groups.
+pub const PERMS: &[&str] = &["view", "ban", "delete", "sign_out", "moderate", "review", "flames"];
+const MAX_GROUPS: usize = 20;
+pub const MAX_PRONOUNS: usize = 24;
+pub const MAX_BIO: usize = 300;
 
 pub struct Accounts {
     path: PathBuf,
@@ -223,12 +263,14 @@ pub struct Accounts {
     by_id: BTreeMap<u64, Account>,
     /// Lowercased handle -> id.
     by_handle: HashMap<String, u64>,
+    groups: Vec<Group>,
 }
 
 impl Accounts {
     pub fn open(dir: &Path) -> Result<Self> {
         let path = dir.join("people.json");
-        let mut store = Self { path, next_id: 1, by_id: BTreeMap::new(), by_handle: HashMap::new() };
+        let mut store =
+            Self { path, next_id: 1, by_id: BTreeMap::new(), by_handle: HashMap::new(), groups: Vec::new() };
         let text = match std::fs::read_to_string(&store.path) {
             Ok(text) => text,
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(store),
@@ -241,12 +283,14 @@ impl Accounts {
         let book: Book = serde_json::from_str(&text)
             .with_context(|| format!("{} is not a people file", store.path.display()))?;
         store.next_id = book.next_id.max(1);
+        store.groups = book.groups;
         for account in book.accounts {
             store.by_handle.insert(account.handle.to_lowercase(), account.id);
             store.next_id = store.next_id.max(account.id + 1);
             store.by_id.insert(account.id, account);
         }
         tracing::info!(accounts = store.by_id.len(), "read the people file");
+        store.migrate_admins();
         Ok(store)
     }
 
@@ -302,6 +346,11 @@ impl Accounts {
                 renamed: Vec::new(),
                 avatar: 0,
                 admin: false,
+                owner: false,
+                group: String::new(),
+                pronouns: String::new(),
+                bio: String::new(),
+                avatar_pending: 0,
                 ban: None,
                 two_factor: false,
                 sessions: Vec::new(),
@@ -419,6 +468,13 @@ impl Accounts {
         }
         let account = self.by_id.get_mut(&me).ok_or(Refused::NoSuchAccount)?;
         account.display_name = name.to_owned();
+        self.save();
+        Ok(())
+    }
+
+    /// Back to the handle.
+    pub fn clear_display_name(&mut self, me: u64) -> Result<(), Refused> {
+        self.by_id.get_mut(&me).ok_or(Refused::NoSuchAccount)?.display_name.clear();
         self.save();
         Ok(())
     }
@@ -546,20 +602,128 @@ impl Accounts {
         Ok(())
     }
 
-    pub fn set_admin(&mut self, me: u64, on: bool) -> Result<(), Refused> {
-        self.by_id.get_mut(&me).ok_or(Refused::NoSuchAccount)?.admin = on;
-        self.save();
-        Ok(())
-    }
-
     pub fn set_two_factor(&mut self, me: u64, on: bool) -> Result<(), Refused> {
         self.by_id.get_mut(&me).ok_or(Refused::NoSuchAccount)?.two_factor = on;
         self.save();
         Ok(())
     }
 
-    pub fn any_admin(&self) -> bool {
-        self.by_id.values().any(|a| a.admin)
+    /// From before owners and groups: the oldest admin becomes the owner and
+    /// the others go into an "Admin" group that can do everything.
+    fn migrate_admins(&mut self) {
+        if self.by_id.values().any(|a| a.owner) {
+            return;
+        }
+        let Some(first) = self.by_id.values().find(|a| a.admin).map(|a| a.id) else {
+            return;
+        };
+        self.by_id.get_mut(&first).expect("found").owner = true;
+        let others: Vec<u64> =
+            self.by_id.values().filter(|a| a.admin && !a.owner && a.group.is_empty()).map(|a| a.id).collect();
+        if !others.is_empty() && !self.groups.iter().any(|g| g.name == "Admin") {
+            self.groups.push(Group { name: "Admin".into(), perms: PERMS.iter().map(|p| (*p).to_owned()).collect() });
+        }
+        for id in others {
+            self.by_id.get_mut(&id).expect("listed").group = "Admin".into();
+        }
+        tracing::info!(owner = first, "the first admin is now the Fireplace owner");
+        self.save();
+    }
+
+    pub fn any_owner(&self) -> bool {
+        self.by_id.values().any(|a| a.owner)
+    }
+
+    /// Makes this account the owner, and nobody else.
+    pub fn set_owner(&mut self, me: u64) -> Result<(), Refused> {
+        self.must_exist(me)?;
+        for account in self.by_id.values_mut() {
+            account.owner = account.id == me;
+            account.admin = account.owner || !account.group.is_empty();
+        }
+        self.save();
+        Ok(())
+    }
+
+    pub fn groups(&self) -> &[Group] {
+        &self.groups
+    }
+
+    /// Replaces every group. Members of a group that is gone lose it.
+    pub fn set_groups(&mut self, groups: Vec<Group>) -> Result<(), Refused> {
+        let mut seen = std::collections::HashSet::new();
+        let good = groups.len() <= MAX_GROUPS
+            && groups.iter().all(|g| {
+                (1..=24).contains(&g.name.len())
+                    && g.name == g.name.trim()
+                    && !g.name.chars().any(char::is_control)
+                    && seen.insert(g.name.to_lowercase())
+                    && g.perms.iter().all(|p| PERMS.contains(&p.as_str()))
+            });
+        if !good {
+            return Err(Refused::BadGroups);
+        }
+        for account in self.by_id.values_mut() {
+            if !account.group.is_empty() && !groups.iter().any(|g| g.name == account.group) {
+                account.group.clear();
+                account.admin = account.owner;
+            }
+        }
+        self.groups = groups;
+        self.save();
+        Ok(())
+    }
+
+    /// Puts an account in a group, or with "" in none.
+    pub fn set_group(&mut self, me: u64, group: &str) -> Result<(), Refused> {
+        if !group.is_empty() && !self.groups.iter().any(|g| g.name == group) {
+            return Err(Refused::BadGroups);
+        }
+        let account = self.by_id.get_mut(&me).ok_or(Refused::NoSuchAccount)?;
+        account.group = group.to_owned();
+        account.admin = account.owner || !group.is_empty();
+        self.save();
+        Ok(())
+    }
+
+    /// Whether this account may do `perm`.
+    pub fn can(&self, me: u64, perm: &str) -> bool {
+        self.by_id.get(&me).is_some_and(|a| {
+            a.owner || self.groups.iter().any(|g| g.name == a.group && g.perms.iter().any(|p| p == perm))
+        })
+    }
+
+    /// What `me` may do, so the pages show only those tools.
+    pub fn perms_of(&self, me: u64) -> Vec<&'static str> {
+        PERMS.iter().copied().filter(|p| self.can(me, p)).collect()
+    }
+
+    /// Owner 2, a group member 1, anybody else 0: nobody acts on an account
+    /// ranked as high as their own.
+    pub fn rank(&self, me: u64) -> u8 {
+        self.by_id.get(&me).map_or(0, |a| if a.owner { 2 } else { u8::from(!a.group.is_empty()) })
+    }
+
+    pub fn set_profile(&mut self, me: u64, pronouns: &str, bio: &str) -> Result<(), Refused> {
+        let (pronouns, bio) = (pronouns.trim(), bio.trim());
+        if pronouns.len() > MAX_PRONOUNS
+            || bio.len() > MAX_BIO
+            || pronouns.chars().any(char::is_control)
+            || bio.chars().any(|c| c.is_control() && c != '\n')
+        {
+            return Err(Refused::BadProfile);
+        }
+        let account = self.by_id.get_mut(&me).ok_or(Refused::NoSuchAccount)?;
+        account.pronouns = pronouns.to_owned();
+        account.bio = bio.to_owned();
+        self.save();
+        Ok(())
+    }
+
+    pub fn set_avatar_pending(&mut self, me: u64, version: u64) -> Result<(), Refused> {
+        self.by_id.get_mut(&me).ok_or(Refused::NoSuchAccount)?.avatar_pending = version;
+        self.save();
+        Ok(())
     }
 
     /// Bans (or with `None` unbans) and, banning, signs it out everywhere.
@@ -679,8 +843,12 @@ impl Accounts {
     /// swallowed: there is nothing useful to tell the player, and the next
     /// write will try again.
     fn save(&self) {
-        let book =
-            Book { version: 1, next_id: self.next_id, accounts: self.by_id.values().cloned().collect() };
+        let book = Book {
+            version: 1,
+            next_id: self.next_id,
+            accounts: self.by_id.values().cloned().collect(),
+            groups: self.groups.clone(),
+        };
         if let Err(err) = write_atomically(&self.path, &book) {
             tracing::error!(path = %self.path.display(), "could not write the people file: {err:#}");
         }
@@ -707,6 +875,17 @@ impl Account {
     /// What everybody else sees.
     pub fn display(&self) -> &str {
         if self.display_name.is_empty() { &self.handle } else { &self.display_name }
+    }
+
+    /// The badge on the profile and over the head: kind and words.
+    pub fn badge(&self) -> Option<(&'static str, &str)> {
+        if self.owner {
+            Some(("owner", "Fireplace owner"))
+        } else if !self.group.is_empty() {
+            Some(("staff", &self.group))
+        } else {
+            None
+        }
     }
 }
 
@@ -981,6 +1160,37 @@ mod tests {
         store.set_sharing(1, false).unwrap();
         let written = std::fs::read_to_string(dir.join("people.json")).unwrap();
         assert!(!written.contains("email") && !written.contains("recovery"), "{written}");
+    }
+
+    #[test]
+    fn the_oldest_admin_becomes_the_owner_and_groups_decide_the_rest() {
+        let dir = temp("owner");
+        let old = r#"{"version":1,"next_id":4,"accounts":[
+            {"id":1,"handle":"ada","password":"x","created":1},
+            {"id":2,"handle":"bob","password":"x","created":1,"admin":true},
+            {"id":3,"handle":"cy","password":"x","created":1,"admin":true}]}"#;
+        std::fs::write(dir.join("people.json"), old).unwrap();
+        let mut store = Accounts::open(&dir).unwrap();
+        assert!(store.get(2).unwrap().owner && !store.get(3).unwrap().owner);
+        assert_eq!(store.get(3).unwrap().group, "Admin");
+        assert!(store.can(3, "ban") && !store.can(1, "ban"));
+        assert_eq!((store.rank(2), store.rank(3), store.rank(1)), (2, 1, 0));
+
+        let mods = Group { name: "Mods".into(), perms: vec!["review".into()] };
+        store.set_groups(vec![mods.clone()]).unwrap();
+        assert_eq!(store.get(3).unwrap().group, "", "the Admin group is gone, and so is its member's place in it");
+        assert!(!store.get(3).unwrap().admin);
+        store.set_group(1, "Mods").unwrap();
+        assert!(store.can(1, "review") && !store.can(1, "ban") && store.get(1).unwrap().admin);
+        assert_eq!(store.set_group(1, "Nobody"), Err(Refused::BadGroups));
+        let twice = vec![mods.clone(), Group { name: "mods".into(), perms: vec![] }];
+        assert_eq!(store.set_groups(twice), Err(Refused::BadGroups), "a name is used once");
+        let unknown = vec![Group { name: "X".into(), perms: vec!["everything".into()] }];
+        assert_eq!(store.set_groups(unknown), Err(Refused::BadGroups));
+
+        let store = Accounts::open(&dir).unwrap();
+        assert_eq!(store.groups(), &[mods][..], "kept across a restart");
+        assert_eq!(store.get(1).unwrap().group, "Mods");
     }
 
     #[test]

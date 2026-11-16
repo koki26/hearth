@@ -73,6 +73,8 @@ const TOAST_TIME := 5.0
 const HOME_WORLD := "res://worlds/hub"
 ## The menu's pages, in the order they sit across the top.
 ## Friends and chat are not tabs: they hang either side of the menu, always.
+## How many public Flames the lift panel lists, busiest first.
+const PUBLIC_FLAMES_SHOWN := 6
 const MENU_TABS := [
 	{"id": "tab:worlds", "label": "Worlds", "icon": "res://icons/globe.svg"},
 	{"id": "tab:camera", "label": "Camera", "icon": "res://icons/camera.svg"},
@@ -160,6 +162,10 @@ var _friend_typed := ""
 var _email_typed := ""
 ## An ember to walk into the moment we land on a friend's Flame, or -1.
 var _join_ember := -1
+## Whose profile the menu's profile page shows: a peer id, or -1 for your own.
+var _profile_of := -1
+## A profile asked for by handle (a friend), shown on the profile page.
+var _profile_seen := {}
 ## Which page of the lift panel is showing: "main", "warning" or "advanced".
 ## Three pages, one `_panel_rows`, no second scene.
 var _panel_page := "main"
@@ -259,6 +265,10 @@ func _ready() -> void:
 	_fireplace.signed_out.connect(_on_signed_out)
 	_fireplace.friends_changed.connect(_refresh_menu)
 	_fireplace.account_changed.connect(_refresh_panel)
+	_fireplace.account_changed.connect(_refresh_menu)
+	_fireplace.profile_seen.connect(_on_profile_seen)
+	_fireplace.picture_ready.connect(_on_picture_ready)
+	_fireplace.flames_changed.connect(_refresh_panel)
 	_fireplace.failed.connect(_on_fireplace_failed)
 	_fireplace.said.connect(func(message: String) -> void:
 		_message = message
@@ -456,6 +466,21 @@ func _panel_rows() -> Array:
 	if _panel_page == "account":
 		return _account_rows()
 	var rows: Array = []
+	rows.append({"heading": "Public Flames"})
+	if _fireplace.flames.is_empty():
+		rows.append({"label": "none listed right now"})
+	for i in mini(_fireplace.flames.size(), PUBLIC_FLAMES_SHOWN):
+		var flame: Dictionary = _fireplace.flames[i]
+		var most = flame.get("max_players")
+		rows.append({
+			"id": "flame:%d" % i,
+			"label": str(flame.get("name", "?")),
+			"sub": str(flame.get("address", "")),
+			"note": "%d / %s" % [int(flame.get("players", 0)), "-" if most == null else str(int(most))],
+			"icon": "res://icons/flame.svg",
+		})
+	rows.append({"id": "flames_refresh", "label": "Refresh the list", "icon": "res://icons/globe.svg"})
+	rows.append({"heading": "Direct connect"})
 	rows.append({"id": "address", "label": "Server", "text": _details.address, "icon": "res://icons/globe.svg"})
 	rows.append({"id": "name", "label": "Name", "text": _details.player_name, "icon": "res://icons/user.svg"})
 	rows.append({
@@ -592,6 +617,7 @@ func _advanced_rows() -> Array:
 
 func _open_panel() -> void:
 	_panel_page = "main"
+	_fireplace.fetch_flames()
 	_panel.mount(_panel_rows(), [], _panel_title())
 	_place_lift_ui()
 
@@ -667,7 +693,15 @@ func _join() -> void:
 
 func _on_panel_chosen(id: String) -> void:
 	_audio.play("click")
+	if id.begins_with("flame:"):
+		var flame: Dictionary = _fireplace.flames[int(id.substr(6))]
+		if not _connecting:
+			_details.address = str(flame.get("address", ""))
+			_join()
+		return
 	match id:
+		"flames_refresh":
+			_fireplace.fetch_flames()
 		"join":
 			if not _connecting:
 				_join()
@@ -785,6 +819,12 @@ func _on_typed(text: String) -> void:
 		_password_typed = text
 	elif _editing == "email":
 		_email_typed = text
+	elif _editing == "my_name":
+		_fireplace.set_display_name(text)
+	elif _editing == "my_pronouns":
+		_fireplace.set_profile(text, str(_fireplace.me.get("bio", "")))
+	elif _editing == "my_bio":
+		_fireplace.set_profile(str(_fireplace.me.get("pronouns", "")), text)
 	elif _editing == "addfriend":
 		_friend_typed = ""
 		_fireplace.add_friend(text)
@@ -1145,12 +1185,16 @@ func _on_layer(node: Node) -> void:
 		_on_layer(child)
 
 
-func _on_peer_joined(id: int, peer_name: String) -> void:
+func _on_peer_joined(id: int, peer_name: String, account := "") -> void:
 	var avatar := avatar_scene.instantiate()
 	$Peers.add_child(avatar)
 	_on_layer(avatar)
 	avatar.set_label(peer_name)
+	avatar.set_meta("account", account)
 	_peers[id] = avatar
+	# Who they are comes from the Fireplace, never the Flame: it only passes on
+	# the id their ticket gave them here.
+	_fireplace.look_up($Client.certificate(), account)
 	_status("%s joined" % peer_name)
 	if _joined:
 		_add_chat(-1, "", "%s came in" % peer_name)
@@ -1594,12 +1638,17 @@ func _menu_title() -> String:
 
 ## The menu's rows, rebuilt every time it opens so the lists are current.
 func _menu_rows() -> Array:
+	if _menu_tab == "profile":
+		return _profile_rows()
+	var rows: Array = [_me_row()]
 	match _menu_tab:
 		"camera":
-			return _camera_rows()
+			rows.append_array(_camera_rows())
 		"settings":
-			return _settings_rows()
-	return _worlds_rows()
+			rows.append_array(_settings_rows())
+		_:
+			rows.append_array(_worlds_rows())
+	return rows
 
 
 ## The left-hand panel: your friends and where they are, then who is standing
@@ -1615,15 +1664,117 @@ func _friends_rows() -> Array:
 			"sub": "to add friends and follow them"})
 	rows.append({"heading": "In this ember  %d" % (_peers.size() + 1)})
 	var me := _details.player_name.strip_edges()
-	rows.append({"label": me, "avatar": me, "status": "online", "sub": "you"})
+	rows.append({"id": "profile:me", "label": me, "avatar": me, "face": _face_of(_fireplace.me),
+		"status": "online", "sub": "you", "more": true})
 	for id: int in _peers:
 		# Off the dictionary rather than through a typed local: an avatar has
 		# no class_name, so a Node3D would not know it has a name to give.
 		var peer_name := _peer_name(id)
-		rows.append({"label": peer_name, "avatar": peer_name, "status": "online", "sub": "here"})
+		var profile: Dictionary = _peers[id].profile if is_instance_valid(_peers[id]) else {}
+		var badge = profile.get("badge")
+		var sub := "here"
+		if badge is Dictionary:
+			sub = str(badge.get("label", ""))
+		elif str(profile.get("pronouns", "")) != "":
+			sub = str(profile.get("pronouns", ""))
+		rows.append({"id": "profile:%d" % id, "label": peer_name, "avatar": peer_name,
+			"face": _face_of(profile), "status": "online", "sub": sub, "more": true})
 	if _peers.is_empty():
 		rows.append({"label": "nobody else is here yet"})
 	return rows
+
+
+## A profile the Fireplace sent: onto the nameplate of whoever it is for,
+## or onto the profile page when it was asked for by handle.
+func _on_profile_seen(key: String, profile: Dictionary) -> void:
+	if key.begins_with("@"):
+		_profile_seen = profile
+		_refresh_menu()
+		return
+	for id: int in _peers:
+		# Untyped: the avatar script has no class_name to type it by.
+		var avatar = _peers[id]
+		if not is_instance_valid(avatar) or str(avatar.get_meta("account", "")) != key:
+			continue
+		avatar.set_profile(profile)
+		avatar.set_label(str(profile.get("display_name", avatar.label())))
+		avatar.set_picture(_face_of(profile))
+	_refresh_menu()
+
+
+func _on_picture_ready(account_id: int, texture: Texture2D) -> void:
+	for id: int in _peers:
+		# Untyped: the avatar script has no class_name to type it by.
+		var avatar = _peers[id]
+		if is_instance_valid(avatar) and int(avatar.profile.get("id", 0)) == account_id:
+			avatar.set_picture(texture)
+	_refresh_menu()
+
+
+## Somebody's picture for a menu row or a nameplate: null until it is here.
+func _face_of(profile: Dictionary) -> Texture2D:
+	return _fireplace.picture(int(profile.get("id", 0)), int(profile.get("avatar", 0)))
+
+
+## The profile page: yours, to edit, or somebody else's, to read.
+func _profile_rows() -> Array:
+	var rows: Array = [{"id": "profile_back", "label": "Back", "icon": "res://icons/back.svg"}]
+	var mine := _profile_of == -1 and _profile_seen.is_empty()
+	var profile: Dictionary = {}
+	if mine:
+		profile = _fireplace.me
+	elif not _profile_seen.is_empty():
+		profile = _profile_seen
+	elif _peers.has(_profile_of) and is_instance_valid(_peers[_profile_of]):
+		profile = _peers[_profile_of].profile
+	if profile.is_empty():
+		var who := _peer_name(_profile_of) if _peers.has(_profile_of) else _details.player_name.strip_edges()
+		rows.append({"label": who, "avatar": who, "sub": "a guest: no profile"})
+		return rows
+	var face := _face_of(profile)
+	if face != null:
+		rows.append({"picture": face})
+	var display := str(profile.get("display_name", ""))
+	var handle := str(profile.get("handle", ""))
+	var pronouns := str(profile.get("pronouns", ""))
+	rows.append({"heading": display})
+	rows.append({"label": "@" + handle, "avatar": handle, "face": face,
+		"sub": pronouns if pronouns != "" else "no pronouns set"})
+	var badge = profile.get("badge")
+	if badge is Dictionary:
+		var is_owner := str(badge.get("kind", "")) == "owner"
+		rows.append({"label": str(badge.get("label", "")), "sub": "verified by this Fireplace",
+			"icon": "res://icons/crown.svg" if is_owner else "res://icons/shield.svg"})
+	if mine:
+		rows.append({"heading": "Edit"})
+		rows.append({"id": "my_name", "label": "Display name", "text": display, "icon": "res://icons/user.svg"})
+		rows.append({"id": "my_pronouns", "label": "Pronouns", "text": pronouns, "icon": "res://icons/user.svg"})
+		rows.append({"id": "my_bio", "label": "Bio", "text": str(profile.get("bio", "")), "icon": "res://icons/chat.svg"})
+		var waiting := int(profile.get("avatar_pending", 0)) > 0
+		rows.append({"id": "my_picture", "label": "Change picture", "icon": "res://icons/image.svg", "more": true,
+			"sub": "waiting for review" if waiting else "on your account page"})
+		return rows
+	var bio := str(profile.get("bio", ""))
+	if bio != "":
+		rows.append({"heading": "Bio"})
+		var chars := int((_menu.width - UiStyle.PAD * 2.0) / (UiStyle.FONT * UiStyle.PIXEL * UiStyle.CHAR_WIDTH))
+		for line in bio.split("\n"):
+			for piece in UiStyle.wrap(line, chars):
+				rows.append({"label": piece, "bright": true})
+	return rows
+
+
+## The top of every menu page: who you are here.
+func _me_row() -> Dictionary:
+	if not _fireplace.is_signed_in():
+		var guest := _details.player_name.strip_edges()
+		return {"label": guest, "avatar": guest, "sub": "playing as a guest"}
+	var me := _fireplace.me
+	var display := str(me.get("display_name", _fireplace.handle))
+	var pronouns := str(me.get("pronouns", ""))
+	var sub := "@" + _fireplace.handle + ("  -  " + pronouns if pronouns != "" else "")
+	return {"id": "profile:me", "label": display, "avatar": _fireplace.handle, "face": _face_of(me),
+		"sub": sub, "more": true}
 
 
 ## Somebody's name, from their avatar.
@@ -1988,6 +2139,17 @@ func _on_menu_chosen(id: String) -> void:
 	elif id.begins_with("join:"):
 		_menu.close()
 		$Client.join_instance(int(id.substr(5)))
+	elif id.begins_with("profile:"):
+		_profile_of = -1 if id == "profile:me" else int(id.substr(8))
+		_profile_seen = {}
+		_menu_tab = "profile"
+		_refresh_menu()
+	elif id == "profile_back":
+		_menu_tab = "worlds"
+		_profile_seen = {}
+		_refresh_menu()
+	elif id == "my_picture":
+		OS.shell_open(_fireplace.base_url() + "/")
 
 
 func _on_menu_changed(id: String, value: float) -> void:

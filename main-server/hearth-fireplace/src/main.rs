@@ -22,7 +22,7 @@ async fn main() -> Result<()> {
         println!("fireplace admin reset-password <handle> [fireplace.toml]");
         println!("fireplace admin test-mail <address> [fireplace.toml]");
         println!("fireplace admin policy-mail <letter.txt> [fireplace.toml]");
-        println!("fireplace admin make-admin <handle> [fireplace.toml]");
+        println!("fireplace admin make-owner <handle> [fireplace.toml]");
         return Ok(());
     }
     if args.first().is_some_and(|a| a == "admin") {
@@ -85,7 +85,7 @@ fn read_config(path: &str) -> Result<Config> {
 async fn admin(args: &[String]) -> Result<()> {
     let (Some(command), Some(what)) = (args.first(), args.get(1)) else {
         anyhow::bail!(
-            "fireplace admin reset-password <handle> | test-mail <address> | policy-mail <letter.txt> | make-admin <handle> [fireplace.toml]"
+            "fireplace admin reset-password <handle> | test-mail <address> | policy-mail <letter.txt> | make-owner <handle> [fireplace.toml]"
         );
     };
     let config = read_config(args.get(2).map_or("fireplace.toml", String::as_str))?;
@@ -127,18 +127,18 @@ async fn admin(args: &[String]) -> Result<()> {
                 }
             }
         }
-        // The first admin. Works only while there is none: once one exists,
-        // admins make admins on the account page, and if the last admin goes
-        // (deletes their account), this works again.
-        "make-admin" => {
+        // The Fireplace owner. Works only while there is none: the owner
+        // makes groups and gives them out on the account page, and if the
+        // owner deletes their account, this works again.
+        "make-owner" | "make-admin" => {
             if !config.data_dir.join("people.json").exists()
                 || !hearth_fireplace::token::key_path(&config.data_dir).exists()
             {
                 anyhow::bail!("no accounts in {}: run this where fireplace.toml is", config.data_dir.display());
             }
             let accounts = hearth_fireplace::accounts::Accounts::open(&config.data_dir)?;
-            if accounts.any_admin() {
-                anyhow::bail!("there is already an admin: they can make more on the account page");
+            if accounts.any_owner() {
+                anyhow::bail!("this Fireplace already has an owner: they give out groups on the account page");
             }
             let account = accounts.by_handle(what).with_context(|| format!("nobody here goes by {what:?}"))?;
             let (id, handle, epoch) = (account.id, account.handle.clone(), account.token_epoch);
@@ -150,12 +150,12 @@ async fn admin(args: &[String]) -> Result<()> {
             let link = keys.mint_link("admin", id, epoch, "", hearth_fireplace::token::now());
             let port = config.port;
             match claim_over_loopback(port, &link).await {
-                Ok((200, _)) => println!("{handle} is now an admin."),
+                Ok((200, _)) => println!("{handle} is now the Fireplace owner."),
                 Ok((status, said)) => anyhow::bail!("the Fireplace said no ({status}): {said}"),
                 Err(err) if err.kind() == std::io::ErrorKind::ConnectionRefused => {
                     let mut accounts = hearth_fireplace::accounts::Accounts::open(&config.data_dir)?;
-                    accounts.set_admin(id, true).map_err(|refused| anyhow::anyhow!("{refused}"))?;
-                    println!("{handle} is now an admin (the Fireplace was not running).");
+                    accounts.set_owner(id).map_err(|refused| anyhow::anyhow!("{refused}"))?;
+                    println!("{handle} is now the Fireplace owner (the Fireplace was not running).");
                 }
                 Err(err) => return Err(err).context("could not reach the Fireplace on this machine"),
             }

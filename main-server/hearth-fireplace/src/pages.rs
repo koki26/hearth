@@ -441,7 +441,8 @@ pub fn privacy_html(config: &crate::Config) -> String {
         ),
         row("Whether two-step sign-in is on", "Asking for a code from your email on every sign-in", contract, until_deleted),
         row("When you last changed your display name (the last 30 days)", "Display names change at most twice a month, so nobody can hide behind a new one every day", security, "30 days"),
-        row("Your picture, if you upload one", "Shown to other players next to your name; anyone with its link can see it", contract, "Until you remove it or delete your account"),
+        row("Your picture, if you upload one", "Shown to other players next to your name; anyone with its link can see it. A new one is first looked at by this server's moderators", contract, "Until you remove it or delete your account"),
+        row("Pronouns and a bio, if you write them", "Your public profile, which anybody may look up", contract, "Until you change them or delete your account"),
         row("When you accepted the terms and this notice", "A record that you did", "Legal obligation to be able to show it (Art. 6(1)(c), 7(1))", until_deleted),
         row(
             "<strong>IP addresses you signed in from</strong>, with when each was first and last used",
@@ -500,7 +501,8 @@ pub fn privacy_html(config: &crate::Config) -> String {
          <li><strong>This server's admins</strong>: the people the controller trusts to run it can see accounts, \
          emails and sign-in IP addresses, to stop abuse. They can suspend an account or block an address, \
          always with a reason and an end date or \"for good\", and the person is shown both.</li>\
-         <li><strong>Other players</strong>: your handle, display name and picture; your friends also see \
+         <li><strong>Other players</strong>: your public profile (handle, display name, picture, and pronouns \
+         and bio if you wrote them), which anybody may look up; your friends also see \
          whether you are online and, if you allow it, on which server.</li>\
          <li>Nobody else. Nothing is sold or shared.</li></ul></section>\
          <section><h2>Decisions made automatically</h2><p>Only three, all simple rules, none of them \

@@ -69,6 +69,28 @@ button.wide { width: 100%; margin-top: 22px; padding: 12px; }
 .pill { font: 500 .72rem system-ui, sans-serif; letter-spacing: .04em; text-transform: uppercase;
         padding: 3px 8px; border-radius: 99px; background: var(--raise); color: var(--dim); border: 1px solid var(--line); }
 .pill:empty { display: none; }
+textarea { width: 100%; padding: 11px 13px; border-radius: 10px; border: 1px solid var(--line); resize: vertical;
+           background: var(--bg); color: var(--text); font: inherit; }
+textarea:focus { outline: none; border-color: var(--fire); box-shadow: 0 0 0 3px color-mix(in srgb, var(--fire) 22%, transparent); }
+
+/* Staff wear a green shield, the Fireplace owner a yellow crown; both say who verified them. */
+.badge { --c: var(--green); display: inline-flex; align-items: center; gap: 4px; color: var(--c);
+         font: 600 .72rem system-ui, sans-serif; letter-spacing: .04em; text-transform: uppercase; vertical-align: 2px; }
+.badge.owner { --c: #e0a922; }
+.badge .ic { width: 15px; height: 15px; stroke-width: 6; }
+.badge .check { width: 13px; height: 13px; }
+.who .badge, .acct .badge, .me-text .badge { margin-left: 8px; }
+.me-text .badge { margin-left: 0; display: flex; }
+.profile-card { display: flex; gap: 18px; align-items: flex-start; }
+.profile-card .about { min-width: 0; }
+.profile-card h2 { margin: 2px 0 2px; flex-wrap: wrap; }
+.profile-card .bio { white-space: pre-wrap; overflow-wrap: anywhere; margin: 10px 0 0; }
+.people li.link { cursor: pointer; }
+.group { border-top: 1px solid var(--line); padding: 12px 0; }
+.group:first-child { border-top: 0; padding-top: 0; }
+.group .perms { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 8px; }
+.group .perms label { display: inline-flex; gap: 6px; align-items: center; margin: 0; color: var(--text); }
+.group .perms input { width: auto; }
 
 /* --- signed out: the fire on the left, the form on the right --------------- */
 .auth { min-height: 100%; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }

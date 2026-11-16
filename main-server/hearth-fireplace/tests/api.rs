@@ -1046,7 +1046,10 @@ async fn upload(app: &Router, access: &str, bytes: Vec<u8>) -> (StatusCode, Valu
 
 #[tokio::test]
 async fn a_picture_is_redrawn_small_and_anything_else_is_refused() {
-    let (app, dir) = fireplace("avatar");
+    let (app, state) = fireplace_state("avatar");
+    let dir = state.config.data_dir.clone();
+    let root = join(&app, "root").await;
+    claim(&app, &state, "root").await;
     let access = join(&app, "ada").await;
     let mut png = Vec::new();
     image::RgbImage::from_pixel(900, 600, image::Rgb([10, 120, 200]))
@@ -1055,6 +1058,15 @@ async fn a_picture_is_redrawn_small_and_anything_else_is_refused() {
     let (status, said) = upload(&app, &access, png).await;
     assert_eq!(status, StatusCode::OK, "{said}");
     let (_, me) = call(&app, "GET", "/me", Some(&access), Value::Null).await;
+    assert_eq!(me["avatar"], 0, "nobody else sees it until it is reviewed");
+    assert!(me["avatar_pending"].as_u64().unwrap() > 0);
+    let picture = || Request::builder().uri(format!("/avatars/{}.jpg", me["id"])).body(Body::empty()).unwrap();
+    assert_eq!(app.clone().oneshot(picture()).await.unwrap().status(), StatusCode::NOT_FOUND);
+    let (_, waiting) = call(&app, "GET", "/admin/pictures", Some(&root), Value::Null).await;
+    assert_eq!(waiting[0]["handle"], "ada");
+    assert_eq!(call(&app, "GET", "/admin/pictures", Some(&access), Value::Null).await.0, StatusCode::FORBIDDEN);
+    let approve = json!({"handle": "ada", "approve": true});
+    assert_eq!(call(&app, "POST", "/admin/pictures/decide", Some(&root), approve).await.0, StatusCode::OK);
     let response = app
         .clone()
         .oneshot(Request::builder().uri(format!("/avatars/{}.jpg", me["id"])).body(Body::empty()).unwrap())
@@ -1124,6 +1136,80 @@ async fn the_first_admin_is_made_once_and_again_only_when_there_is_none() {
     call(&app, "POST", "/me/delete", Some(&root), json!({"password": "a long one"})).await;
     assert_eq!(claim(&app, &state, "other").await, StatusCode::OK);
     let _ = other;
+}
+
+#[tokio::test]
+async fn a_profile_is_public_polite_and_found_from_a_flame() {
+    let (app, state) = fireplace_state("profiles");
+    let ada = join(&app, "ada").await;
+    let profile = json!({"pronouns": "she/her", "bio": "counts things"});
+    assert_eq!(call(&app, "POST", "/me/profile", Some(&ada), profile).await.0, StatusCode::OK);
+    let rude = json!({"pronouns": "", "bio": "F.u_u-u\u{a9}k this"});
+    assert_eq!(call(&app, "POST", "/me/profile", Some(&ada), rude).await.0, StatusCode::BAD_REQUEST);
+    assert_eq!(call(&app, "POST", "/me/name", Some(&ada), json!({"display_name": "sh1iit"})).await.0, StatusCode::BAD_REQUEST);
+    let account = |handle: &str| json!({"handle": handle, "password": "a long one", "birthdate": "1990-05-04", "accept_terms": true});
+    assert_eq!(call(&app, "POST", "/accounts", None, account("xXp0rnXx")).await.0, StatusCode::BAD_REQUEST);
+
+    let (status, seen) = call(&app, "GET", "/profiles/ADA", None, Value::Null).await;
+    assert_eq!(status, StatusCode::OK, "anybody may look, signed in or not");
+    assert_eq!((seen["pronouns"].as_str(), seen["bio"].as_str()), (Some("she/her"), Some("counts things")));
+    assert!(seen["badge"].is_null() && seen.get("email").is_none());
+
+    // What a game sees: a Flame's certificate and the id Ada has there.
+    let flame = "ab".repeat(32);
+    let id = state.accounts.lock().unwrap().by_handle("ada").unwrap().id;
+    let pid = state.keys.pid_of(id, &flame);
+    let (status, found) = call(&app, "GET", &format!("/profiles/at/{flame}/{pid}"), None, Value::Null).await;
+    assert_eq!((status, found["handle"].as_str()), (StatusCode::OK, Some("ada")));
+    let other = "cd".repeat(32);
+    assert_eq!(call(&app, "GET", &format!("/profiles/at/{other}/{pid}"), None, Value::Null).await.0, StatusCode::NOT_FOUND, "that id means nothing on another Flame");
+}
+
+#[tokio::test]
+async fn the_owner_makes_groups_and_nobody_acts_on_their_equals() {
+    let (app, state) = fireplace_state("groups");
+    let root = join(&app, "root").await;
+    let mod_a = join(&app, "moda").await;
+    let mod_b = join(&app, "modb").await;
+    join(&app, "bob").await;
+    claim(&app, &state, "root").await;
+    let (_, owner) = call(&app, "GET", "/profiles/root", None, Value::Null).await;
+    assert_eq!(owner["badge"], json!({"kind": "owner", "label": "Fireplace owner"}));
+
+    let groups = json!({"groups": [{"name": "Mods", "perms": ["ban", "review"]}]});
+    assert_eq!(call(&app, "POST", "/admin/groups", Some(&mod_a), groups.clone()).await.0, StatusCode::FORBIDDEN);
+    assert_eq!(call(&app, "POST", "/admin/groups", Some(&root), groups).await.0, StatusCode::OK);
+    for who in ["moda", "modb"] {
+        let give = json!({"handle": who, "group": "Mods"});
+        assert_eq!(call(&app, "POST", "/admin/set-group", Some(&root), give).await.0, StatusCode::OK);
+    }
+    let (_, seen) = call(&app, "GET", "/profiles/moda", None, Value::Null).await;
+    assert_eq!(seen["badge"], json!({"kind": "staff", "label": "Mods"}));
+
+    let ban = |who: &str| json!({"handle": who, "minutes": 5, "reason": "testing"});
+    assert_eq!(call(&app, "POST", "/admin/ban", Some(&mod_a), ban("bob")).await.0, StatusCode::OK, "a Mod may ban");
+    assert_eq!(call(&app, "POST", "/admin/ban", Some(&mod_a), ban("modb")).await.0, StatusCode::FORBIDDEN, "not another Mod");
+    assert_eq!(call(&app, "POST", "/admin/ban", Some(&mod_b), ban("root")).await.0, StatusCode::FORBIDDEN, "nor the owner");
+    let wipe = json!({"handle": "bob", "clear": ["bio"]});
+    assert_eq!(call(&app, "POST", "/admin/moderate", Some(&mod_a), wipe).await.0, StatusCode::FORBIDDEN, "Mods were not given that");
+    assert_eq!(call(&app, "GET", "/admin/accounts", Some(&mod_a), Value::Null).await.0, StatusCode::FORBIDDEN);
+    let (_, me) = call(&app, "GET", "/me", Some(&mod_a), Value::Null).await;
+    assert_eq!(me["perms"], json!(["ban", "review"]));
+}
+
+#[tokio::test]
+async fn a_flame_is_only_listed_once_the_fireplace_has_reached_it() {
+    let (app, _state) = fireplace_state("flames");
+    let announce = |address: &str| json!({"name": "Ada's", "address": address, "port": 7777, "certificate": "ab".repeat(32), "players": 3});
+    let (status, _) = call_from(&app, "203.0.113.9", "POST", "/flames/announce", None, announce("")).await;
+    assert_eq!(status, StatusCode::ACCEPTED);
+    let rude = json!({"name": "p0rn hub", "port": 7777, "certificate": "ab".repeat(32)});
+    assert_eq!(call_from(&app, "203.0.113.9", "POST", "/flames/announce", None, rude).await.0, StatusCode::BAD_REQUEST);
+    let (status, said) = call_from(&app, "127.0.0.1", "POST", "/flames/announce", None, announce("")).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{said}");
+    // Nothing answers there, so nothing is listed.
+    let (_, list) = call(&app, "GET", "/flames", None, Value::Null).await;
+    assert_eq!(list["flames"], json!([]));
 }
 
 #[tokio::test]
@@ -1262,4 +1348,22 @@ async fn a_session_can_be_seen_and_ended_on_its_own() {
     assert_eq!(ended["ended"], 1);
     let (_, list) = call(&app, "GET", "/me/sessions", Some(fresh), Value::Null).await;
     assert_eq!(list.as_array().unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn the_probe_reads_the_certificate_a_real_flame_shows() {
+    let (cert, key) = hearth_flame::generate_cert().unwrap();
+    let endpoint = hearth_flame::endpoint(0, cert.clone(), key).unwrap();
+    let port = endpoint.local_addr().unwrap().port();
+    let accepting = tokio::spawn(async move {
+        let _connection = endpoint.accept().await.unwrap().await;
+    });
+    let shown = hearth_fireplace::flames::probe("127.0.0.1", port).await.unwrap();
+    let expected: String = ring::digest::digest(&ring::digest::SHA256, cert.as_ref())
+        .as_ref()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    assert_eq!(shown, expected);
+    accepting.abort();
 }

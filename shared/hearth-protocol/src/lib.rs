@@ -3,7 +3,7 @@
 
 use std::fmt;
 
-pub const PROTOCOL_VERSION: u16 = 7;
+pub const PROTOCOL_VERSION: u16 = 8;
 /// Unchanged across protocol versions on purpose: a version mismatch should
 /// reach the client as a `Reject`, not as an opaque TLS failure.
 pub const ALPN: &[u8] = b"hearth/1";
@@ -242,6 +242,9 @@ pub struct Pose {
 pub struct Peer {
     pub id: u16,
     pub name: String,
+    /// The id their Fireplace ticket gave them on this Flame (lowercase hex),
+    /// for looking their profile up there; empty for a guest.
+    pub account: String,
 }
 
 /// One packed world in a server's repository. The server never looks inside;
@@ -471,6 +474,14 @@ pub fn validate_name(name: &str) -> Result<(), DecodeError> {
     Ok(())
 }
 
+/// A player's per-Flame account id: up to 64 lowercase hex digits, or empty.
+pub fn validate_account(account: &str) -> Result<(), DecodeError> {
+    if account.len() > 64 || !account.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
+        return Err(DecodeError::BadTicket);
+    }
+    Ok(())
+}
+
 /// A ticket is opaque to everything but the Flame checking it; this only
 /// keeps it printable and bounded.
 pub fn validate_ticket(ticket: &str) -> Result<(), DecodeError> {
@@ -538,6 +549,9 @@ impl Control {
                 out.push(ty::PEER_JOINED);
                 out.extend_from_slice(&peer.id.to_le_bytes());
                 put_name(out, &peer.name);
+                debug_assert!(validate_account(&peer.account).is_ok(), "encoding invalid account {:?}", peer.account);
+                out.push(peer.account.len() as u8);
+                out.extend_from_slice(peer.account.as_bytes());
             }
             Self::PeerLeft { id } => {
                 out.push(ty::PEER_LEFT);
@@ -674,7 +688,7 @@ impl Control {
                     reason: RejectReason::from_code(code).ok_or(DecodeError::BadRejectReason(code))?,
                 }
             }
-            ty::PEER_JOINED => Self::PeerJoined(Peer { id: r.u16()?, name: r.name()? }),
+            ty::PEER_JOINED => Self::PeerJoined(Peer { id: r.u16()?, name: r.name()?, account: r.account()? }),
             ty::PEER_LEFT => Self::PeerLeft { id: r.u16()? },
             ty::WORLD_ADDED => {
                 Self::WorldAdded(World { slug: r.slug()?, size: r.world_size()?, sha256: r.take::<32>()? })
@@ -906,6 +920,17 @@ impl<'a> Reader<'a> {
         validate_chat(text)?;
         Ok(text.to_owned())
     }
+    fn account(&mut self) -> Result<String, DecodeError> {
+        let len = self.u8()? as usize;
+        if self.0.len() < len {
+            return Err(DecodeError::Truncated);
+        }
+        let (bytes, rest) = self.0.split_at(len);
+        self.0 = rest;
+        let text = std::str::from_utf8(bytes).map_err(|_| DecodeError::BadTicket)?;
+        validate_account(text)?;
+        Ok(text.to_owned())
+    }
     fn ticket(&mut self) -> Result<String, DecodeError> {
         let len = self.u16()? as usize;
         if self.0.len() < len {
@@ -1082,7 +1107,13 @@ mod tests {
         ] {
             control_round_trip(Control::Reject { reason });
         }
-        control_round_trip(Control::PeerJoined(Peer { id: 3, name: "Bob".into() }));
+        control_round_trip(Control::PeerJoined(Peer { id: 3, name: "Bob".into(), account: String::new() }));
+        control_round_trip(Control::PeerJoined(Peer { id: 3, name: "Bob".into(), account: "0a1b".repeat(8) }));
+        let mut bad = Vec::new();
+        Control::PeerJoined(Peer { id: 3, name: "Bob".into(), account: "ab".into() }).encode(&mut bad);
+        let at = bad.len() - 2;
+        bad[at..].copy_from_slice(b"/.");
+        assert_eq!(Control::decode(&bad[2..]), Err(DecodeError::BadTicket), "not hex");
         control_round_trip(Control::PeerLeft { id: 3 });
     }
 

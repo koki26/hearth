@@ -221,8 +221,8 @@ async fn two_players_join_relay_and_leave() {
 
     let (mut bob, bob_id, _) = h.join("Bob").await;
     assert_eq!(bob_id, 2);
-    assert_eq!(bob.next().await, Control::PeerJoined(Peer { id: 1, name: "Ada".into() }));
-    assert_eq!(ada.next_any().await, Control::PeerJoined(Peer { id: 2, name: "Bob".into() }));
+    assert_eq!(bob.next().await, Control::PeerJoined(Peer { id: 1, name: "Ada".into(), account: String::new() }));
+    assert_eq!(ada.next_any().await, Control::PeerJoined(Peer { id: 2, name: "Bob".into(), account: String::new() }));
     // Everyone already here is told how full the instance now is.
     assert_eq!(ada.next_any().await, Control::InstanceCount { instance: HUB_INSTANCE, players: 2 });
     assert_eq!(h.hub_players(), vec![(1, "Ada".to_owned()), (2, "Bob".to_owned())]);
@@ -247,7 +247,7 @@ async fn two_players_join_relay_and_leave() {
     // The slot, and the id, are free again.
     let (_dee, dee_id, _) = h.join("Dee").await;
     assert_eq!(dee_id, 2);
-    assert_eq!(ada.next().await, Control::PeerJoined(Peer { id: 2, name: "Dee".into() }));
+    assert_eq!(ada.next().await, Control::PeerJoined(Peer { id: 2, name: "Dee".into(), account: String::new() }));
     let _ = ada.send.finish();
 }
 
@@ -269,8 +269,8 @@ async fn instances_keep_players_apart() {
     assert_eq!(worlds[0].size, "packed world forest".len() as u32);
 
     let (mut bob, bob_id, _) = h.join("Bob").await;
-    assert_eq!(bob.next().await, Control::PeerJoined(Peer { id: 1, name: "Ada".into() }));
-    assert_eq!(ada.next().await, Control::PeerJoined(Peer { id: bob_id, name: "Bob".into() }));
+    assert_eq!(bob.next().await, Control::PeerJoined(Peer { id: 1, name: "Ada".into(), account: String::new() }));
+    assert_eq!(ada.next().await, Control::PeerJoined(Peer { id: bob_id, name: "Bob".into(), account: String::new() }));
 
     // The host starts an instance; both players hear about it.
     let forest = h.server.start_instance("forest").unwrap();
@@ -302,8 +302,8 @@ async fn instances_keep_players_apart() {
     // Bob follows, and now they see each other again.
     bob.say(Control::JoinInstance { instance: forest }).await;
     assert_eq!(bob.next().await, Control::Moved { instance: forest });
-    assert_eq!(bob.next().await, Control::PeerJoined(Peer { id: 1, name: "Ada".into() }));
-    assert_eq!(ada.next().await, Control::PeerJoined(Peer { id: bob_id, name: "Bob".into() }));
+    assert_eq!(bob.next().await, Control::PeerJoined(Peer { id: 1, name: "Ada".into(), account: String::new() }));
+    assert_eq!(ada.next().await, Control::PeerJoined(Peer { id: bob_id, name: "Bob".into(), account: String::new() }));
     ada.conn.send_datagram(Datagram::Pose(pose).encode().into()).unwrap();
     assert_eq!(bob.datagram().await, Datagram::PoseRelay { from: 1, pose });
 
@@ -601,8 +601,9 @@ async fn stored_data_comes_back() {
     // Somebody else, with an account of their own, sees their own nothing.
     let (mut bob, _, _, _) =
         Client::join_with(harness.addr, &harness.cert, "Bob", &harness.ticket("b2", "Bob")).await;
-    // Bob hears about Ada before he hears his own answer.
-    assert!(matches!(bob.next().await, Control::PeerJoined(Peer { .. })));
+    // Bob hears about Ada before he hears his own answer, with the id her
+    // ticket gave her here, so his game can look her profile up.
+    assert!(matches!(bob.next().await, Control::PeerJoined(Peer { ref account, .. }) if account == "a1"));
     bob.say(Control::Fetch { key: "score".into() }).await;
     assert_eq!(bob.next().await, Control::Value { key: "score".into(), value: Vec::new() });
 
@@ -663,7 +664,7 @@ async fn a_guest_plays_but_nothing_is_saved_and_typing_a_name_claims_nothing() {
     // A guest typing the same display name is somebody else entirely.
     let (mut guest, _, _, flags) = Client::join_with(harness.addr, &harness.cert, "Ada", "").await;
     assert_eq!(flags & welcome::SAVES, 0, "a guest is told there are no saves");
-    assert!(matches!(guest.next().await, Control::PeerJoined(Peer { .. })));
+    assert!(matches!(guest.next().await, Control::PeerJoined(Peer { ref account, .. }) if account == "a1"));
     guest.say(Control::Fetch { key: "score".into() }).await;
     assert_eq!(guest.next().await, Control::Value { key: "score".into(), value: Vec::new() });
     // And a write is answered with what is kept for them: nothing.

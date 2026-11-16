@@ -21,7 +21,7 @@ use serde_json::{Value, json};
 use crate::accounts::{self, Ban, Refused};
 use crate::avatar;
 use crate::presence::{self, Where};
-use crate::{Fireplace, limit, token};
+use crate::{Fireplace, flames, limit, token};
 
 /// Nothing we read is bigger than a handle and a password.
 const MAX_BODY: usize = 8 * 1024;
@@ -71,8 +71,20 @@ pub fn router(state: Arc<Fireplace>) -> Router {
         .route("/admin/ban-ip", post(admin_ban_ip))
         .route("/admin/unban-ip", post(admin_unban_ip))
         .route("/admin/delete", post(admin_delete))
-        .route("/admin/set-admin", post(admin_set_admin))
         .route("/admin/sign-out", post(admin_sign_out))
+        .route("/admin/groups", get(admin_groups).post(admin_set_groups))
+        .route("/admin/set-group", post(admin_set_group))
+        .route("/admin/moderate", post(admin_moderate))
+        .route("/admin/pictures", get(admin_pictures))
+        .route("/admin/pictures/decide", post(admin_decide_picture))
+        .route("/admin/pictures/{file}", get(admin_picture_file))
+        .route("/admin/flames/hide", post(admin_hide_flame))
+        .route("/admin/flames/unhide", post(admin_unhide_flame))
+        .route("/me/profile", post(set_profile))
+        .route("/profiles/{handle}", get(profile))
+        .route("/profiles/at/{flame}/{pid}", get(profile_at))
+        .route("/flames", get(public_flames))
+        .route("/flames/announce", post(announce_flame))
         .merge(crate::pages::routes())
         // Anything that is not a route is a file from the web folder: the
         // account page, its stylesheet and script, and whatever else a host
@@ -167,7 +179,11 @@ impl IntoResponse for ApiError {
 impl From<Refused> for ApiError {
     fn from(refused: Refused) -> Self {
         let status = match refused {
-            Refused::BadHandle | Refused::Yourself | Refused::BadDisplayName => StatusCode::BAD_REQUEST,
+            Refused::BadHandle
+            | Refused::Yourself
+            | Refused::BadDisplayName
+            | Refused::BadProfile
+            | Refused::BadGroups => StatusCode::BAD_REQUEST,
             Refused::HandleTaken | Refused::AlreadyFriends => StatusCode::CONFLICT,
             Refused::NoSuchAccount => StatusCode::NOT_FOUND,
             Refused::TooManyFriends | Refused::TooManyRequests => StatusCode::CONFLICT,
@@ -179,6 +195,11 @@ impl From<Refused> for ApiError {
 
 fn bad(say: &str) -> ApiError {
     ApiError::new(StatusCode::BAD_REQUEST, say)
+}
+
+/// Refuses text with a blocked word in it (`words`).
+fn polite(state: &Fireplace, text: &str) -> Result<(), ApiError> {
+    if state.words.is_clean(text) { Ok(()) } else { Err(bad("that has a word in it that is not allowed here")) }
 }
 
 fn unauthorised() -> ApiError {
@@ -387,6 +408,7 @@ async fn create_account(
     if !accounts::handle_is_usable(&handle) {
         return Err(Refused::BadHandle.into());
     }
+    polite(&state, &handle)?;
     if !accounts::password_is_usable(&body.password) {
         return Err(bad("a password is 8 to 128 characters"));
     }
@@ -600,6 +622,13 @@ async fn me(State(state): State<Arc<Fireplace>>, headers: HeaderMap) -> Result<J
         "id": account.id,
         "handle": account.handle,
         "display_name": account.display(),
+        "pronouns": account.pronouns,
+        "bio": account.bio,
+        "badge": badge_json(account),
+        "owner": account.owner,
+        "group": account.group,
+        "perms": accounts.perms_of(id),
+        "avatar_pending": account.avatar_pending,
         "share_location": account.share_location,
         "friends": account.friends.len(),
         "email": account.email.as_ref().map(|e| &e.address),
@@ -647,6 +676,11 @@ async fn export(State(state): State<Arc<Fireplace>>, headers: HeaderMap) -> Resu
         "sessions": account.sessions,
         "display_name_changes": account.renamed,
         "picture": (account.avatar > 0).then(|| format!("/avatars/{}.jpg", account.id)),
+        "picture_waiting_for_review": account.avatar_pending > 0,
+        "pronouns": account.pronouns,
+        "bio": account.bio,
+        "owner": account.owner,
+        "group": account.group,
         "admin": account.admin,
         "two_factor": account.two_factor,
         "ban": account.ban,
@@ -808,6 +842,7 @@ async fn set_name(
     Json(body): Json<DisplayName>,
 ) -> Result<Json<Value>, ApiError> {
     let id = signed_in(&state, &headers)?;
+    polite(&state, &body.display_name)?;
     let now = token::now();
     let mut accounts = state.accounts.lock().unwrap();
     let same = accounts.get(id).is_some_and(|a| a.display_name == body.display_name.trim());
@@ -1064,23 +1099,209 @@ async fn upload_avatar(
     if !state.limits.lock().unwrap().allow(&format!("avatar@{id}"), avatar::PER_HOUR, limit::HOUR, now) {
         return Err(too_many("that is a lot of pictures: try again in an hour"));
     }
-    let jpeg = tokio::task::spawn_blocking(move || avatar::shrink(&body))
-        .await
-        .map_err(|_| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "that did not work, try again"))?
-        .map_err(|err| bad(&err.to_string()))?;
-    avatar::save(&state.config.data_dir, id, &jpeg).map_err(|err| {
-        tracing::error!(id, "could not save a picture: {err:#}");
-        ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "could not save that picture")
-    })?;
-    state.accounts.lock().unwrap().set_avatar(id, now)?;
-    Ok(Json(json!({ "avatar": now })))
+    // Somebody who reviews pictures does not wait for their own.
+    let reviewed = !state.config.moderation.review_pictures || state.accounts.lock().unwrap().can(id, "review");
+    let data_dir = state.config.data_dir.clone();
+    let check = state.config.moderation.picture_check.clone();
+    let pending = avatar::pending_path(&data_dir, id);
+    // Saved as waiting first, so the checker reads the redrawn file and a
+    // refused picture is never the live one.
+    tokio::task::spawn_blocking(move || {
+        let jpeg = avatar::shrink(&body).map_err(|err| bad(&err.to_string()))?;
+        avatar::save(&pending, &jpeg).map_err(|err| {
+            tracing::error!(id, "could not save a picture: {err:#}");
+            ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "could not save that picture")
+        })?;
+        avatar::check(&check, &pending).map_err(|err| {
+            let _ = std::fs::remove_file(&pending);
+            tracing::info!(id, "a picture was refused by the check: {err:#}");
+            bad("that picture is not allowed here")
+        })
+    })
+    .await
+    .map_err(|_| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "that did not work, try again"))??;
+    let mut accounts = state.accounts.lock().unwrap();
+    if reviewed {
+        avatar::approve(&data_dir, id).map_err(|err| {
+            tracing::error!(id, "could not save a picture: {err:#}");
+            ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "could not save that picture")
+        })?;
+        accounts.set_avatar_pending(id, 0)?;
+        accounts.set_avatar(id, now)?;
+        return Ok(Json(json!({ "avatar": now, "avatar_pending": 0 })));
+    }
+    accounts.set_avatar_pending(id, now)?;
+    let avatar = accounts.get(id).map_or(0, |a| a.avatar);
+    Ok(Json(json!({ "avatar": avatar, "avatar_pending": now })))
 }
 
 async fn delete_avatar(State(state): State<Arc<Fireplace>>, headers: HeaderMap) -> Result<Json<Value>, ApiError> {
     let id = signed_in(&state, &headers)?;
     avatar::remove(&state.config.data_dir, id);
-    state.accounts.lock().unwrap().set_avatar(id, 0)?;
-    Ok(Json(json!({ "avatar": 0 })))
+    let mut accounts = state.accounts.lock().unwrap();
+    accounts.set_avatar(id, 0)?;
+    accounts.set_avatar_pending(id, 0)?;
+    Ok(Json(json!({ "avatar": 0, "avatar_pending": 0 })))
+}
+
+// --- public profiles ------------------------------------------------------------
+//
+// What anybody may see about an account. Only the Fireplace writes any of
+// it: a Flame passes on an id and nothing else, so it cannot change what a
+// profile says.
+
+fn badge_json(account: &accounts::Account) -> Value {
+    account.badge().map_or(Value::Null, |(kind, label)| json!({ "kind": kind, "label": label }))
+}
+
+fn profile_json(account: &accounts::Account) -> Value {
+    json!({
+        "id": account.id,
+        "handle": account.handle,
+        "display_name": account.display(),
+        "pronouns": account.pronouns,
+        "bio": account.bio,
+        "avatar": account.avatar,
+        "badge": badge_json(account),
+        "created": account.created,
+    })
+}
+
+async fn profile(State(state): State<Arc<Fireplace>>, Path(handle): Path<String>) -> Result<Json<Value>, ApiError> {
+    let accounts = state.accounts.lock().unwrap();
+    let account = accounts.by_handle(handle.trim()).ok_or(Refused::NoSuchAccount)?;
+    Ok(Json(profile_json(account)))
+}
+
+/// Lookups by per-Flame id an address may make in ten minutes: a full room
+/// joining is a few dozen.
+const PROFILE_LOOKUPS: u32 = 300;
+
+/// Somebody in a Flame, by the id their ticket gave them there: what the game
+/// asks for each player it sees.
+async fn profile_at(
+    State(state): State<Arc<Fireplace>>,
+    Caller(from): Caller,
+    Path((flame, pid)): Path<(String, String)>,
+) -> Result<Json<Value>, ApiError> {
+    let hex = |s: &str, len: usize| s.len() == len && s.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b));
+    if !hex(&flame, 64) || !hex(&pid, 32) {
+        return Err(bad("that is not a Flame and a player on it"));
+    }
+    if !state.limits.lock().unwrap().allow(&format!("profile:{from}"), PROFILE_LOOKUPS, 600, token::now()) {
+        return Err(too_many("that is a lot of profiles: wait a few minutes"));
+    }
+    let accounts = state.accounts.lock().unwrap();
+    // shortcut: one HMAC per account per lookup (about 10 ms at 10 000 accounts); keep a pid map from mint_join if it shows up in profiles.
+    let account = accounts.all().find(|a| state.keys.pid_of(a.id, &flame) == pid).ok_or(Refused::NoSuchAccount)?;
+    Ok(Json(profile_json(account)))
+}
+
+#[derive(serde::Deserialize)]
+struct Profile {
+    #[serde(default)]
+    pronouns: String,
+    #[serde(default)]
+    bio: String,
+}
+
+async fn set_profile(
+    State(state): State<Arc<Fireplace>>,
+    headers: HeaderMap,
+    Json(body): Json<Profile>,
+) -> Result<Json<Value>, ApiError> {
+    let id = signed_in(&state, &headers)?;
+    polite(&state, &body.pronouns)?;
+    polite(&state, &body.bio)?;
+    let mut accounts = state.accounts.lock().unwrap();
+    accounts.set_profile(id, &body.pronouns, &body.bio)?;
+    let account = accounts.get(id).ok_or_else(unauthorised)?;
+    Ok(Json(json!({ "pronouns": account.pronouns, "bio": account.bio })))
+}
+
+// --- public Flames --------------------------------------------------------------
+
+async fn public_flames(State(state): State<Arc<Fireplace>>) -> Json<Value> {
+    Json(json!({ "flames": state.flames.lock().unwrap().list(token::now()) }))
+}
+
+#[derive(serde::Deserialize)]
+struct Announce {
+    name: String,
+    /// `host` or `host:port`; empty for the address this request came from.
+    #[serde(default)]
+    address: String,
+    port: u16,
+    certificate: String,
+    #[serde(default)]
+    players: u32,
+    #[serde(default)]
+    max_players: Option<u32>,
+    #[serde(default)]
+    guests: bool,
+}
+
+/// Asks to be listed. Answered at once; the Fireplace then connects back to
+/// check, and lists it only if that shows the certificate named here.
+async fn announce_flame(
+    State(state): State<Arc<Fireplace>>,
+    Caller(from): Caller,
+    Json(body): Json<Announce>,
+) -> Result<StatusCode, ApiError> {
+    let now = token::now();
+    if !state.limits.lock().unwrap().allow(&format!("announce:{from}"), 20, 600, now) {
+        return Err(too_many("once a minute is plenty"));
+    }
+    let name = body.name.trim().to_owned();
+    if hearth_protocol::validate_name(&name).is_err() {
+        return Err(Refused::BadDisplayName.into());
+    }
+    polite(&state, &name)?;
+    let certificate = body.certificate.trim().to_lowercase();
+    if certificate.len() != 64 || !certificate.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err(bad("that is not a certificate hash"));
+    }
+    if state.flames.lock().unwrap().is_hidden(&certificate) {
+        return Err(ApiError::new(StatusCode::FORBIDDEN, "an admin took this Flame off the list"));
+    }
+    let (host, port) = match body.address.trim() {
+        "" => {
+            let ip: IpAddr = from.parse().map_err(|_| bad("could not tell where you are"))?;
+            if ip.is_loopback() {
+                return Err(bad("set [listing] address: the Fireplace only sees this machine's own address"));
+            }
+            (ip.to_string(), body.port)
+        }
+        given => {
+            if !presence::usable_flame(given) {
+                return Err(bad("that is not an address"));
+            }
+            match given.rsplit_once(':').filter(|(host, _)| !host.contains(':') || host.ends_with(']')) {
+                Some((host, port)) => (host.trim_matches(['[', ']']).to_owned(), port.parse().map_err(|_| bad("that is not a port"))?),
+                None => (given.trim_matches(['[', ']']).to_owned(), body.port),
+            }
+        }
+    };
+    if port == 0 {
+        return Err(bad("that is not a port"));
+    }
+    let address = if host.contains(':') { format!("[{host}]:{port}") } else { format!("{host}:{port}") };
+    tokio::spawn(async move {
+        match flames::probe(&host, port).await {
+            Ok(shown) if shown == certificate => state.flames.lock().unwrap().reached(flames::Listed {
+                name,
+                address,
+                certificate,
+                players: body.players.min(u32::from(u16::MAX)),
+                max_players: body.max_players,
+                guests: body.guests,
+                seen: token::now(),
+            }),
+            Ok(_) => tracing::info!(%address, "not listed: it showed another certificate"),
+            Err(err) => tracing::info!(%address, "not listed: could not reach it: {err:#}"),
+        }
+    });
+    Ok(StatusCode::ACCEPTED)
 }
 
 /// `/avatars/<id>.jpg`. Only ever a JPEG this server drew, served so that a
@@ -1109,26 +1330,42 @@ async fn avatar_file(State(state): State<Arc<Fireplace>>, Path(file): Path<Strin
 
 // --- admins -------------------------------------------------------------------
 //
-// The first admin is made with `fireplace admin make-admin <handle>` on the
-// server itself; after that, admins make admins. Every action is logged with
-// who did it to whom -- by account number and handle, never an address.
+// The Fireplace owner is made with `fireplace admin make-owner <handle>` on
+// the server itself. The owner makes groups of permissions (`accounts::PERMS`)
+// and puts people in them; each route asks for one permission. Nobody acts on
+// an account ranked as high as their own (owner > a group > everybody), so a
+// group can never touch another group's members or the owner. Every action is
+// logged with who did it to whom -- by account number, never an address.
 
-/// The admin asking, or 403.
-fn admin_of(state: &Fireplace, headers: &HeaderMap) -> Result<(u64, String), ApiError> {
+/// The asker, if they may do `perm`, or 403.
+fn admin_of(state: &Fireplace, headers: &HeaderMap, perm: &str) -> Result<(u64, String), ApiError> {
     let id = signed_in(state, headers)?;
     let accounts = state.accounts.lock().unwrap();
     match accounts.get(id) {
-        Some(account) if account.admin => Ok((id, account.handle.clone())),
-        _ => Err(ApiError::new(StatusCode::FORBIDDEN, "that is for admins")),
+        Some(account) if accounts.can(id, perm) => Ok((id, account.handle.clone())),
+        _ => Err(ApiError::new(StatusCode::FORBIDDEN, "you are not allowed to do that here")),
     }
 }
 
-/// Another account, by handle. An admin acts on others; their own account
+fn owner_of(state: &Fireplace, headers: &HeaderMap) -> Result<u64, ApiError> {
+    let id = signed_in(state, headers)?;
+    if state.accounts.lock().unwrap().get(id).is_some_and(|a| a.owner) {
+        Ok(id)
+    } else {
+        Err(ApiError::new(StatusCode::FORBIDDEN, "only the Fireplace owner can do that"))
+    }
+}
+
+/// Another account, by handle, ranked below the asker. Their own account
 /// goes through the ordinary pages, with their password.
 fn target(state: &Fireplace, me: u64, handle: &str) -> Result<u64, ApiError> {
-    let id = state.accounts.lock().unwrap().by_handle(handle.trim()).map(|a| a.id).ok_or(Refused::NoSuchAccount)?;
+    let accounts = state.accounts.lock().unwrap();
+    let id = accounts.by_handle(handle.trim()).map(|a| a.id).ok_or(Refused::NoSuchAccount)?;
     if id == me {
         return Err(bad("not on your own account"));
+    }
+    if accounts.rank(id) >= accounts.rank(me) {
+        return Err(ApiError::new(StatusCode::FORBIDDEN, "not on somebody ranked as high as you"));
     }
     Ok(id)
 }
@@ -1139,7 +1376,7 @@ struct Claim {
 }
 
 /// The one-time door: a link only the server's own key can sign, from the
-/// server's own machine, and only while there is no admin at all.
+/// server's own machine, and only while there is no owner.
 async fn admin_claim(
     State(state): State<Arc<Fireplace>>,
     Caller(from): Caller,
@@ -1153,19 +1390,19 @@ async fn admin_claim(
         .verify_link(body.link.trim(), "admin", token::now())
         .map_err(|_| ApiError::new(StatusCode::FORBIDDEN, "that link is not good"))?;
     let mut accounts = state.accounts.lock().unwrap();
-    if accounts.any_admin() {
-        return Err(ApiError::new(StatusCode::CONFLICT, "there is already an admin"));
+    if accounts.any_owner() {
+        return Err(ApiError::new(StatusCode::CONFLICT, "this Fireplace already has an owner"));
     }
     let account = accounts.get(claims.sub).filter(|a| a.token_epoch == claims.epoch).ok_or(Refused::NoSuchAccount)?;
     let handle = account.handle.clone();
-    accounts.set_admin(claims.sub, true)?;
-    tracing::info!(id = claims.sub, %handle, "is the first admin");
-    Ok(Json(json!({ "admin": handle })))
+    accounts.set_owner(claims.sub)?;
+    tracing::info!(id = claims.sub, %handle, "is the Fireplace owner");
+    Ok(Json(json!({ "owner": handle })))
 }
 
 /// Every account, with everything kept about it, sign-in addresses included.
 async fn admin_accounts(State(state): State<Arc<Fireplace>>, headers: HeaderMap) -> Result<Json<Value>, ApiError> {
-    admin_of(&state, &headers)?;
+    admin_of(&state, &headers, "view")?;
     let now = token::now();
     let accounts = state.accounts.lock().unwrap();
     let mut list: Vec<&accounts::Account> = accounts.all().collect();
@@ -1176,11 +1413,16 @@ async fn admin_accounts(State(state): State<Arc<Fireplace>>, headers: HeaderMap)
             "id": a.id,
             "handle": a.handle,
             "display_name": a.display(),
+            "pronouns": a.pronouns,
+            "bio": a.bio,
             "created": a.created,
             "email": a.email.as_ref().map(|e| &e.address),
             "email_verified": a.email.as_ref().is_some_and(|e| e.verified),
-            "admin": a.admin,
+            "owner": a.owner,
+            "group": a.group,
+            "badge": badge_json(a),
             "avatar": a.avatar,
+            "avatar_pending": a.avatar_pending,
             "friends": a.friends.len(),
             "ban": a.ban.as_ref().filter(|b| b.active(now)).map(ban_json),
             "places": a.seen,
@@ -1189,7 +1431,7 @@ async fn admin_accounts(State(state): State<Arc<Fireplace>>, headers: HeaderMap)
 }
 
 async fn admin_bans(State(state): State<Arc<Fireplace>>, headers: HeaderMap) -> Result<Json<Value>, ApiError> {
-    admin_of(&state, &headers)?;
+    admin_of(&state, &headers, "ban")?;
     let mut bans = state.ip_bans.lock().unwrap();
     Ok(Json(json!(bans
         .list(token::now())
@@ -1225,14 +1467,11 @@ async fn admin_ban(
     headers: HeaderMap,
     Json(body): Json<BanBody>,
 ) -> Result<Json<Value>, ApiError> {
-    let (me, by) = admin_of(&state, &headers)?;
+    let (me, by) = admin_of(&state, &headers, "ban")?;
     let id = target(&state, me, &body.handle)?;
     let ban = make_ban(&body, &by, token::now())?;
     let handle = {
         let mut accounts = state.accounts.lock().unwrap();
-        if accounts.get(id).is_some_and(|a| a.admin) {
-            return Err(bad("take their admin away first"));
-        }
         accounts.set_ban(id, Some(ban.clone()))?;
         accounts.get(id).map(|a| a.handle.clone()).unwrap_or_default()
     };
@@ -1249,7 +1488,7 @@ async fn admin_unban(
     headers: HeaderMap,
     Json(body): Json<ByHandle>,
 ) -> Result<Json<Value>, ApiError> {
-    let (me, _) = admin_of(&state, &headers)?;
+    let (me, _) = admin_of(&state, &headers, "ban")?;
     let id = target(&state, me, &body.handle)?;
     let handle = {
         let mut accounts = state.accounts.lock().unwrap();
@@ -1268,7 +1507,7 @@ async fn admin_ban_ip(
     Caller(from): Caller,
     Json(body): Json<BanBody>,
 ) -> Result<Json<Value>, ApiError> {
-    let (me, by) = admin_of(&state, &headers)?;
+    let (me, by) = admin_of(&state, &headers, "ban")?;
     let ip: IpAddr = body.ip.trim().parse().map_err(|_| bad("that is not an IP address"))?;
     if ip.is_loopback() || ip.is_unspecified() {
         return Err(bad("not this server's own address"));
@@ -1292,7 +1531,7 @@ async fn admin_unban_ip(
     headers: HeaderMap,
     Json(body): Json<ByIp>,
 ) -> Result<Json<Value>, ApiError> {
-    let (me, _) = admin_of(&state, &headers)?;
+    let (me, _) = admin_of(&state, &headers, "ban")?;
     let ip = body.ip.trim().parse::<IpAddr>().map(|ip| ip.to_string()).unwrap_or_else(|_| body.ip.trim().to_owned());
     if !state.ip_bans.lock().unwrap().remove(&ip) {
         return Err(ApiError::new(StatusCode::NOT_FOUND, "that address is not banned"));
@@ -1306,7 +1545,7 @@ async fn admin_delete(
     headers: HeaderMap,
     Json(body): Json<ByHandle>,
 ) -> Result<StatusCode, ApiError> {
-    let (me, _) = admin_of(&state, &headers)?;
+    let (me, _) = admin_of(&state, &headers, "delete")?;
     let id = target(&state, me, &body.handle)?;
     state.accounts.lock().unwrap().delete(id)?;
     state.presence.lock().unwrap().clear(id);
@@ -1315,38 +1554,201 @@ async fn admin_delete(
     Ok(StatusCode::NO_CONTENT)
 }
 
-#[derive(serde::Deserialize)]
-struct SetAdmin {
-    handle: String,
-    admin: bool,
-}
-
-async fn admin_set_admin(
-    State(state): State<Arc<Fireplace>>,
-    headers: HeaderMap,
-    Json(body): Json<SetAdmin>,
-) -> Result<Json<Value>, ApiError> {
-    let (me, _) = admin_of(&state, &headers)?;
-    let id = target(&state, me, &body.handle)?;
-    let mut accounts = state.accounts.lock().unwrap();
-    if body.admin && accounts.get(id).is_some_and(|a| a.ban.is_some()) {
-        return Err(bad("unban them first"));
-    }
-    accounts.set_admin(id, body.admin)?;
-    tracing::info!(admin = me, target = id, on = body.admin, "changed who is an admin");
-    Ok(Json(json!({ "admin": body.admin })))
-}
-
 async fn admin_sign_out(
     State(state): State<Arc<Fireplace>>,
     headers: HeaderMap,
     Json(body): Json<ByHandle>,
 ) -> Result<StatusCode, ApiError> {
-    let (me, _) = admin_of(&state, &headers)?;
+    let (me, _) = admin_of(&state, &headers, "sign_out")?;
     let id = target(&state, me, &body.handle)?;
     state.accounts.lock().unwrap().sign_out_everywhere(id)?;
     tracing::info!(admin = me, target = id, "signed an account out everywhere");
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// The groups, and every permission there is, for anybody in one.
+async fn admin_groups(State(state): State<Arc<Fireplace>>, headers: HeaderMap) -> Result<Json<Value>, ApiError> {
+    let id = signed_in(&state, &headers)?;
+    let accounts = state.accounts.lock().unwrap();
+    if accounts.rank(id) == 0 {
+        return Err(ApiError::new(StatusCode::FORBIDDEN, "you are not allowed to do that here"));
+    }
+    Ok(Json(json!({ "groups": accounts.groups(), "perms": accounts::PERMS })))
+}
+
+#[derive(serde::Deserialize)]
+struct Groups {
+    groups: Vec<accounts::Group>,
+}
+
+/// Replaces every group: the owner's page sends the whole list back.
+async fn admin_set_groups(
+    State(state): State<Arc<Fireplace>>,
+    headers: HeaderMap,
+    Json(body): Json<Groups>,
+) -> Result<Json<Value>, ApiError> {
+    let me = owner_of(&state, &headers)?;
+    for group in &body.groups {
+        polite(&state, &group.name)?;
+    }
+    let mut accounts = state.accounts.lock().unwrap();
+    accounts.set_groups(body.groups)?;
+    tracing::info!(admin = me, groups = accounts.groups().len(), "changed the groups");
+    Ok(Json(json!({ "groups": accounts.groups() })))
+}
+
+#[derive(serde::Deserialize)]
+struct SetGroup {
+    handle: String,
+    /// Empty takes them out of any group.
+    #[serde(default)]
+    group: String,
+}
+
+async fn admin_set_group(
+    State(state): State<Arc<Fireplace>>,
+    headers: HeaderMap,
+    Json(body): Json<SetGroup>,
+) -> Result<Json<Value>, ApiError> {
+    let me = owner_of(&state, &headers)?;
+    let id = target(&state, me, &body.handle)?;
+    let mut accounts = state.accounts.lock().unwrap();
+    if !body.group.is_empty() && accounts.get(id).is_some_and(|a| a.ban.is_some()) {
+        return Err(bad("unban them first"));
+    }
+    accounts.set_group(id, &body.group)?;
+    tracing::info!(admin = me, target = id, group = %body.group, "changed somebody's group");
+    Ok(Json(json!({ "group": body.group })))
+}
+
+#[derive(serde::Deserialize)]
+struct Moderate {
+    handle: String,
+    /// Any of "display_name", "pronouns", "bio", "avatar".
+    clear: Vec<String>,
+}
+
+/// Takes down what somebody put on their profile.
+async fn admin_moderate(
+    State(state): State<Arc<Fireplace>>,
+    headers: HeaderMap,
+    Json(body): Json<Moderate>,
+) -> Result<StatusCode, ApiError> {
+    let (me, _) = admin_of(&state, &headers, "moderate")?;
+    let id = target(&state, me, &body.handle)?;
+    let mut accounts = state.accounts.lock().unwrap();
+    let account = accounts.get(id).ok_or(Refused::NoSuchAccount)?;
+    let (mut pronouns, mut bio) = (account.pronouns.clone(), account.bio.clone());
+    for what in &body.clear {
+        match what.as_str() {
+            "display_name" => {
+                // Not counted against their renames: they did not choose it.
+                accounts.clear_display_name(id)?;
+            }
+            "pronouns" => pronouns.clear(),
+            "bio" => bio.clear(),
+            "avatar" => {
+                avatar::remove(&state.config.data_dir, id);
+                accounts.set_avatar(id, 0)?;
+                accounts.set_avatar_pending(id, 0)?;
+            }
+            _ => return Err(bad("clear display_name, pronouns, bio or avatar")),
+        }
+    }
+    accounts.set_profile(id, &pronouns, &bio)?;
+    tracing::info!(admin = me, target = id, cleared = ?body.clear, "moderated a profile");
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// Pictures waiting for review, oldest first.
+async fn admin_pictures(State(state): State<Arc<Fireplace>>, headers: HeaderMap) -> Result<Json<Value>, ApiError> {
+    admin_of(&state, &headers, "review")?;
+    let accounts = state.accounts.lock().unwrap();
+    let mut waiting: Vec<&accounts::Account> = accounts.all().filter(|a| a.avatar_pending > 0).collect();
+    waiting.sort_by_key(|a| a.avatar_pending);
+    Ok(Json(json!(waiting
+        .iter()
+        .map(|a| json!({ "id": a.id, "handle": a.handle, "display_name": a.display(), "avatar_pending": a.avatar_pending }))
+        .collect::<Vec<_>>())))
+}
+
+/// `/admin/pictures/<id>.jpg`: a waiting picture, only to a reviewer.
+async fn admin_picture_file(
+    State(state): State<Arc<Fireplace>>,
+    headers: HeaderMap,
+    Path(file): Path<String>,
+) -> Result<Response, ApiError> {
+    admin_of(&state, &headers, "review")?;
+    let id = file.strip_suffix(".jpg").and_then(|id| id.parse::<u64>().ok()).ok_or(Refused::NoSuchAccount)?;
+    let bytes = tokio::fs::read(avatar::pending_path(&state.config.data_dir, id))
+        .await
+        .map_err(|_| Refused::NoSuchAccount)?;
+    Ok((
+        [
+            (axum::http::header::CONTENT_TYPE, "image/jpeg"),
+            (axum::http::header::X_CONTENT_TYPE_OPTIONS, "nosniff"),
+            (axum::http::header::CACHE_CONTROL, "no-store"),
+        ],
+        bytes,
+    )
+        .into_response())
+}
+
+#[derive(serde::Deserialize)]
+struct Decide {
+    handle: String,
+    approve: bool,
+}
+
+async fn admin_decide_picture(
+    State(state): State<Arc<Fireplace>>,
+    headers: HeaderMap,
+    Json(body): Json<Decide>,
+) -> Result<Json<Value>, ApiError> {
+    let (me, _) = admin_of(&state, &headers, "review")?;
+    let mut accounts = state.accounts.lock().unwrap();
+    let account = accounts.by_handle(body.handle.trim()).ok_or(Refused::NoSuchAccount)?;
+    let (id, pending) = (account.id, account.avatar_pending);
+    if pending == 0 {
+        return Err(ApiError::new(StatusCode::NOT_FOUND, "there is no picture waiting there"));
+    }
+    if body.approve {
+        avatar::approve(&state.config.data_dir, id).map_err(|err| {
+            tracing::error!(id, "could not approve a picture: {err:#}");
+            ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "could not approve that picture")
+        })?;
+        accounts.set_avatar(id, pending)?;
+    } else {
+        let _ = std::fs::remove_file(avatar::pending_path(&state.config.data_dir, id));
+    }
+    accounts.set_avatar_pending(id, 0)?;
+    tracing::info!(admin = me, target = id, approved = body.approve, "reviewed a picture");
+    Ok(Json(json!({ "approved": body.approve })))
+}
+
+#[derive(serde::Deserialize)]
+struct ByCertificate {
+    certificate: String,
+}
+
+async fn admin_hide_flame(
+    State(state): State<Arc<Fireplace>>,
+    headers: HeaderMap,
+    Json(body): Json<ByCertificate>,
+) -> Result<Json<Value>, ApiError> {
+    let (me, _) = admin_of(&state, &headers, "flames")?;
+    let listed = state.flames.lock().unwrap().hide(body.certificate.trim());
+    tracing::info!(admin = me, "took a Flame off the public list");
+    Ok(Json(json!({ "was_listed": listed })))
+}
+
+async fn admin_unhide_flame(
+    State(state): State<Arc<Fireplace>>,
+    headers: HeaderMap,
+    Json(body): Json<ByCertificate>,
+) -> Result<Json<Value>, ApiError> {
+    admin_of(&state, &headers, "flames")?;
+    Ok(Json(json!({ "was_hidden": state.flames.lock().unwrap().unhide(body.certificate.trim()) })))
 }
 
 // --- codes from email -----------------------------------------------------------

@@ -60,6 +60,7 @@ struct App {
     client_instancing: bool,
     allow_guests: bool,
     fireplace: String,
+    listing: hearth_flame::public::Listing,
     max_players: Limit,
     max_players_per_instance: Limit,
     max_instances: Limit,
@@ -97,6 +98,7 @@ impl App {
             client_instancing: config.client_instancing,
             allow_guests: config.allow_guests,
             fireplace: config.fireplace,
+            listing: config.listing,
             max_players: config.max_players,
             max_players_per_instance: config.max_players_per_instance,
             max_instances: config.max_instances,
@@ -124,6 +126,7 @@ impl App {
             max_players_per_instance: self.max_players_per_instance,
             max_instances: self.max_instances,
             max_instances_per_player: self.max_instances_per_player,
+            listing: self.listing.clone(),
         }
     }
 
@@ -424,6 +427,12 @@ impl eframe::App for App {
                 ui.end_row();
                 ui.label("");
                 ui.checkbox(&mut self.allow_guests, "Let people in without an account (they get no saves)");
+                ui.end_row();
+                ui.label("");
+                ui.checkbox(&mut self.listing.public, "List this Flame publicly on the Fireplace");
+                ui.end_row();
+                ui.label("Public name");
+                ui.add(egui::TextEdit::singleline(&mut self.listing.name).hint_text("the hub world's name"));
                 ui.end_row();
             });
             ui.add_space(6.0);
