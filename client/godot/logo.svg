@@ -1,23 +1,59 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <!-- Hearth: a fire inside an arch. Cool stone and warm flame, the same
-       moonlight-and-torchlight palette the hub world is lit with. -->
+  <!-- Hearth: a stone fireplace with a fire in it. Moonlit stone outside,
+       firelight inside, the palette the hub world is lit with. Rendered to
+       PNG and ICO by tools/make_logo.gd; web/favicon.svg is a copy. -->
   <defs>
-    <linearGradient id="fire" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#ffe3b0"/>
-      <stop offset="0.55" stop-color="#ffb366"/>
-      <stop offset="1" stop-color="#ff7a2f"/>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1d2456"/>
+      <stop offset="1" stop-color="#0b0e22"/>
     </linearGradient>
-    <radialGradient id="glow" cx="0.5" cy="0.62" r="0.5">
-      <stop offset="0" stop-color="#ffb366" stop-opacity="0.35"/>
-      <stop offset="1" stop-color="#ffb366" stop-opacity="0"/>
+    <linearGradient id="stone" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#d4defe"/>
+      <stop offset="1" stop-color="#8a9de0"/>
+    </linearGradient>
+    <radialGradient id="box" cx="0.5" cy="0.82" r="0.75">
+      <stop offset="0" stop-color="#7a2c14"/>
+      <stop offset="0.45" stop-color="#3a1a22"/>
+      <stop offset="1" stop-color="#140f26"/>
     </radialGradient>
+    <radialGradient id="spill" cx="0.5" cy="0.8" r="0.5">
+      <stop offset="0" stop-color="#ff8a3d" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#ff8a3d" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="outer" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffb04a"/>
+      <stop offset="1" stop-color="#f0491c"/>
+    </linearGradient>
+    <linearGradient id="inner" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffe08a"/>
+      <stop offset="1" stop-color="#ff9a2e"/>
+    </linearGradient>
   </defs>
-  <rect width="512" height="512" rx="112" fill="#171c38"/>
-  <rect width="512" height="512" rx="112" fill="url(#glow)"/>
-  <g fill="none" stroke="#aec2ff" stroke-width="40" stroke-linecap="round">
-    <path d="M136 376 V240 A120 120 0 0 1 376 240 V376"/>
-    <path d="M104 396 H408"/>
+
+  <rect width="512" height="512" rx="112" fill="url(#sky)"/>
+  <rect width="512" height="512" rx="112" fill="url(#spill)"/>
+
+  <!-- the firebox, then the stone around it -->
+  <path d="M146 392V258a110 110 0 0 1 220 0v134z" fill="url(#box)"/>
+  <path d="M146 392V258a110 110 0 0 1 220 0v134" fill="none" stroke="url(#stone)" stroke-width="38"/>
+  <path d="M229 124h54l-8 52h-38z" fill="#eef2ff" stroke="#1a2050" stroke-width="5" stroke-linejoin="round"/>
+  <rect x="104" y="386" width="304" height="40" rx="14" fill="url(#stone)"/>
+
+  <!-- logs -->
+  <g fill="#6b3a26" stroke="#2a1410" stroke-width="5">
+    <rect x="186" y="356" width="140" height="22" rx="11" transform="rotate(-9 256 367)"/>
+    <rect x="186" y="356" width="140" height="22" rx="11" transform="rotate(9 256 367)"/>
   </g>
-  <path d="M258 172 C266 218 300 238 312 272 C326 312 300 358 254 358 C210 358 188 324 194 292 C199 264 222 250 231 224 C240 246 250 251 256 243 C263 232 256 202 258 172 Z" fill="url(#fire)"/>
-  <path d="M254 256 C276 280 287 293 287 310 C287 328 272 341 254 341 C236 341 222 328 222 310 C222 293 233 280 254 256 Z" fill="#fff3d6" opacity="0.92"/>
+
+  <!-- the fire -->
+  <path d="M256 186c16 46 66 70 66 128c0 40-30 62-66 62s-66-22-66-62c0-32 18-52 34-72c3 20 11 32 22 36c-8-32-4-62 10-92z" fill="url(#outer)"/>
+  <path d="M260 246c9 30 40 46 40 80c0 28-20 44-44 44s-44-16-44-42c0-22 14-36 26-50c2 14 8 22 15 24c-4-20-2-38 7-56z" fill="url(#inner)"/>
+  <path d="M256 304c14 18 24 30 24 44c0 15-11 24-24 24s-24-9-24-24c0-14 10-26 24-44z" fill="#fff4d8"/>
+
+  <!-- sparks -->
+  <g fill="#ffc46b">
+    <circle cx="314" cy="208" r="6"/>
+    <circle cx="204" cy="230" r="4.5"/>
+    <circle cx="292" cy="170" r="3.5"/>
+  </g>
 </svg>
