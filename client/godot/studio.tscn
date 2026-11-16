@@ -1,0 +1,252 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://studio.gd" id="1_studio"]
+
+[sub_resource type="StyleBoxFlat" id="1_panel"]
+bg_color = Color(0.09, 0.1, 0.13, 0.94)
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+
+[sub_resource type="StyleBoxFlat" id="2_panel_right"]
+bg_color = Color(0.09, 0.1, 0.13, 0.94)
+corner_radius_top_left = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="3_panel_bottom"]
+bg_color = Color(0.09, 0.1, 0.13, 0.94)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+
+[node name="Studio" type="Node3D"]
+script = ExtResource("1_studio")
+
+[node name="Camera" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.92, 0.39, 0, -0.39, 0.92, 0, 6, 12)
+far = 400.0
+
+[node name="WorldRoot" type="Node3D" parent="."]
+
+[node name="Highlight" type="MeshInstance3D" parent="."]
+visible = false
+cast_shadow = 0
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="Left" type="PanelContainer" parent="UI"]
+anchors_preset = 9
+anchor_bottom = 1.0
+offset_right = 232.0
+grow_vertical = 2
+theme_override_styles/panel = SubResource("1_panel")
+
+[node name="Margin" type="MarginContainer" parent="UI/Left"]
+layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 12
+
+[node name="Rows" type="VBoxContainer" parent="UI/Left/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Title" type="Label" parent="UI/Left/Margin/Rows"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "Hearth Studio"
+
+[node name="Tabs" type="HBoxContainer" parent="UI/Left/Margin/Rows"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="WorldsTab" type="Button" parent="UI/Left/Margin/Rows/Tabs"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+button_pressed = true
+text = "Worlds"
+
+[node name="AvatarsTab" type="Button" parent="UI/Left/Margin/Rows/Tabs"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+tooltip_text = "Avatars come next. The world format already reserves them."
+disabled = true
+text = "Avatars"
+
+[node name="WorldsLabel" type="Label" parent="UI/Left/Margin/Rows"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.68, 0.72, 0.78, 1)
+text = "Your worlds"
+
+[node name="WorldList" type="ItemList" parent="UI/Left/Margin/Rows"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 120)
+layout_mode = 2
+
+[node name="WorldButtons" type="HBoxContainer" parent="UI/Left/Margin/Rows"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="NewWorld" type="Button" parent="UI/Left/Margin/Rows/WorldButtons"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "New"
+
+[node name="CopyWorld" type="Button" parent="UI/Left/Margin/Rows/WorldButtons"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Copy"
+
+[node name="NewName" type="LineEdit" parent="UI/Left/Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+placeholder_text = "name for a new world"
+max_length = 32
+
+[node name="PaletteLabel" type="Label" parent="UI/Left/Margin/Rows"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.68, 0.72, 0.78, 1)
+text = "Click a piece, then click the ground"
+
+[node name="Palette" type="ItemList" parent="UI/Left/Margin/Rows"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 150)
+layout_mode = 2
+
+[node name="Import" type="Button" parent="UI/Left/Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Import a model..."
+
+[node name="Help" type="Label" parent="UI/Left/Margin/Rows"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.58, 0.64, 1)
+theme_override_font_sizes/font_size = 11
+text = "right drag looks, WASD/QE flies
+drag moves, Alt+drag lifts
+Del removes, Ctrl+D copies
+Ctrl+Z undoes, Ctrl+S saves"
+autowrap_mode = 3
+
+[node name="Right" type="PanelContainer" parent="UI"]
+anchors_preset = 11
+anchor_left = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -268.0
+grow_horizontal = 0
+grow_vertical = 2
+theme_override_styles/panel = SubResource("2_panel_right")
+
+[node name="Margin" type="MarginContainer" parent="UI/Right"]
+layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 12
+
+[node name="Rows" type="VBoxContainer" parent="UI/Right/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="SelectionLabel" type="Label" parent="UI/Right/Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Nothing selected"
+
+[node name="Fields" type="VBoxContainer" parent="UI/Right/Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="ObjectButtons" type="HBoxContainer" parent="UI/Right/Margin/Rows"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Duplicate" type="Button" parent="UI/Right/Margin/Rows/ObjectButtons"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Copy"
+
+[node name="Delete" type="Button" parent="UI/Right/Margin/Rows/ObjectButtons"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Delete"
+
+[node name="ObjectsLabel" type="Label" parent="UI/Right/Margin/Rows"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.68, 0.72, 0.78, 1)
+text = "In this world"
+
+[node name="ObjectList" type="ItemList" parent="UI/Right/Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Bottom" type="PanelContainer" parent="UI"]
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 232.0
+offset_top = -52.0
+offset_right = -268.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_styles/panel = SubResource("3_panel_bottom")
+
+[node name="Margin" type="MarginContainer" parent="UI/Bottom"]
+layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 8
+
+[node name="Row" type="HBoxContainer" parent="UI/Bottom/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Save" type="Button" parent="UI/Bottom/Margin/Row"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Save"
+
+[node name="Pack" type="Button" parent="UI/Bottom/Margin/Row"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Pack .hworld"
+
+[node name="Test" type="Button" parent="UI/Bottom/Margin/Row"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Test"
+
+[node name="SpawnHere" type="Button" parent="UI/Bottom/Margin/Row"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Spawn here"
+
+[node name="Status" type="Label" parent="UI/Bottom/Margin/Row"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.95, 0.82, 0.55, 1)
+vertical_alignment = 1
+clip_text = true
+
+[node name="ImportDialog" type="FileDialog" parent="UI"]
+unique_name_in_owner = true
+title = "Import a model"
+initial_position = 2
+size = Vector2i(760, 520)
+ok_button_text = "Import"
+file_mode = 0
+access = 2
+filters = PackedStringArray("*.glb, *.gltf, *.obj, *.fbx ; 3D models")

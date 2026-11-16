@@ -1,0 +1,3470 @@
+{
+	"format": 1,
+	"kind": "world",
+	"name": "hub",
+	"spawn": {
+		"pos": [
+			0.0,
+			0.0,
+			0.0
+		],
+		"yaw": 0.0
+	},
+	"sky": {
+		"top": "#0b1026",
+		"horizon": "#3d3350",
+		"ground": "#07080f",
+		"ambient": "#56608c",
+		"fog": 0.006,
+		"sun": {
+			"color": "#9fb4ff",
+			"energy": 0.28,
+			"angles": [
+				-38.0,
+				24.0
+			]
+		}
+	},
+	"kill_y": -40.0,
+	"objects": [
+		{
+			"name": "Plaza",
+			"shape": "cylinder",
+			"size": [
+				54.0,
+				1.6,
+				54.0
+			],
+			"pos": [
+				0.0,
+				-2.0,
+				0.0
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.75
+		},
+		{
+			"name": "PlazaRim",
+			"shape": "torus",
+			"size": [
+				52.8,
+				0.5,
+				54.6
+			],
+			"pos": [
+				0.0,
+				-1.52,
+				0.0
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.6
+		},
+		{
+			"name": "Step0",
+			"shape": "cylinder",
+			"size": [
+				12.2,
+				0.4,
+				12.2
+			],
+			"pos": [
+				0.0,
+				-1.0,
+				0.0
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.7
+		},
+		{
+			"name": "Step1",
+			"shape": "cylinder",
+			"size": [
+				10.7,
+				0.4,
+				10.7
+			],
+			"pos": [
+				0.0,
+				-0.6,
+				0.0
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.7
+		},
+		{
+			"name": "Dais",
+			"shape": "cylinder",
+			"size": [
+				9.2,
+				1.2,
+				9.2
+			],
+			"pos": [
+				0.0,
+				-0.6,
+				0.0
+			],
+			"color": "#7a6f63",
+			"body": "static",
+			"roughness": 0.5
+		},
+		{
+			"name": "DaisRing",
+			"shape": "torus",
+			"size": [
+				8.3,
+				0.12,
+				8.85
+			],
+			"pos": [
+				0.0,
+				-0.03,
+				0.0
+			],
+			"color": "#7fd4ff",
+			"body": "none",
+			"emission": "#7fd4ff",
+			"emission_energy": 2.2,
+			"roughness": 0.3
+		},
+		{
+			"name": "DaisLight",
+			"light": {
+				"color": "#7fd4ff",
+				"energy": 2.2,
+				"range": 13.0
+			},
+			"pos": [
+				0.0,
+				2.2,
+				0.0
+			]
+		},
+		{
+			"name": "PillarBase0",
+			"shape": "box",
+			"size": [
+				1.7,
+				0.4,
+				1.7
+			],
+			"pos": [
+				22.0,
+				-1.0,
+				0.0
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.7
+		},
+		{
+			"name": "Pillar0",
+			"shape": "cylinder",
+			"size": [
+				1.15,
+				6.0,
+				1.15
+			],
+			"pos": [
+				22.0,
+				2.2,
+				0.0
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.55
+		},
+		{
+			"name": "Capital0",
+			"shape": "box",
+			"size": [
+				1.6,
+				0.45,
+				1.6
+			],
+			"pos": [
+				22.0,
+				5.42,
+				0.0
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.6
+		},
+		{
+			"name": "PillarBase1",
+			"shape": "box",
+			"size": [
+				1.7,
+				0.4,
+				1.7
+			],
+			"pos": [
+				20.3253,
+				-1.0,
+				8.419
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.7
+		},
+		{
+			"name": "Pillar1",
+			"shape": "cylinder",
+			"size": [
+				1.15,
+				6.0,
+				1.15
+			],
+			"pos": [
+				20.3253,
+				2.2,
+				8.419
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.55
+		},
+		{
+			"name": "Capital1",
+			"shape": "box",
+			"size": [
+				1.6,
+				0.45,
+				1.6
+			],
+			"pos": [
+				20.3253,
+				5.42,
+				8.419
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.6
+		},
+		{
+			"name": "PillarBase2",
+			"shape": "box",
+			"size": [
+				1.7,
+				0.4,
+				1.7
+			],
+			"pos": [
+				15.5563,
+				-1.0,
+				15.5563
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.7
+		},
+		{
+			"name": "Pillar2",
+			"shape": "cylinder",
+			"size": [
+				1.15,
+				6.0,
+				1.15
+			],
+			"pos": [
+				15.5563,
+				2.2,
+				15.5563
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.55
+		},
+		{
+			"name": "Capital2",
+			"shape": "box",
+			"size": [
+				1.6,
+				0.45,
+				1.6
+			],
+			"pos": [
+				15.5563,
+				5.42,
+				15.5563
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.6
+		},
+		{
+			"name": "PillarBase3",
+			"shape": "box",
+			"size": [
+				1.7,
+				0.4,
+				1.7
+			],
+			"pos": [
+				8.419,
+				-1.0,
+				20.3253
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.7
+		},
+		{
+			"name": "Pillar3",
+			"shape": "cylinder",
+			"size": [
+				1.15,
+				6.0,
+				1.15
+			],
+			"pos": [
+				8.419,
+				2.2,
+				20.3253
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.55
+		},
+		{
+			"name": "Capital3",
+			"shape": "box",
+			"size": [
+				1.6,
+				0.45,
+				1.6
+			],
+			"pos": [
+				8.419,
+				5.42,
+				20.3253
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.6
+		},
+		{
+			"name": "PillarBase4",
+			"shape": "box",
+			"size": [
+				1.7,
+				0.4,
+				1.7
+			],
+			"pos": [
+				0.0,
+				-1.0,
+				22.0
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.7
+		},
+		{
+			"name": "Pillar4",
+			"shape": "cylinder",
+			"size": [
+				1.15,
+				6.0,
+				1.15
+			],
+			"pos": [
+				0.0,
+				2.2,
+				22.0
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.55
+		},
+		{
+			"name": "Capital4",
+			"shape": "box",
+			"size": [
+				1.6,
+				0.45,
+				1.6
+			],
+			"pos": [
+				0.0,
+				5.42,
+				22.0
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.6
+		},
+		{
+			"name": "PillarBase5",
+			"shape": "box",
+			"size": [
+				1.7,
+				0.4,
+				1.7
+			],
+			"pos": [
+				-8.419,
+				-1.0,
+				20.3253
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.7
+		},
+		{
+			"name": "Pillar5",
+			"shape": "cylinder",
+			"size": [
+				1.15,
+				6.0,
+				1.15
+			],
+			"pos": [
+				-8.419,
+				2.2,
+				20.3253
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.55
+		},
+		{
+			"name": "Capital5",
+			"shape": "box",
+			"size": [
+				1.6,
+				0.45,
+				1.6
+			],
+			"pos": [
+				-8.419,
+				5.42,
+				20.3253
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.6
+		},
+		{
+			"name": "PillarBase6",
+			"shape": "box",
+			"size": [
+				1.7,
+				0.4,
+				1.7
+			],
+			"pos": [
+				-15.5563,
+				-1.0,
+				15.5563
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.7
+		},
+		{
+			"name": "Pillar6",
+			"shape": "cylinder",
+			"size": [
+				1.15,
+				6.0,
+				1.15
+			],
+			"pos": [
+				-15.5563,
+				2.2,
+				15.5563
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.55
+		},
+		{
+			"name": "Capital6",
+			"shape": "box",
+			"size": [
+				1.6,
+				0.45,
+				1.6
+			],
+			"pos": [
+				-15.5563,
+				5.42,
+				15.5563
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.6
+		},
+		{
+			"name": "PillarBase7",
+			"shape": "box",
+			"size": [
+				1.7,
+				0.4,
+				1.7
+			],
+			"pos": [
+				-20.3253,
+				-1.0,
+				8.419
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.7
+		},
+		{
+			"name": "Pillar7",
+			"shape": "cylinder",
+			"size": [
+				1.15,
+				6.0,
+				1.15
+			],
+			"pos": [
+				-20.3253,
+				2.2,
+				8.419
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.55
+		},
+		{
+			"name": "Capital7",
+			"shape": "box",
+			"size": [
+				1.6,
+				0.45,
+				1.6
+			],
+			"pos": [
+				-20.3253,
+				5.42,
+				8.419
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.6
+		},
+		{
+			"name": "PillarBase8",
+			"shape": "box",
+			"size": [
+				1.7,
+				0.4,
+				1.7
+			],
+			"pos": [
+				-22.0,
+				-1.0,
+				0.0
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.7
+		},
+		{
+			"name": "Pillar8",
+			"shape": "cylinder",
+			"size": [
+				1.15,
+				6.0,
+				1.15
+			],
+			"pos": [
+				-22.0,
+				2.2,
+				0.0
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.55
+		},
+		{
+			"name": "Capital8",
+			"shape": "box",
+			"size": [
+				1.6,
+				0.45,
+				1.6
+			],
+			"pos": [
+				-22.0,
+				5.42,
+				0.0
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.6
+		},
+		{
+			"name": "PillarBase9",
+			"shape": "box",
+			"size": [
+				1.7,
+				0.4,
+				1.7
+			],
+			"pos": [
+				-20.3253,
+				-1.0,
+				-8.419
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.7
+		},
+		{
+			"name": "Pillar9",
+			"shape": "cylinder",
+			"size": [
+				1.15,
+				6.0,
+				1.15
+			],
+			"pos": [
+				-20.3253,
+				2.2,
+				-8.419
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.55
+		},
+		{
+			"name": "Capital9",
+			"shape": "box",
+			"size": [
+				1.6,
+				0.45,
+				1.6
+			],
+			"pos": [
+				-20.3253,
+				5.42,
+				-8.419
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.6
+		},
+		{
+			"name": "PillarBase10",
+			"shape": "box",
+			"size": [
+				1.7,
+				0.4,
+				1.7
+			],
+			"pos": [
+				-15.5563,
+				-1.0,
+				-15.5563
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.7
+		},
+		{
+			"name": "Pillar10",
+			"shape": "cylinder",
+			"size": [
+				1.15,
+				6.0,
+				1.15
+			],
+			"pos": [
+				-15.5563,
+				2.2,
+				-15.5563
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.55
+		},
+		{
+			"name": "Capital10",
+			"shape": "box",
+			"size": [
+				1.6,
+				0.45,
+				1.6
+			],
+			"pos": [
+				-15.5563,
+				5.42,
+				-15.5563
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.6
+		},
+		{
+			"name": "PillarBase11",
+			"shape": "box",
+			"size": [
+				1.7,
+				0.4,
+				1.7
+			],
+			"pos": [
+				-8.419,
+				-1.0,
+				-20.3253
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.7
+		},
+		{
+			"name": "Pillar11",
+			"shape": "cylinder",
+			"size": [
+				1.15,
+				6.0,
+				1.15
+			],
+			"pos": [
+				-8.419,
+				2.2,
+				-20.3253
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.55
+		},
+		{
+			"name": "Capital11",
+			"shape": "box",
+			"size": [
+				1.6,
+				0.45,
+				1.6
+			],
+			"pos": [
+				-8.419,
+				5.42,
+				-20.3253
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.6
+		},
+		{
+			"name": "PillarBase12",
+			"shape": "box",
+			"size": [
+				1.7,
+				0.4,
+				1.7
+			],
+			"pos": [
+				-0.0,
+				-1.0,
+				-22.0
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.7
+		},
+		{
+			"name": "Pillar12",
+			"shape": "cylinder",
+			"size": [
+				1.15,
+				6.0,
+				1.15
+			],
+			"pos": [
+				-0.0,
+				2.2,
+				-22.0
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.55
+		},
+		{
+			"name": "Capital12",
+			"shape": "box",
+			"size": [
+				1.6,
+				0.45,
+				1.6
+			],
+			"pos": [
+				-0.0,
+				5.42,
+				-22.0
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.6
+		},
+		{
+			"name": "PillarBase13",
+			"shape": "box",
+			"size": [
+				1.7,
+				0.4,
+				1.7
+			],
+			"pos": [
+				8.419,
+				-1.0,
+				-20.3253
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.7
+		},
+		{
+			"name": "Pillar13",
+			"shape": "cylinder",
+			"size": [
+				1.15,
+				6.0,
+				1.15
+			],
+			"pos": [
+				8.419,
+				2.2,
+				-20.3253
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.55
+		},
+		{
+			"name": "Capital13",
+			"shape": "box",
+			"size": [
+				1.6,
+				0.45,
+				1.6
+			],
+			"pos": [
+				8.419,
+				5.42,
+				-20.3253
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.6
+		},
+		{
+			"name": "PillarBase14",
+			"shape": "box",
+			"size": [
+				1.7,
+				0.4,
+				1.7
+			],
+			"pos": [
+				15.5563,
+				-1.0,
+				-15.5563
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.7
+		},
+		{
+			"name": "Pillar14",
+			"shape": "cylinder",
+			"size": [
+				1.15,
+				6.0,
+				1.15
+			],
+			"pos": [
+				15.5563,
+				2.2,
+				-15.5563
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.55
+		},
+		{
+			"name": "Capital14",
+			"shape": "box",
+			"size": [
+				1.6,
+				0.45,
+				1.6
+			],
+			"pos": [
+				15.5563,
+				5.42,
+				-15.5563
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.6
+		},
+		{
+			"name": "PillarBase15",
+			"shape": "box",
+			"size": [
+				1.7,
+				0.4,
+				1.7
+			],
+			"pos": [
+				20.3253,
+				-1.0,
+				-8.419
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.7
+		},
+		{
+			"name": "Pillar15",
+			"shape": "cylinder",
+			"size": [
+				1.15,
+				6.0,
+				1.15
+			],
+			"pos": [
+				20.3253,
+				2.2,
+				-8.419
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.55
+		},
+		{
+			"name": "Capital15",
+			"shape": "box",
+			"size": [
+				1.6,
+				0.45,
+				1.6
+			],
+			"pos": [
+				20.3253,
+				5.42,
+				-8.419
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.6
+		},
+		{
+			"name": "Beam0",
+			"shape": "box",
+			"size": [
+				8.784,
+				0.55,
+				1.1
+			],
+			"pos": [
+				21.1627,
+				5.92,
+				4.2095
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.6,
+			"rot": [
+				0.0,
+				-101.25,
+				0.0
+			]
+		},
+		{
+			"name": "Beam1",
+			"shape": "box",
+			"size": [
+				8.784,
+				0.55,
+				1.1
+			],
+			"pos": [
+				17.9408,
+				5.92,
+				11.9877
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.6,
+			"rot": [
+				0.0,
+				-123.75,
+				0.0
+			]
+		},
+		{
+			"name": "Beam2",
+			"shape": "box",
+			"size": [
+				8.784,
+				0.55,
+				1.1
+			],
+			"pos": [
+				11.9877,
+				5.92,
+				17.9408
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.6,
+			"rot": [
+				0.0,
+				-146.25,
+				0.0
+			]
+		},
+		{
+			"name": "Beam3",
+			"shape": "box",
+			"size": [
+				8.784,
+				0.55,
+				1.1
+			],
+			"pos": [
+				4.2095,
+				5.92,
+				21.1627
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.6,
+			"rot": [
+				0.0,
+				-168.75,
+				0.0
+			]
+		},
+		{
+			"name": "Beam4",
+			"shape": "box",
+			"size": [
+				8.784,
+				0.55,
+				1.1
+			],
+			"pos": [
+				-4.2095,
+				5.92,
+				21.1627
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.6,
+			"rot": [
+				0.0,
+				-191.25,
+				0.0
+			]
+		},
+		{
+			"name": "Beam5",
+			"shape": "box",
+			"size": [
+				8.784,
+				0.55,
+				1.1
+			],
+			"pos": [
+				-11.9877,
+				5.92,
+				17.9408
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.6,
+			"rot": [
+				0.0,
+				-213.75,
+				0.0
+			]
+		},
+		{
+			"name": "Beam6",
+			"shape": "box",
+			"size": [
+				8.784,
+				0.55,
+				1.1
+			],
+			"pos": [
+				-17.9408,
+				5.92,
+				11.9877
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.6,
+			"rot": [
+				0.0,
+				-236.25,
+				0.0
+			]
+		},
+		{
+			"name": "Beam7",
+			"shape": "box",
+			"size": [
+				8.784,
+				0.55,
+				1.1
+			],
+			"pos": [
+				-21.1627,
+				5.92,
+				4.2095
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.6,
+			"rot": [
+				0.0,
+				-258.75,
+				0.0
+			]
+		},
+		{
+			"name": "Beam8",
+			"shape": "box",
+			"size": [
+				8.784,
+				0.55,
+				1.1
+			],
+			"pos": [
+				-21.1627,
+				5.92,
+				-4.2095
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.6,
+			"rot": [
+				0.0,
+				-281.25,
+				0.0
+			]
+		},
+		{
+			"name": "Beam9",
+			"shape": "box",
+			"size": [
+				8.784,
+				0.55,
+				1.1
+			],
+			"pos": [
+				-17.9408,
+				5.92,
+				-11.9877
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.6,
+			"rot": [
+				0.0,
+				-303.75,
+				0.0
+			]
+		},
+		{
+			"name": "Beam10",
+			"shape": "box",
+			"size": [
+				8.784,
+				0.55,
+				1.1
+			],
+			"pos": [
+				-11.9877,
+				5.92,
+				-17.9408
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.6,
+			"rot": [
+				0.0,
+				-326.25,
+				0.0
+			]
+		},
+		{
+			"name": "Beam11",
+			"shape": "box",
+			"size": [
+				8.784,
+				0.55,
+				1.1
+			],
+			"pos": [
+				-4.2095,
+				5.92,
+				-21.1627
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.6,
+			"rot": [
+				0.0,
+				-348.75,
+				0.0
+			]
+		},
+		{
+			"name": "Beam12",
+			"shape": "box",
+			"size": [
+				8.784,
+				0.55,
+				1.1
+			],
+			"pos": [
+				4.2095,
+				5.92,
+				-21.1627
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.6,
+			"rot": [
+				0.0,
+				-371.25,
+				0.0
+			]
+		},
+		{
+			"name": "Beam13",
+			"shape": "box",
+			"size": [
+				8.784,
+				0.55,
+				1.1
+			],
+			"pos": [
+				11.9877,
+				5.92,
+				-17.9408
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.6,
+			"rot": [
+				0.0,
+				-393.75,
+				0.0
+			]
+		},
+		{
+			"name": "Beam14",
+			"shape": "box",
+			"size": [
+				8.784,
+				0.55,
+				1.1
+			],
+			"pos": [
+				17.9408,
+				5.92,
+				-11.9877
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.6,
+			"rot": [
+				0.0,
+				-416.25,
+				0.0
+			]
+		},
+		{
+			"name": "Beam15",
+			"shape": "box",
+			"size": [
+				8.784,
+				0.55,
+				1.1
+			],
+			"pos": [
+				21.1627,
+				5.92,
+				-4.2095
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.6,
+			"rot": [
+				0.0,
+				-438.75,
+				0.0
+			]
+		},
+		{
+			"name": "Crown",
+			"shape": "torus",
+			"size": [
+				43.2,
+				0.3,
+				44.5
+			],
+			"pos": [
+				0.0,
+				6.45,
+				0.0
+			],
+			"color": "#7fd4ff",
+			"body": "none",
+			"emission": "#7fd4ff",
+			"emission_energy": 1.6,
+			"roughness": 0.3
+		},
+		{
+			"name": "Bracket0",
+			"shape": "box",
+			"size": [
+				0.5,
+				0.14,
+				0.14
+			],
+			"pos": [
+				20.4,
+				1.9,
+				0.0
+			],
+			"color": "#595f6e",
+			"body": "static",
+			"metallic": 0.7,
+			"roughness": 0.4,
+			"rot": [
+				0.0,
+				-0.0,
+				0.0
+			]
+		},
+		{
+			"name": "Lamp0",
+			"shape": "sphere",
+			"size": [
+				0.42,
+				0.42,
+				0.42
+			],
+			"pos": [
+				20.4,
+				1.64,
+				0.0
+			],
+			"color": "#7fd4ff",
+			"body": "none",
+			"emission": "#7fd4ff",
+			"emission_energy": 3.0,
+			"roughness": 0.3
+		},
+		{
+			"name": "LampLight0",
+			"light": {
+				"color": "#7fd4ff",
+				"energy": 1.5,
+				"range": 9.0
+			},
+			"pos": [
+				20.4,
+				1.64,
+				0.0
+			]
+		},
+		{
+			"name": "Bracket1",
+			"shape": "box",
+			"size": [
+				0.5,
+				0.14,
+				0.14
+			],
+			"pos": [
+				14.425,
+				1.9,
+				14.425
+			],
+			"color": "#595f6e",
+			"body": "static",
+			"metallic": 0.7,
+			"roughness": 0.4,
+			"rot": [
+				0.0,
+				-45.0,
+				0.0
+			]
+		},
+		{
+			"name": "Lamp1",
+			"shape": "sphere",
+			"size": [
+				0.42,
+				0.42,
+				0.42
+			],
+			"pos": [
+				14.425,
+				1.64,
+				14.425
+			],
+			"color": "#7fd4ff",
+			"body": "none",
+			"emission": "#7fd4ff",
+			"emission_energy": 3.0,
+			"roughness": 0.3
+		},
+		{
+			"name": "Bracket2",
+			"shape": "box",
+			"size": [
+				0.5,
+				0.14,
+				0.14
+			],
+			"pos": [
+				0.0,
+				1.9,
+				20.4
+			],
+			"color": "#595f6e",
+			"body": "static",
+			"metallic": 0.7,
+			"roughness": 0.4,
+			"rot": [
+				0.0,
+				-90.0,
+				0.0
+			]
+		},
+		{
+			"name": "Lamp2",
+			"shape": "sphere",
+			"size": [
+				0.42,
+				0.42,
+				0.42
+			],
+			"pos": [
+				0.0,
+				1.64,
+				20.4
+			],
+			"color": "#7fd4ff",
+			"body": "none",
+			"emission": "#7fd4ff",
+			"emission_energy": 3.0,
+			"roughness": 0.3
+		},
+		{
+			"name": "LampLight2",
+			"light": {
+				"color": "#7fd4ff",
+				"energy": 1.5,
+				"range": 9.0
+			},
+			"pos": [
+				0.0,
+				1.64,
+				20.4
+			]
+		},
+		{
+			"name": "Bracket3",
+			"shape": "box",
+			"size": [
+				0.5,
+				0.14,
+				0.14
+			],
+			"pos": [
+				-14.425,
+				1.9,
+				14.425
+			],
+			"color": "#595f6e",
+			"body": "static",
+			"metallic": 0.7,
+			"roughness": 0.4,
+			"rot": [
+				0.0,
+				-135.0,
+				0.0
+			]
+		},
+		{
+			"name": "Lamp3",
+			"shape": "sphere",
+			"size": [
+				0.42,
+				0.42,
+				0.42
+			],
+			"pos": [
+				-14.425,
+				1.64,
+				14.425
+			],
+			"color": "#7fd4ff",
+			"body": "none",
+			"emission": "#7fd4ff",
+			"emission_energy": 3.0,
+			"roughness": 0.3
+		},
+		{
+			"name": "Bracket4",
+			"shape": "box",
+			"size": [
+				0.5,
+				0.14,
+				0.14
+			],
+			"pos": [
+				-20.4,
+				1.9,
+				0.0
+			],
+			"color": "#595f6e",
+			"body": "static",
+			"metallic": 0.7,
+			"roughness": 0.4,
+			"rot": [
+				0.0,
+				-180.0,
+				0.0
+			]
+		},
+		{
+			"name": "Lamp4",
+			"shape": "sphere",
+			"size": [
+				0.42,
+				0.42,
+				0.42
+			],
+			"pos": [
+				-20.4,
+				1.64,
+				0.0
+			],
+			"color": "#7fd4ff",
+			"body": "none",
+			"emission": "#7fd4ff",
+			"emission_energy": 3.0,
+			"roughness": 0.3
+		},
+		{
+			"name": "LampLight4",
+			"light": {
+				"color": "#7fd4ff",
+				"energy": 1.5,
+				"range": 9.0
+			},
+			"pos": [
+				-20.4,
+				1.64,
+				0.0
+			]
+		},
+		{
+			"name": "Bracket5",
+			"shape": "box",
+			"size": [
+				0.5,
+				0.14,
+				0.14
+			],
+			"pos": [
+				-14.425,
+				1.9,
+				-14.425
+			],
+			"color": "#595f6e",
+			"body": "static",
+			"metallic": 0.7,
+			"roughness": 0.4,
+			"rot": [
+				0.0,
+				-225.0,
+				0.0
+			]
+		},
+		{
+			"name": "Lamp5",
+			"shape": "sphere",
+			"size": [
+				0.42,
+				0.42,
+				0.42
+			],
+			"pos": [
+				-14.425,
+				1.64,
+				-14.425
+			],
+			"color": "#7fd4ff",
+			"body": "none",
+			"emission": "#7fd4ff",
+			"emission_energy": 3.0,
+			"roughness": 0.3
+		},
+		{
+			"name": "Bracket6",
+			"shape": "box",
+			"size": [
+				0.5,
+				0.14,
+				0.14
+			],
+			"pos": [
+				-0.0,
+				1.9,
+				-20.4
+			],
+			"color": "#595f6e",
+			"body": "static",
+			"metallic": 0.7,
+			"roughness": 0.4,
+			"rot": [
+				0.0,
+				-270.0,
+				0.0
+			]
+		},
+		{
+			"name": "Lamp6",
+			"shape": "sphere",
+			"size": [
+				0.42,
+				0.42,
+				0.42
+			],
+			"pos": [
+				-0.0,
+				1.64,
+				-20.4
+			],
+			"color": "#7fd4ff",
+			"body": "none",
+			"emission": "#7fd4ff",
+			"emission_energy": 3.0,
+			"roughness": 0.3
+		},
+		{
+			"name": "LampLight6",
+			"light": {
+				"color": "#7fd4ff",
+				"energy": 1.5,
+				"range": 9.0
+			},
+			"pos": [
+				-0.0,
+				1.64,
+				-20.4
+			]
+		},
+		{
+			"name": "Bracket7",
+			"shape": "box",
+			"size": [
+				0.5,
+				0.14,
+				0.14
+			],
+			"pos": [
+				14.425,
+				1.9,
+				-14.425
+			],
+			"color": "#595f6e",
+			"body": "static",
+			"metallic": 0.7,
+			"roughness": 0.4,
+			"rot": [
+				0.0,
+				-315.0,
+				0.0
+			]
+		},
+		{
+			"name": "Lamp7",
+			"shape": "sphere",
+			"size": [
+				0.42,
+				0.42,
+				0.42
+			],
+			"pos": [
+				14.425,
+				1.64,
+				-14.425
+			],
+			"color": "#7fd4ff",
+			"body": "none",
+			"emission": "#7fd4ff",
+			"emission_energy": 3.0,
+			"roughness": 0.3
+		},
+		{
+			"name": "BrazierStem0",
+			"shape": "cylinder",
+			"size": [
+				0.5,
+				1.5,
+				0.5
+			],
+			"pos": [
+				12.5574,
+				-0.45,
+				7.25
+			],
+			"color": "#595f6e",
+			"body": "static",
+			"metallic": 0.75,
+			"roughness": 0.35
+		},
+		{
+			"name": "BrazierBowl0",
+			"shape": "cylinder",
+			"size": [
+				1.5,
+				0.5,
+				1.0
+			],
+			"pos": [
+				12.5574,
+				0.5,
+				7.25
+			],
+			"color": "#595f6e",
+			"body": "static",
+			"metallic": 0.8,
+			"roughness": 0.3
+		},
+		{
+			"name": "Fire0",
+			"shape": "sphere",
+			"size": [
+				1.15,
+				0.95,
+				1.15
+			],
+			"pos": [
+				12.5574,
+				0.9,
+				7.25
+			],
+			"color": "#ff9a4a",
+			"body": "none",
+			"emission": "#ff9a4a",
+			"emission_energy": 3.4,
+			"roughness": 0.3
+		},
+		{
+			"name": "FireLight0",
+			"light": {
+				"color": "#ff9a4a",
+				"energy": 2.6,
+				"range": 15.0
+			},
+			"pos": [
+				12.5574,
+				1.3,
+				7.25
+			]
+		},
+		{
+			"name": "BrazierStem1",
+			"shape": "cylinder",
+			"size": [
+				0.5,
+				1.5,
+				0.5
+			],
+			"pos": [
+				0.0,
+				-0.45,
+				14.5
+			],
+			"color": "#595f6e",
+			"body": "static",
+			"metallic": 0.75,
+			"roughness": 0.35
+		},
+		{
+			"name": "BrazierBowl1",
+			"shape": "cylinder",
+			"size": [
+				1.5,
+				0.5,
+				1.0
+			],
+			"pos": [
+				0.0,
+				0.5,
+				14.5
+			],
+			"color": "#595f6e",
+			"body": "static",
+			"metallic": 0.8,
+			"roughness": 0.3
+		},
+		{
+			"name": "Fire1",
+			"shape": "sphere",
+			"size": [
+				1.15,
+				0.95,
+				1.15
+			],
+			"pos": [
+				0.0,
+				0.9,
+				14.5
+			],
+			"color": "#ff9a4a",
+			"body": "none",
+			"emission": "#ff9a4a",
+			"emission_energy": 3.4,
+			"roughness": 0.3
+		},
+		{
+			"name": "FireLight1",
+			"light": {
+				"color": "#ff9a4a",
+				"energy": 2.6,
+				"range": 15.0
+			},
+			"pos": [
+				0.0,
+				1.3,
+				14.5
+			]
+		},
+		{
+			"name": "BrazierStem2",
+			"shape": "cylinder",
+			"size": [
+				0.5,
+				1.5,
+				0.5
+			],
+			"pos": [
+				-12.5574,
+				-0.45,
+				7.25
+			],
+			"color": "#595f6e",
+			"body": "static",
+			"metallic": 0.75,
+			"roughness": 0.35
+		},
+		{
+			"name": "BrazierBowl2",
+			"shape": "cylinder",
+			"size": [
+				1.5,
+				0.5,
+				1.0
+			],
+			"pos": [
+				-12.5574,
+				0.5,
+				7.25
+			],
+			"color": "#595f6e",
+			"body": "static",
+			"metallic": 0.8,
+			"roughness": 0.3
+		},
+		{
+			"name": "Fire2",
+			"shape": "sphere",
+			"size": [
+				1.15,
+				0.95,
+				1.15
+			],
+			"pos": [
+				-12.5574,
+				0.9,
+				7.25
+			],
+			"color": "#ff9a4a",
+			"body": "none",
+			"emission": "#ff9a4a",
+			"emission_energy": 3.4,
+			"roughness": 0.3
+		},
+		{
+			"name": "FireLight2",
+			"light": {
+				"color": "#ff9a4a",
+				"energy": 2.6,
+				"range": 15.0
+			},
+			"pos": [
+				-12.5574,
+				1.3,
+				7.25
+			]
+		},
+		{
+			"name": "BrazierStem3",
+			"shape": "cylinder",
+			"size": [
+				0.5,
+				1.5,
+				0.5
+			],
+			"pos": [
+				-12.5574,
+				-0.45,
+				-7.25
+			],
+			"color": "#595f6e",
+			"body": "static",
+			"metallic": 0.75,
+			"roughness": 0.35
+		},
+		{
+			"name": "BrazierBowl3",
+			"shape": "cylinder",
+			"size": [
+				1.5,
+				0.5,
+				1.0
+			],
+			"pos": [
+				-12.5574,
+				0.5,
+				-7.25
+			],
+			"color": "#595f6e",
+			"body": "static",
+			"metallic": 0.8,
+			"roughness": 0.3
+		},
+		{
+			"name": "Fire3",
+			"shape": "sphere",
+			"size": [
+				1.15,
+				0.95,
+				1.15
+			],
+			"pos": [
+				-12.5574,
+				0.9,
+				-7.25
+			],
+			"color": "#ff9a4a",
+			"body": "none",
+			"emission": "#ff9a4a",
+			"emission_energy": 3.4,
+			"roughness": 0.3
+		},
+		{
+			"name": "FireLight3",
+			"light": {
+				"color": "#ff9a4a",
+				"energy": 2.6,
+				"range": 15.0
+			},
+			"pos": [
+				-12.5574,
+				1.3,
+				-7.25
+			]
+		},
+		{
+			"name": "BrazierStem4",
+			"shape": "cylinder",
+			"size": [
+				0.5,
+				1.5,
+				0.5
+			],
+			"pos": [
+				-0.0,
+				-0.45,
+				-14.5
+			],
+			"color": "#595f6e",
+			"body": "static",
+			"metallic": 0.75,
+			"roughness": 0.35
+		},
+		{
+			"name": "BrazierBowl4",
+			"shape": "cylinder",
+			"size": [
+				1.5,
+				0.5,
+				1.0
+			],
+			"pos": [
+				-0.0,
+				0.5,
+				-14.5
+			],
+			"color": "#595f6e",
+			"body": "static",
+			"metallic": 0.8,
+			"roughness": 0.3
+		},
+		{
+			"name": "Fire4",
+			"shape": "sphere",
+			"size": [
+				1.15,
+				0.95,
+				1.15
+			],
+			"pos": [
+				-0.0,
+				0.9,
+				-14.5
+			],
+			"color": "#ff9a4a",
+			"body": "none",
+			"emission": "#ff9a4a",
+			"emission_energy": 3.4,
+			"roughness": 0.3
+		},
+		{
+			"name": "FireLight4",
+			"light": {
+				"color": "#ff9a4a",
+				"energy": 2.6,
+				"range": 15.0
+			},
+			"pos": [
+				-0.0,
+				1.3,
+				-14.5
+			]
+		},
+		{
+			"name": "BrazierStem5",
+			"shape": "cylinder",
+			"size": [
+				0.5,
+				1.5,
+				0.5
+			],
+			"pos": [
+				12.5574,
+				-0.45,
+				-7.25
+			],
+			"color": "#595f6e",
+			"body": "static",
+			"metallic": 0.75,
+			"roughness": 0.35
+		},
+		{
+			"name": "BrazierBowl5",
+			"shape": "cylinder",
+			"size": [
+				1.5,
+				0.5,
+				1.0
+			],
+			"pos": [
+				12.5574,
+				0.5,
+				-7.25
+			],
+			"color": "#595f6e",
+			"body": "static",
+			"metallic": 0.8,
+			"roughness": 0.3
+		},
+		{
+			"name": "Fire5",
+			"shape": "sphere",
+			"size": [
+				1.15,
+				0.95,
+				1.15
+			],
+			"pos": [
+				12.5574,
+				0.9,
+				-7.25
+			],
+			"color": "#ff9a4a",
+			"body": "none",
+			"emission": "#ff9a4a",
+			"emission_energy": 3.4,
+			"roughness": 0.3
+		},
+		{
+			"name": "FireLight5",
+			"light": {
+				"color": "#ff9a4a",
+				"energy": 2.6,
+				"range": 15.0
+			},
+			"pos": [
+				12.5574,
+				1.3,
+				-7.25
+			]
+		},
+		{
+			"name": "Bench0",
+			"shape": "box",
+			"size": [
+				2.8,
+				0.22,
+				0.75
+			],
+			"pos": [
+				8.2272,
+				-0.68,
+				4.75
+			],
+			"color": "#7a6f63",
+			"body": "static",
+			"roughness": 0.65,
+			"rot": [
+				0.0,
+				-120.0,
+				0.0
+			]
+		},
+		{
+			"name": "BenchLeg0A",
+			"shape": "box",
+			"size": [
+				0.3,
+				0.5,
+				0.65
+			],
+			"pos": [
+				7.6772,
+				-0.95,
+				5.7026
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.7,
+			"rot": [
+				0.0,
+				-120.0,
+				0.0
+			]
+		},
+		{
+			"name": "BenchLeg0B",
+			"shape": "box",
+			"size": [
+				0.3,
+				0.5,
+				0.65
+			],
+			"pos": [
+				8.7772,
+				-0.95,
+				3.7974
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.7,
+			"rot": [
+				0.0,
+				-120.0,
+				0.0
+			]
+		},
+		{
+			"name": "Bench1",
+			"shape": "box",
+			"size": [
+				2.8,
+				0.22,
+				0.75
+			],
+			"pos": [
+				0.0,
+				-0.68,
+				9.5
+			],
+			"color": "#7a6f63",
+			"body": "static",
+			"roughness": 0.65,
+			"rot": [
+				0.0,
+				-180.0,
+				0.0
+			]
+		},
+		{
+			"name": "BenchLeg1A",
+			"shape": "box",
+			"size": [
+				0.3,
+				0.5,
+				0.65
+			],
+			"pos": [
+				-1.1,
+				-0.95,
+				9.5
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.7,
+			"rot": [
+				0.0,
+				-180.0,
+				0.0
+			]
+		},
+		{
+			"name": "BenchLeg1B",
+			"shape": "box",
+			"size": [
+				0.3,
+				0.5,
+				0.65
+			],
+			"pos": [
+				1.1,
+				-0.95,
+				9.5
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.7,
+			"rot": [
+				0.0,
+				-180.0,
+				0.0
+			]
+		},
+		{
+			"name": "Bench2",
+			"shape": "box",
+			"size": [
+				2.8,
+				0.22,
+				0.75
+			],
+			"pos": [
+				-8.2272,
+				-0.68,
+				4.75
+			],
+			"color": "#7a6f63",
+			"body": "static",
+			"roughness": 0.65,
+			"rot": [
+				0.0,
+				-240.0,
+				0.0
+			]
+		},
+		{
+			"name": "BenchLeg2A",
+			"shape": "box",
+			"size": [
+				0.3,
+				0.5,
+				0.65
+			],
+			"pos": [
+				-8.7772,
+				-0.95,
+				3.7974
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.7,
+			"rot": [
+				0.0,
+				-240.0,
+				0.0
+			]
+		},
+		{
+			"name": "BenchLeg2B",
+			"shape": "box",
+			"size": [
+				0.3,
+				0.5,
+				0.65
+			],
+			"pos": [
+				-7.6772,
+				-0.95,
+				5.7026
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.7,
+			"rot": [
+				0.0,
+				-240.0,
+				0.0
+			]
+		},
+		{
+			"name": "Bench3",
+			"shape": "box",
+			"size": [
+				2.8,
+				0.22,
+				0.75
+			],
+			"pos": [
+				-8.2272,
+				-0.68,
+				-4.75
+			],
+			"color": "#7a6f63",
+			"body": "static",
+			"roughness": 0.65,
+			"rot": [
+				0.0,
+				-300.0,
+				0.0
+			]
+		},
+		{
+			"name": "BenchLeg3A",
+			"shape": "box",
+			"size": [
+				0.3,
+				0.5,
+				0.65
+			],
+			"pos": [
+				-7.6772,
+				-0.95,
+				-5.7026
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.7,
+			"rot": [
+				0.0,
+				-300.0,
+				0.0
+			]
+		},
+		{
+			"name": "BenchLeg3B",
+			"shape": "box",
+			"size": [
+				0.3,
+				0.5,
+				0.65
+			],
+			"pos": [
+				-8.7772,
+				-0.95,
+				-3.7974
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.7,
+			"rot": [
+				0.0,
+				-300.0,
+				0.0
+			]
+		},
+		{
+			"name": "Bench4",
+			"shape": "box",
+			"size": [
+				2.8,
+				0.22,
+				0.75
+			],
+			"pos": [
+				-0.0,
+				-0.68,
+				-9.5
+			],
+			"color": "#7a6f63",
+			"body": "static",
+			"roughness": 0.65,
+			"rot": [
+				0.0,
+				-360.0,
+				0.0
+			]
+		},
+		{
+			"name": "BenchLeg4A",
+			"shape": "box",
+			"size": [
+				0.3,
+				0.5,
+				0.65
+			],
+			"pos": [
+				1.1,
+				-0.95,
+				-9.5
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.7,
+			"rot": [
+				0.0,
+				-360.0,
+				0.0
+			]
+		},
+		{
+			"name": "BenchLeg4B",
+			"shape": "box",
+			"size": [
+				0.3,
+				0.5,
+				0.65
+			],
+			"pos": [
+				-1.1,
+				-0.95,
+				-9.5
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.7,
+			"rot": [
+				0.0,
+				-360.0,
+				0.0
+			]
+		},
+		{
+			"name": "Bench5",
+			"shape": "box",
+			"size": [
+				2.8,
+				0.22,
+				0.75
+			],
+			"pos": [
+				8.2272,
+				-0.68,
+				-4.75
+			],
+			"color": "#7a6f63",
+			"body": "static",
+			"roughness": 0.65,
+			"rot": [
+				0.0,
+				-420.0,
+				0.0
+			]
+		},
+		{
+			"name": "BenchLeg5A",
+			"shape": "box",
+			"size": [
+				0.3,
+				0.5,
+				0.65
+			],
+			"pos": [
+				8.7772,
+				-0.95,
+				-3.7974
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.7,
+			"rot": [
+				0.0,
+				-420.0,
+				0.0
+			]
+		},
+		{
+			"name": "BenchLeg5B",
+			"shape": "box",
+			"size": [
+				0.3,
+				0.5,
+				0.65
+			],
+			"pos": [
+				7.6772,
+				-0.95,
+				-5.7026
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.7,
+			"rot": [
+				0.0,
+				-420.0,
+				0.0
+			]
+		},
+		{
+			"name": "Causeway0",
+			"shape": "box",
+			"size": [
+				17.0,
+				0.5,
+				4.0
+			],
+			"pos": [
+				24.0416,
+				-1.44,
+				24.0416
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.7,
+			"rot": [
+				0.0,
+				-45.0,
+				0.0
+			]
+		},
+		{
+			"name": "Rail0A",
+			"shape": "box",
+			"size": [
+				17.0,
+				0.5,
+				0.2
+			],
+			"pos": [
+				22.6981,
+				-0.89,
+				25.3851
+			],
+			"color": "#595f6e",
+			"body": "static",
+			"metallic": 0.6,
+			"roughness": 0.45,
+			"rot": [
+				0.0,
+				-45.0,
+				0.0
+			]
+		},
+		{
+			"name": "Rail0B",
+			"shape": "box",
+			"size": [
+				17.0,
+				0.5,
+				0.2
+			],
+			"pos": [
+				25.3851,
+				-0.89,
+				22.6981
+			],
+			"color": "#595f6e",
+			"body": "static",
+			"metallic": 0.6,
+			"roughness": 0.45,
+			"rot": [
+				0.0,
+				-45.0,
+				0.0
+			]
+		},
+		{
+			"name": "Causeway1",
+			"shape": "box",
+			"size": [
+				17.0,
+				0.5,
+				4.0
+			],
+			"pos": [
+				-24.0416,
+				-1.44,
+				24.0416
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.7,
+			"rot": [
+				0.0,
+				-135.0,
+				0.0
+			]
+		},
+		{
+			"name": "Rail1A",
+			"shape": "box",
+			"size": [
+				17.0,
+				0.5,
+				0.2
+			],
+			"pos": [
+				-25.3851,
+				-0.89,
+				22.6981
+			],
+			"color": "#595f6e",
+			"body": "static",
+			"metallic": 0.6,
+			"roughness": 0.45,
+			"rot": [
+				0.0,
+				-135.0,
+				0.0
+			]
+		},
+		{
+			"name": "Rail1B",
+			"shape": "box",
+			"size": [
+				17.0,
+				0.5,
+				0.2
+			],
+			"pos": [
+				-22.6981,
+				-0.89,
+				25.3851
+			],
+			"color": "#595f6e",
+			"body": "static",
+			"metallic": 0.6,
+			"roughness": 0.45,
+			"rot": [
+				0.0,
+				-135.0,
+				0.0
+			]
+		},
+		{
+			"name": "Causeway2",
+			"shape": "box",
+			"size": [
+				17.0,
+				0.5,
+				4.0
+			],
+			"pos": [
+				-24.0416,
+				-1.44,
+				-24.0416
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.7,
+			"rot": [
+				0.0,
+				-225.0,
+				0.0
+			]
+		},
+		{
+			"name": "Rail2A",
+			"shape": "box",
+			"size": [
+				17.0,
+				0.5,
+				0.2
+			],
+			"pos": [
+				-22.6981,
+				-0.89,
+				-25.3851
+			],
+			"color": "#595f6e",
+			"body": "static",
+			"metallic": 0.6,
+			"roughness": 0.45,
+			"rot": [
+				0.0,
+				-225.0,
+				0.0
+			]
+		},
+		{
+			"name": "Rail2B",
+			"shape": "box",
+			"size": [
+				17.0,
+				0.5,
+				0.2
+			],
+			"pos": [
+				-25.3851,
+				-0.89,
+				-22.6981
+			],
+			"color": "#595f6e",
+			"body": "static",
+			"metallic": 0.6,
+			"roughness": 0.45,
+			"rot": [
+				0.0,
+				-225.0,
+				0.0
+			]
+		},
+		{
+			"name": "Causeway3",
+			"shape": "box",
+			"size": [
+				17.0,
+				0.5,
+				4.0
+			],
+			"pos": [
+				24.0416,
+				-1.44,
+				-24.0416
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.7,
+			"rot": [
+				0.0,
+				-315.0,
+				0.0
+			]
+		},
+		{
+			"name": "Rail3A",
+			"shape": "box",
+			"size": [
+				17.0,
+				0.5,
+				0.2
+			],
+			"pos": [
+				25.3851,
+				-0.89,
+				-22.6981
+			],
+			"color": "#595f6e",
+			"body": "static",
+			"metallic": 0.6,
+			"roughness": 0.45,
+			"rot": [
+				0.0,
+				-315.0,
+				0.0
+			]
+		},
+		{
+			"name": "Rail3B",
+			"shape": "box",
+			"size": [
+				17.0,
+				0.5,
+				0.2
+			],
+			"pos": [
+				22.6981,
+				-0.89,
+				-25.3851
+			],
+			"color": "#595f6e",
+			"body": "static",
+			"metallic": 0.6,
+			"roughness": 0.45,
+			"rot": [
+				0.0,
+				-315.0,
+				0.0
+			]
+		},
+		{
+			"name": "Deck0",
+			"shape": "cylinder",
+			"size": [
+				15.0,
+				0.8,
+				15.0
+			],
+			"pos": [
+				28.9914,
+				-1.6,
+				28.9914
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.7
+		},
+		{
+			"name": "DeckPost0",
+			"shape": "cylinder",
+			"size": [
+				0.35,
+				3.4,
+				0.35
+			],
+			"pos": [
+				28.9914,
+				0.5,
+				28.9914
+			],
+			"color": "#595f6e",
+			"body": "static",
+			"metallic": 0.7,
+			"roughness": 0.4
+		},
+		{
+			"name": "DeckLamp0",
+			"shape": "sphere",
+			"size": [
+				0.7,
+				0.7,
+				0.7
+			],
+			"pos": [
+				28.9914,
+				2.3,
+				28.9914
+			],
+			"color": "#7fd4ff",
+			"body": "none",
+			"emission": "#7fd4ff",
+			"emission_energy": 3.2,
+			"roughness": 0.3
+		},
+		{
+			"name": "DeckLight0",
+			"light": {
+				"color": "#7fd4ff",
+				"energy": 2.0,
+				"range": 14.0
+			},
+			"pos": [
+				28.9914,
+				2.3,
+				28.9914
+			]
+		},
+		{
+			"name": "Deck1",
+			"shape": "cylinder",
+			"size": [
+				15.0,
+				0.8,
+				15.0
+			],
+			"pos": [
+				-28.9914,
+				-1.6,
+				28.9914
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.7
+		},
+		{
+			"name": "DeckPost1",
+			"shape": "cylinder",
+			"size": [
+				0.35,
+				3.4,
+				0.35
+			],
+			"pos": [
+				-28.9914,
+				0.5,
+				28.9914
+			],
+			"color": "#595f6e",
+			"body": "static",
+			"metallic": 0.7,
+			"roughness": 0.4
+		},
+		{
+			"name": "DeckLamp1",
+			"shape": "sphere",
+			"size": [
+				0.7,
+				0.7,
+				0.7
+			],
+			"pos": [
+				-28.9914,
+				2.3,
+				28.9914
+			],
+			"color": "#7fd4ff",
+			"body": "none",
+			"emission": "#7fd4ff",
+			"emission_energy": 3.2,
+			"roughness": 0.3
+		},
+		{
+			"name": "DeckLight1",
+			"light": {
+				"color": "#7fd4ff",
+				"energy": 2.0,
+				"range": 14.0
+			},
+			"pos": [
+				-28.9914,
+				2.3,
+				28.9914
+			]
+		},
+		{
+			"name": "Deck2",
+			"shape": "cylinder",
+			"size": [
+				15.0,
+				0.8,
+				15.0
+			],
+			"pos": [
+				-28.9914,
+				-1.6,
+				-28.9914
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.7
+		},
+		{
+			"name": "DeckPost2",
+			"shape": "cylinder",
+			"size": [
+				0.35,
+				3.4,
+				0.35
+			],
+			"pos": [
+				-28.9914,
+				0.5,
+				-28.9914
+			],
+			"color": "#595f6e",
+			"body": "static",
+			"metallic": 0.7,
+			"roughness": 0.4
+		},
+		{
+			"name": "DeckLamp2",
+			"shape": "sphere",
+			"size": [
+				0.7,
+				0.7,
+				0.7
+			],
+			"pos": [
+				-28.9914,
+				2.3,
+				-28.9914
+			],
+			"color": "#7fd4ff",
+			"body": "none",
+			"emission": "#7fd4ff",
+			"emission_energy": 3.2,
+			"roughness": 0.3
+		},
+		{
+			"name": "DeckLight2",
+			"light": {
+				"color": "#7fd4ff",
+				"energy": 2.0,
+				"range": 14.0
+			},
+			"pos": [
+				-28.9914,
+				2.3,
+				-28.9914
+			]
+		},
+		{
+			"name": "Deck3",
+			"shape": "cylinder",
+			"size": [
+				15.0,
+				0.8,
+				15.0
+			],
+			"pos": [
+				28.9914,
+				-1.6,
+				-28.9914
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.7
+		},
+		{
+			"name": "DeckPost3",
+			"shape": "cylinder",
+			"size": [
+				0.35,
+				3.4,
+				0.35
+			],
+			"pos": [
+				28.9914,
+				0.5,
+				-28.9914
+			],
+			"color": "#595f6e",
+			"body": "static",
+			"metallic": 0.7,
+			"roughness": 0.4
+		},
+		{
+			"name": "DeckLamp3",
+			"shape": "sphere",
+			"size": [
+				0.7,
+				0.7,
+				0.7
+			],
+			"pos": [
+				28.9914,
+				2.3,
+				-28.9914
+			],
+			"color": "#7fd4ff",
+			"body": "none",
+			"emission": "#7fd4ff",
+			"emission_energy": 3.2,
+			"roughness": 0.3
+		},
+		{
+			"name": "DeckLight3",
+			"light": {
+				"color": "#7fd4ff",
+				"energy": 2.0,
+				"range": 14.0
+			},
+			"pos": [
+				28.9914,
+				2.3,
+				-28.9914
+			]
+		},
+		{
+			"name": "Island0",
+			"shape": "sphere",
+			"size": [
+				19.0,
+				8.55,
+				19.0
+			],
+			"pos": [
+				-54.0,
+				13.0,
+				-31.0
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.8
+		},
+		{
+			"name": "IslandCap0",
+			"shape": "cylinder",
+			"size": [
+				11.78,
+				0.4,
+				11.78
+			],
+			"pos": [
+				-54.0,
+				16.8,
+				-31.0
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.75
+		},
+		{
+			"name": "IslandLamp0",
+			"shape": "sphere",
+			"size": [
+				0.6,
+				0.6,
+				0.6
+			],
+			"pos": [
+				-54.0,
+				18.7,
+				-31.0
+			],
+			"color": "#ff9a4a",
+			"body": "none",
+			"emission": "#ff9a4a",
+			"emission_energy": 2.6,
+			"roughness": 0.3
+		},
+		{
+			"name": "Island1",
+			"shape": "sphere",
+			"size": [
+				15.0,
+				6.75,
+				15.0
+			],
+			"pos": [
+				49.0,
+				19.0,
+				-45.0
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.8
+		},
+		{
+			"name": "IslandCap1",
+			"shape": "cylinder",
+			"size": [
+				9.3,
+				0.4,
+				9.3
+			],
+			"pos": [
+				49.0,
+				22.0,
+				-45.0
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.75
+		},
+		{
+			"name": "IslandLamp1",
+			"shape": "sphere",
+			"size": [
+				0.6,
+				0.6,
+				0.6
+			],
+			"pos": [
+				49.0,
+				23.5,
+				-45.0
+			],
+			"color": "#ff9a4a",
+			"body": "none",
+			"emission": "#ff9a4a",
+			"emission_energy": 2.6,
+			"roughness": 0.3
+		},
+		{
+			"name": "Island2",
+			"shape": "sphere",
+			"size": [
+				23.0,
+				10.35,
+				23.0
+			],
+			"pos": [
+				13.0,
+				25.0,
+				63.0
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.8
+		},
+		{
+			"name": "IslandCap2",
+			"shape": "cylinder",
+			"size": [
+				14.26,
+				0.4,
+				14.26
+			],
+			"pos": [
+				13.0,
+				29.6,
+				63.0
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.75
+		},
+		{
+			"name": "IslandLamp2",
+			"shape": "sphere",
+			"size": [
+				0.6,
+				0.6,
+				0.6
+			],
+			"pos": [
+				13.0,
+				31.9,
+				63.0
+			],
+			"color": "#ff9a4a",
+			"body": "none",
+			"emission": "#ff9a4a",
+			"emission_energy": 2.6,
+			"roughness": 0.3
+		},
+		{
+			"name": "Island3",
+			"shape": "sphere",
+			"size": [
+				13.0,
+				5.85,
+				13.0
+			],
+			"pos": [
+				-67.0,
+				8.0,
+				39.0
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.8
+		},
+		{
+			"name": "IslandCap3",
+			"shape": "cylinder",
+			"size": [
+				8.06,
+				0.4,
+				8.06
+			],
+			"pos": [
+				-67.0,
+				10.6,
+				39.0
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.75
+		},
+		{
+			"name": "IslandLamp3",
+			"shape": "sphere",
+			"size": [
+				0.6,
+				0.6,
+				0.6
+			],
+			"pos": [
+				-67.0,
+				11.9,
+				39.0
+			],
+			"color": "#ff9a4a",
+			"body": "none",
+			"emission": "#ff9a4a",
+			"emission_energy": 2.6,
+			"roughness": 0.3
+		},
+		{
+			"name": "Island4",
+			"shape": "sphere",
+			"size": [
+				17.0,
+				7.65,
+				17.0
+			],
+			"pos": [
+				71.0,
+				30.0,
+				19.0
+			],
+			"color": "#4a4a54",
+			"body": "static",
+			"roughness": 0.8
+		},
+		{
+			"name": "IslandCap4",
+			"shape": "cylinder",
+			"size": [
+				10.54,
+				0.4,
+				10.54
+			],
+			"pos": [
+				71.0,
+				33.4,
+				19.0
+			],
+			"color": "#6b6a72",
+			"body": "static",
+			"roughness": 0.75
+		},
+		{
+			"name": "IslandLamp4",
+			"shape": "sphere",
+			"size": [
+				0.6,
+				0.6,
+				0.6
+			],
+			"pos": [
+				71.0,
+				35.1,
+				19.0
+			],
+			"color": "#ff9a4a",
+			"body": "none",
+			"emission": "#ff9a4a",
+			"emission_energy": 2.6,
+			"roughness": 0.3
+		},
+		{
+			"name": "Crate",
+			"shape": "box",
+			"size": [
+				0.6,
+				0.6,
+				0.6
+			],
+			"pos": [
+				2.2,
+				-0.3,
+				3.4
+			],
+			"color": "#8a6a42",
+			"body": "grabbable",
+			"roughness": 0.8,
+			"mass": 3.0,
+			"reach": 0.5
+		},
+		{
+			"name": "Crate Two",
+			"shape": "box",
+			"size": [
+				0.5,
+				0.5,
+				0.5
+			],
+			"pos": [
+				2.9,
+				-0.35,
+				2.6
+			],
+			"color": "#7d5f3b",
+			"body": "grabbable",
+			"roughness": 0.8,
+			"mass": 2.5,
+			"reach": 0.5
+		},
+		{
+			"name": "Ball",
+			"shape": "sphere",
+			"size": [
+				0.34,
+				0.34,
+				0.34
+			],
+			"pos": [
+				-3.1,
+				-0.4,
+				3.0
+			],
+			"color": "#d8554a",
+			"body": "grabbable",
+			"roughness": 0.45,
+			"mass": 0.8,
+			"reach": 2.5
+		},
+		{
+			"name": "Cup",
+			"shape": "cylinder",
+			"size": [
+				0.2,
+				0.26,
+				0.2
+			],
+			"pos": [
+				-2.4,
+				-0.45,
+				-3.3
+			],
+			"color": "#cfd3dc",
+			"body": "grabbable",
+			"roughness": 0.35,
+			"metallic": 0.5,
+			"mass": 0.4,
+			"reach": 0.4
+		},
+		{
+			"name": "Plinth",
+			"shape": "cylinder",
+			"size": [
+				1.0,
+				1.1,
+				1.0
+			],
+			"pos": [
+				0.0,
+				-0.65,
+				-8.5
+			],
+			"color": "#7a6f63",
+			"body": "static",
+			"roughness": 0.6
+		},
+		{
+			"name": "Gem",
+			"shape": "sphere",
+			"size": [
+				0.34,
+				0.42,
+				0.34
+			],
+			"pos": [
+				0.0,
+				0.2,
+				-8.5
+			],
+			"color": "#7ef0c8",
+			"body": "grabbable",
+			"roughness": 0.1,
+			"emission": "#7ef0c8",
+			"emission_energy": 2.2,
+			"mass": 0.5,
+			"reach": 0.9,
+			"locked": true
+		},
+		{
+			"name": "Lantern",
+			"shape": "cylinder",
+			"size": [
+				0.3,
+				0.44,
+				0.3
+			],
+			"pos": [
+				5.4,
+				-0.42,
+				-5.4
+			],
+			"color": "#ffcf8a",
+			"body": "grabbable",
+			"roughness": 0.3,
+			"emission": "#ff9a4a",
+			"emission_energy": 2.0,
+			"mass": 0.6,
+			"reach": 0.6,
+			"locked": true
+		}
+	]
+}

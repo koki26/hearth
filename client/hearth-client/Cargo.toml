@@ -14,9 +14,10 @@ godot = "0.5.5"
 hearth-protocol.workspace = true
 opus = "0.4.0"
 quinn.workspace = true
+ring = "0.17.14"
 rustls.workspace = true
 tokio.workspace = true
 
 [dev-dependencies]
-hearth-server = { path = "../../server/hearth-server" }
+hearth-flame = { path = "../../server/hearth-flame" }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }

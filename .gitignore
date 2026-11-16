@@ -9,3 +9,13 @@ data/
 
 # Exported client builds
 dist/
+
+# Screenshots from client/godot/tools/shot.gd
+shots/
+
+# Knowledge graphs from /graphify (one per top-level folder)
+graphify-out/
+
+# Leftovers from Godot replacing a loaded DLL, and Python bytecode
+*.TMP
+__pycache__/

@@ -1,0 +1,32 @@
+# A Flame as a service. See docs/RUNNING.md.
+#
+#   sudo cp deploy/flame.service /etc/systemd/system/
+#   sudo systemctl enable --now flame
+#   journalctl -u flame -f
+#
+# It expects the binary, the config and the data directory under /opt/flame,
+# owned by a user called `hearth` that cannot log in.
+
+[Unit]
+Description=Hearth Flame (game server)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=hearth
+WorkingDirectory=/opt/flame
+ExecStart=/opt/flame/flame /opt/flame/flame.toml
+Restart=on-failure
+RestartSec=5
+# Nobody is typing at it: the console commands are for an interactive Flame,
+# and the log goes to the journal.
+StandardInput=null
+# It needs to write its certificate and its worlds, and nothing else.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/flame/data
+
+[Install]
+WantedBy=multi-user.target

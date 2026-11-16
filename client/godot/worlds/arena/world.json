@@ -1,0 +1,1266 @@
+{
+	"format": 1,
+	"kind": "world",
+	"name": "arena",
+	"spawn": {
+		"pos": [
+			0.0,
+			0.0,
+			13.0
+		],
+		"yaw": 180.0
+	},
+	"sky": {
+		"top": "#0a0d1c",
+		"horizon": "#2a2436",
+		"ground": "#06070c",
+		"ambient": "#4a5d8c",
+		"fog": 0.004,
+		"sun": {
+			"color": "#8fa8ff",
+			"energy": 0.22,
+			"angles": [
+				-50.0,
+				15.0
+			]
+		}
+	},
+	"kill_y": -25.0,
+	"objects": [
+		{
+			"name": "LobbyFloor",
+			"shape": "box",
+			"size": [
+				18.0,
+				1.0,
+				18.0
+			],
+			"pos": [
+				0.0,
+				-0.5,
+				11.0
+			],
+			"color": "#5d6068",
+			"body": "static",
+			"roughness": 0.8
+		},
+		{
+			"name": "LobbyWallS",
+			"shape": "box",
+			"size": [
+				18.0,
+				5.5,
+				0.6
+			],
+			"pos": [
+				0.0,
+				2.75,
+				20.0
+			],
+			"color": "#3f424a",
+			"body": "static",
+			"roughness": 0.75
+		},
+		{
+			"name": "LobbyWallW",
+			"shape": "box",
+			"size": [
+				0.6,
+				5.5,
+				18.0
+			],
+			"pos": [
+				-9.0,
+				2.75,
+				11.0
+			],
+			"color": "#3f424a",
+			"body": "static",
+			"roughness": 0.75
+		},
+		{
+			"name": "LobbyWallE",
+			"shape": "box",
+			"size": [
+				0.6,
+				5.5,
+				18.0
+			],
+			"pos": [
+				9.0,
+				2.75,
+				11.0
+			],
+			"color": "#3f424a",
+			"body": "static",
+			"roughness": 0.75
+		},
+		{
+			"name": "LobbyGateWall0",
+			"shape": "box",
+			"size": [
+				7.0,
+				5.5,
+				0.6
+			],
+			"pos": [
+				-5.5,
+				2.75,
+				2.0
+			],
+			"color": "#3f424a",
+			"body": "static",
+			"roughness": 0.75
+		},
+		{
+			"name": "LobbyGateWall1",
+			"shape": "box",
+			"size": [
+				7.0,
+				5.5,
+				0.6
+			],
+			"pos": [
+				5.5,
+				2.75,
+				2.0
+			],
+			"color": "#3f424a",
+			"body": "static",
+			"roughness": 0.75
+		},
+		{
+			"name": "GatePost0",
+			"shape": "box",
+			"size": [
+				0.5,
+				4.2,
+				0.9
+			],
+			"pos": [
+				-2.0,
+				2.1,
+				2.0
+			],
+			"color": "#596273",
+			"body": "static",
+			"metallic": 0.7,
+			"roughness": 0.35
+		},
+		{
+			"name": "GatePost1",
+			"shape": "box",
+			"size": [
+				0.5,
+				4.2,
+				0.9
+			],
+			"pos": [
+				2.0,
+				2.1,
+				2.0
+			],
+			"color": "#596273",
+			"body": "static",
+			"metallic": 0.7,
+			"roughness": 0.35
+		},
+		{
+			"name": "GateArch",
+			"shape": "box",
+			"size": [
+				4.9,
+				0.5,
+				0.9
+			],
+			"pos": [
+				0.0,
+				4.45,
+				2.0
+			],
+			"color": "#596273",
+			"body": "static",
+			"metallic": 0.7,
+			"roughness": 0.35
+		},
+		{
+			"name": "GateGlow",
+			"shape": "box",
+			"size": [
+				3.5,
+				0.12,
+				0.3
+			],
+			"pos": [
+				0.0,
+				4.1,
+				2.0
+			],
+			"color": "#9fd8ff",
+			"body": "none",
+			"emission": "#9fd8ff",
+			"emission_energy": 3.2,
+			"roughness": 0.3
+		},
+		{
+			"name": "GateLight",
+			"light": {
+				"color": "#9fd8ff",
+				"energy": 2.6,
+				"range": 12.0
+			},
+			"pos": [
+				0.0,
+				3.4,
+				2.6
+			]
+		},
+		{
+			"name": "GateStep",
+			"shape": "cylinder",
+			"size": [
+				7.0,
+				0.3,
+				7.0
+			],
+			"pos": [
+				0.0,
+				0.15,
+				4.4
+			],
+			"color": "#3f424a",
+			"body": "static",
+			"roughness": 0.7
+		},
+		{
+			"name": "LobbyBench0",
+			"shape": "box",
+			"size": [
+				1.0,
+				0.25,
+				4.0
+			],
+			"pos": [
+				-5.5,
+				0.52,
+				12.0
+			],
+			"color": "#5d6068",
+			"body": "static",
+			"roughness": 0.65
+		},
+		{
+			"name": "LobbyLeg0A",
+			"shape": "box",
+			"size": [
+				0.8,
+				0.5,
+				0.5
+			],
+			"pos": [
+				-5.5,
+				0.25,
+				10.4
+			],
+			"color": "#3f424a",
+			"body": "static",
+			"roughness": 0.7
+		},
+		{
+			"name": "LobbyLeg0B",
+			"shape": "box",
+			"size": [
+				0.8,
+				0.5,
+				0.5
+			],
+			"pos": [
+				-5.5,
+				0.25,
+				13.6
+			],
+			"color": "#3f424a",
+			"body": "static",
+			"roughness": 0.7
+		},
+		{
+			"name": "LobbyLamp0",
+			"shape": "sphere",
+			"size": [
+				0.5,
+				0.5,
+				0.5
+			],
+			"pos": [
+				-5.5,
+				3.6,
+				12.0
+			],
+			"color": "#9fd8ff",
+			"body": "none",
+			"emission": "#9fd8ff",
+			"emission_energy": 2.6,
+			"roughness": 0.3
+		},
+		{
+			"name": "LobbyLight0",
+			"light": {
+				"color": "#9fd8ff",
+				"energy": 2.0,
+				"range": 11.0
+			},
+			"pos": [
+				-5.5,
+				3.6,
+				12.0
+			]
+		},
+		{
+			"name": "LobbyBench1",
+			"shape": "box",
+			"size": [
+				1.0,
+				0.25,
+				4.0
+			],
+			"pos": [
+				5.5,
+				0.52,
+				12.0
+			],
+			"color": "#5d6068",
+			"body": "static",
+			"roughness": 0.65
+		},
+		{
+			"name": "LobbyLeg1A",
+			"shape": "box",
+			"size": [
+				0.8,
+				0.5,
+				0.5
+			],
+			"pos": [
+				5.5,
+				0.25,
+				10.4
+			],
+			"color": "#3f424a",
+			"body": "static",
+			"roughness": 0.7
+		},
+		{
+			"name": "LobbyLeg1B",
+			"shape": "box",
+			"size": [
+				0.8,
+				0.5,
+				0.5
+			],
+			"pos": [
+				5.5,
+				0.25,
+				13.6
+			],
+			"color": "#3f424a",
+			"body": "static",
+			"roughness": 0.7
+		},
+		{
+			"name": "LobbyLamp1",
+			"shape": "sphere",
+			"size": [
+				0.5,
+				0.5,
+				0.5
+			],
+			"pos": [
+				5.5,
+				3.6,
+				12.0
+			],
+			"color": "#9fd8ff",
+			"body": "none",
+			"emission": "#9fd8ff",
+			"emission_energy": 2.6,
+			"roughness": 0.3
+		},
+		{
+			"name": "LobbyLight1",
+			"light": {
+				"color": "#9fd8ff",
+				"energy": 2.0,
+				"range": 11.0
+			},
+			"pos": [
+				5.5,
+				3.6,
+				12.0
+			]
+		},
+		{
+			"name": "ArenaFloor",
+			"shape": "box",
+			"size": [
+				52.0,
+				1.0,
+				52.0
+			],
+			"pos": [
+				0.0,
+				-0.5,
+				-29.0
+			],
+			"color": "#5d6068",
+			"body": "static",
+			"roughness": 0.8
+		},
+		{
+			"name": "ArenaWallN",
+			"shape": "box",
+			"size": [
+				52.0,
+				5.5,
+				0.6
+			],
+			"pos": [
+				0.0,
+				2.75,
+				-55.0
+			],
+			"color": "#3f424a",
+			"body": "static",
+			"roughness": 0.75
+		},
+		{
+			"name": "ArenaWallS",
+			"shape": "box",
+			"size": [
+				52.0,
+				5.5,
+				0.6
+			],
+			"pos": [
+				0.0,
+				2.75,
+				-3.0
+			],
+			"color": "#3f424a",
+			"body": "static",
+			"roughness": 0.75
+		},
+		{
+			"name": "ArenaWallW",
+			"shape": "box",
+			"size": [
+				0.6,
+				5.5,
+				52.0
+			],
+			"pos": [
+				-26.0,
+				2.75,
+				-29.0
+			],
+			"color": "#3f424a",
+			"body": "static",
+			"roughness": 0.75
+		},
+		{
+			"name": "ArenaWallE",
+			"shape": "box",
+			"size": [
+				0.6,
+				5.5,
+				52.0
+			],
+			"pos": [
+				26.0,
+				2.75,
+				-29.0
+			],
+			"color": "#3f424a",
+			"body": "static",
+			"roughness": 0.75
+		},
+		{
+			"name": "RampA0",
+			"shape": "box",
+			"size": [
+				9.0,
+				0.4,
+				1.6
+			],
+			"pos": [
+				-12.0,
+				0.2,
+				-52.0
+			],
+			"color": "#3f424a",
+			"body": "static",
+			"roughness": 0.75
+		},
+		{
+			"name": "RampA1",
+			"shape": "box",
+			"size": [
+				9.0,
+				0.4,
+				1.6
+			],
+			"pos": [
+				-12.0,
+				0.6,
+				-50.4
+			],
+			"color": "#3f424a",
+			"body": "static",
+			"roughness": 0.75
+		},
+		{
+			"name": "RampA2",
+			"shape": "box",
+			"size": [
+				9.0,
+				0.4,
+				1.6
+			],
+			"pos": [
+				-12.0,
+				1.0,
+				-48.8
+			],
+			"color": "#3f424a",
+			"body": "static",
+			"roughness": 0.75
+		},
+		{
+			"name": "RampA3",
+			"shape": "box",
+			"size": [
+				9.0,
+				0.4,
+				1.6
+			],
+			"pos": [
+				-12.0,
+				1.4,
+				-47.2
+			],
+			"color": "#3f424a",
+			"body": "static",
+			"roughness": 0.75
+		},
+		{
+			"name": "RampA4",
+			"shape": "box",
+			"size": [
+				9.0,
+				0.4,
+				1.6
+			],
+			"pos": [
+				-12.0,
+				1.8,
+				-45.6
+			],
+			"color": "#3f424a",
+			"body": "static",
+			"roughness": 0.75
+		},
+		{
+			"name": "RampA5",
+			"shape": "box",
+			"size": [
+				9.0,
+				0.4,
+				1.6
+			],
+			"pos": [
+				-12.0,
+				2.2,
+				-44.0
+			],
+			"color": "#3f424a",
+			"body": "static",
+			"roughness": 0.75
+		},
+		{
+			"name": "RampA6",
+			"shape": "box",
+			"size": [
+				9.0,
+				0.4,
+				1.6
+			],
+			"pos": [
+				-12.0,
+				2.6,
+				-42.4
+			],
+			"color": "#3f424a",
+			"body": "static",
+			"roughness": 0.75
+		},
+		{
+			"name": "GalleryA",
+			"shape": "box",
+			"size": [
+				16.0,
+				0.6,
+				7.0
+			],
+			"pos": [
+				-12.0,
+				2.5,
+				-38.05
+			],
+			"color": "#5d6068",
+			"body": "static",
+			"roughness": 0.75
+		},
+		{
+			"name": "GalleryRailA",
+			"shape": "box",
+			"size": [
+				16.0,
+				0.9,
+				0.3
+			],
+			"pos": [
+				-12.0,
+				3.25,
+				-34.75
+			],
+			"color": "#596273",
+			"body": "static",
+			"metallic": 0.6,
+			"roughness": 0.45
+		},
+		{
+			"name": "BannerA",
+			"shape": "box",
+			"size": [
+				6.0,
+				2.6,
+				0.2
+			],
+			"pos": [
+				-12.0,
+				4.4,
+				-54.4
+			],
+			"color": "#d8554a",
+			"body": "none",
+			"emission": "#d8554a",
+			"emission_energy": 1.6,
+			"roughness": 0.3
+		},
+		{
+			"name": "EndLightA",
+			"light": {
+				"color": "#d8554a",
+				"energy": 2.2,
+				"range": 18.0
+			},
+			"pos": [
+				-12.0,
+				4.0,
+				-44.0
+			]
+		},
+		{
+			"name": "RampB0",
+			"shape": "box",
+			"size": [
+				9.0,
+				0.4,
+				1.6
+			],
+			"pos": [
+				12.0,
+				0.2,
+				-6.0
+			],
+			"color": "#3f424a",
+			"body": "static",
+			"roughness": 0.75
+		},
+		{
+			"name": "RampB1",
+			"shape": "box",
+			"size": [
+				9.0,
+				0.4,
+				1.6
+			],
+			"pos": [
+				12.0,
+				0.6,
+				-7.6
+			],
+			"color": "#3f424a",
+			"body": "static",
+			"roughness": 0.75
+		},
+		{
+			"name": "RampB2",
+			"shape": "box",
+			"size": [
+				9.0,
+				0.4,
+				1.6
+			],
+			"pos": [
+				12.0,
+				1.0,
+				-9.2
+			],
+			"color": "#3f424a",
+			"body": "static",
+			"roughness": 0.75
+		},
+		{
+			"name": "RampB3",
+			"shape": "box",
+			"size": [
+				9.0,
+				0.4,
+				1.6
+			],
+			"pos": [
+				12.0,
+				1.4,
+				-10.8
+			],
+			"color": "#3f424a",
+			"body": "static",
+			"roughness": 0.75
+		},
+		{
+			"name": "RampB4",
+			"shape": "box",
+			"size": [
+				9.0,
+				0.4,
+				1.6
+			],
+			"pos": [
+				12.0,
+				1.8,
+				-12.4
+			],
+			"color": "#3f424a",
+			"body": "static",
+			"roughness": 0.75
+		},
+		{
+			"name": "RampB5",
+			"shape": "box",
+			"size": [
+				9.0,
+				0.4,
+				1.6
+			],
+			"pos": [
+				12.0,
+				2.2,
+				-14.0
+			],
+			"color": "#3f424a",
+			"body": "static",
+			"roughness": 0.75
+		},
+		{
+			"name": "RampB6",
+			"shape": "box",
+			"size": [
+				9.0,
+				0.4,
+				1.6
+			],
+			"pos": [
+				12.0,
+				2.6,
+				-15.6
+			],
+			"color": "#3f424a",
+			"body": "static",
+			"roughness": 0.75
+		},
+		{
+			"name": "GalleryB",
+			"shape": "box",
+			"size": [
+				16.0,
+				0.6,
+				7.0
+			],
+			"pos": [
+				12.0,
+				2.5,
+				-19.95
+			],
+			"color": "#5d6068",
+			"body": "static",
+			"roughness": 0.75
+		},
+		{
+			"name": "GalleryRailB",
+			"shape": "box",
+			"size": [
+				16.0,
+				0.9,
+				0.3
+			],
+			"pos": [
+				12.0,
+				3.25,
+				-23.25
+			],
+			"color": "#596273",
+			"body": "static",
+			"metallic": 0.6,
+			"roughness": 0.45
+		},
+		{
+			"name": "BannerB",
+			"shape": "box",
+			"size": [
+				6.0,
+				2.6,
+				0.2
+			],
+			"pos": [
+				12.0,
+				4.4,
+				-3.6
+			],
+			"color": "#4a9ad8",
+			"body": "none",
+			"emission": "#4a9ad8",
+			"emission_energy": 1.6,
+			"roughness": 0.3
+		},
+		{
+			"name": "EndLightB",
+			"light": {
+				"color": "#4a9ad8",
+				"energy": 2.2,
+				"range": 18.0
+			},
+			"pos": [
+				12.0,
+				4.0,
+				-14.0
+			]
+		},
+		{
+			"name": "Cover0",
+			"shape": "box",
+			"size": [
+				2.6,
+				2.4,
+				2.6
+			],
+			"pos": [
+				9.0,
+				1.2,
+				-29.0
+			],
+			"color": "#5d6068",
+			"body": "static",
+			"roughness": 0.8,
+			"rot": [
+				0.0,
+				0.0,
+				0.0
+			]
+		},
+		{
+			"name": "Cover1",
+			"shape": "box",
+			"size": [
+				2.6,
+				1.2,
+				2.6
+			],
+			"pos": [
+				12.9443,
+				0.6,
+				-19.5954
+			],
+			"color": "#5d6068",
+			"body": "static",
+			"roughness": 0.8,
+			"rot": [
+				0.0,
+				36.0,
+				0.0
+			]
+		},
+		{
+			"name": "Cover2",
+			"shape": "box",
+			"size": [
+				2.6,
+				1.2,
+				2.6
+			],
+			"pos": [
+				2.7812,
+				0.6,
+				-20.4405
+			],
+			"color": "#5d6068",
+			"body": "static",
+			"roughness": 0.8,
+			"rot": [
+				0.0,
+				72.0,
+				0.0
+			]
+		},
+		{
+			"name": "Cover3",
+			"shape": "box",
+			"size": [
+				2.6,
+				2.4,
+				2.6
+			],
+			"pos": [
+				-4.9443,
+				1.2,
+				-13.7831
+			],
+			"color": "#5d6068",
+			"body": "static",
+			"roughness": 0.8,
+			"rot": [
+				0.0,
+				108.0,
+				0.0
+			]
+		},
+		{
+			"name": "Cover4",
+			"shape": "box",
+			"size": [
+				2.6,
+				1.2,
+				2.6
+			],
+			"pos": [
+				-7.2812,
+				0.6,
+				-23.7099
+			],
+			"color": "#5d6068",
+			"body": "static",
+			"roughness": 0.8,
+			"rot": [
+				0.0,
+				144.0,
+				0.0
+			]
+		},
+		{
+			"name": "Cover5",
+			"shape": "box",
+			"size": [
+				2.6,
+				1.2,
+				2.6
+			],
+			"pos": [
+				-16.0,
+				0.6,
+				-29.0
+			],
+			"color": "#5d6068",
+			"body": "static",
+			"roughness": 0.8,
+			"rot": [
+				0.0,
+				180.0,
+				0.0
+			]
+		},
+		{
+			"name": "Cover6",
+			"shape": "box",
+			"size": [
+				2.6,
+				2.4,
+				2.6
+			],
+			"pos": [
+				-7.2812,
+				1.2,
+				-34.2901
+			],
+			"color": "#5d6068",
+			"body": "static",
+			"roughness": 0.8,
+			"rot": [
+				0.0,
+				216.0,
+				0.0
+			]
+		},
+		{
+			"name": "Cover7",
+			"shape": "box",
+			"size": [
+				2.6,
+				1.2,
+				2.6
+			],
+			"pos": [
+				-4.9443,
+				0.6,
+				-44.2169
+			],
+			"color": "#5d6068",
+			"body": "static",
+			"roughness": 0.8,
+			"rot": [
+				0.0,
+				252.0,
+				0.0
+			]
+		},
+		{
+			"name": "Cover8",
+			"shape": "box",
+			"size": [
+				2.6,
+				1.2,
+				2.6
+			],
+			"pos": [
+				2.7812,
+				0.6,
+				-37.5595
+			],
+			"color": "#5d6068",
+			"body": "static",
+			"roughness": 0.8,
+			"rot": [
+				0.0,
+				288.0,
+				0.0
+			]
+		},
+		{
+			"name": "Cover9",
+			"shape": "box",
+			"size": [
+				2.6,
+				2.4,
+				2.6
+			],
+			"pos": [
+				12.9443,
+				1.2,
+				-38.4046
+			],
+			"color": "#5d6068",
+			"body": "static",
+			"roughness": 0.8,
+			"rot": [
+				0.0,
+				324.0,
+				0.0
+			]
+		},
+		{
+			"name": "Centre",
+			"shape": "cylinder",
+			"size": [
+				2.2,
+				4.0,
+				2.2
+			],
+			"pos": [
+				0.0,
+				2.0,
+				-29.0
+			],
+			"color": "#3f424a",
+			"body": "static",
+			"roughness": 0.6
+		},
+		{
+			"name": "CentreGlow",
+			"shape": "torus",
+			"size": [
+				2.4,
+				0.3,
+				3.0
+			],
+			"pos": [
+				0.0,
+				4.1,
+				-29.0
+			],
+			"color": "#9fd8ff",
+			"body": "none",
+			"emission": "#9fd8ff",
+			"emission_energy": 2.4,
+			"roughness": 0.3
+		},
+		{
+			"name": "CentreLight",
+			"light": {
+				"color": "#9fd8ff",
+				"energy": 2.8,
+				"range": 22.0
+			},
+			"pos": [
+				0.0,
+				5.0,
+				-29.0
+			]
+		},
+		{
+			"name": "RackA",
+			"shape": "box",
+			"size": [
+				3.2,
+				1.0,
+				0.8
+			],
+			"pos": [
+				9.0,
+				0.5,
+				-50.0
+			],
+			"color": "#596273",
+			"body": "static",
+			"metallic": 0.6,
+			"roughness": 0.5
+		},
+		{
+			"name": "Blaster A1",
+			"shape": "box",
+			"size": [
+				0.7,
+				0.18,
+				0.22
+			],
+			"pos": [
+				8.45,
+				1.15,
+				-50.0
+			],
+			"color": "#d8554a",
+			"body": "grabbable",
+			"roughness": 0.4,
+			"metallic": 0.3,
+			"mass": 1.2,
+			"reach": 0.6
+		},
+		{
+			"name": "Blaster A2",
+			"shape": "box",
+			"size": [
+				0.7,
+				0.18,
+				0.22
+			],
+			"pos": [
+				9.55,
+				1.15,
+				-50.0
+			],
+			"color": "#d8554a",
+			"body": "grabbable",
+			"roughness": 0.4,
+			"metallic": 0.3,
+			"mass": 1.2,
+			"reach": 0.6
+		},
+		{
+			"name": "RackB",
+			"shape": "box",
+			"size": [
+				3.2,
+				1.0,
+				0.8
+			],
+			"pos": [
+				-9.0,
+				0.5,
+				-8.0
+			],
+			"color": "#596273",
+			"body": "static",
+			"metallic": 0.6,
+			"roughness": 0.5
+		},
+		{
+			"name": "Blaster B1",
+			"shape": "box",
+			"size": [
+				0.7,
+				0.18,
+				0.22
+			],
+			"pos": [
+				-9.55,
+				1.15,
+				-8.0
+			],
+			"color": "#4a9ad8",
+			"body": "grabbable",
+			"roughness": 0.4,
+			"metallic": 0.3,
+			"mass": 1.2,
+			"reach": 0.6
+		},
+		{
+			"name": "Blaster B2",
+			"shape": "box",
+			"size": [
+				0.7,
+				0.18,
+				0.22
+			],
+			"pos": [
+				-8.45,
+				1.15,
+				-8.0
+			],
+			"color": "#4a9ad8",
+			"body": "grabbable",
+			"roughness": 0.4,
+			"metallic": 0.3,
+			"mass": 1.2,
+			"reach": 0.6
+		},
+		{
+			"name": "Prize",
+			"shape": "sphere",
+			"size": [
+				0.4,
+				0.4,
+				0.4
+			],
+			"pos": [
+				0.0,
+				4.6,
+				-29.0
+			],
+			"color": "#ffd479",
+			"body": "grabbable",
+			"roughness": 0.15,
+			"emission": "#ffd479",
+			"emission_energy": 2.4,
+			"mass": 0.8,
+			"reach": 1.2,
+			"locked": true
+		}
+	]
+}

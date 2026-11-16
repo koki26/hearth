@@ -1,5 +1,5 @@
 //! Opus for the voice channel: mono 48 kHz in 20 ms frames, as
-//! /protocol/PROTOCOL.md specifies.
+//! /docs/PROTOCOL.md specifies.
 
 use std::collections::HashMap;
 
@@ -67,6 +67,11 @@ impl Decoders {
 
     pub fn forget(&mut self, id: u16) {
         self.0.remove(&id);
+    }
+
+    /// Changing instance replaces every speaker at once.
+    pub fn clear(&mut self) {
+        self.0.clear();
     }
 }
 

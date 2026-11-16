@@ -1,0 +1,34 @@
+# The Fireplace as a service. See docs/RUNNING.md.
+#
+#   sudo cp deploy/fireplace.service /etc/systemd/system/
+#   sudo systemctl enable --now fireplace
+#   journalctl -u fireplace -f
+#
+# It expects the binary, the config and the data directory under
+# /opt/fireplace, owned by a user called `hearth` that cannot log in.
+#
+# The Fireplace speaks plain HTTP on purpose and belongs behind a TLS
+# terminator on the same machine (docs/ORACLE.md). Do not open its port to the
+# internet.
+
+[Unit]
+Description=Hearth Fireplace (accounts)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=hearth
+WorkingDirectory=/opt/fireplace
+ExecStart=/opt/fireplace/fireplace /opt/fireplace/fireplace.toml
+Restart=on-failure
+RestartSec=5
+StandardInput=null
+# Keys and accounts live in its data directory; nothing else is writable.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/fireplace/data
+
+[Install]
+WantedBy=multi-user.target

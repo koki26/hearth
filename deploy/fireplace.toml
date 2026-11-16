@@ -1,0 +1,27 @@
+# The Fireplace: the one server that knows who people are (docs/TRUST.md).
+# Every key is optional; the values below are the defaults.
+
+# What to listen on. Loopback, because the Fireplace speaks plain HTTP and
+# belongs behind a TLS terminator on the same machine (docs/ORACLE.md): a port
+# that is never open is a better last line than a firewall rule that might be
+# wrong. Change it only if your terminator is on another box.
+bind = "127.0.0.1"
+
+# TCP port for the account API. Plain HTTP on purpose: doing half of TLS here
+# would read as security without being any.
+port = 7800
+
+# Accounts, friends and the signing key live here. Created on first run; keep
+# it across restarts, and back it up -- losing key.pk8 signs everybody out at
+# once, and losing people.json loses everybody.
+data_dir = "data"
+
+# How many accounts this Fireplace will hold. Running out is then a refusal
+# with a reason rather than a full disk.
+max_accounts = 10000
+
+# New accounts allowed per hour from one address. Everybody in one house
+# shares an address, so this cannot be as mean as it sounds like it should
+# be: raise it while you are testing, lower it if somebody starts making
+# accounts in bulk.
+accounts_per_hour = 10

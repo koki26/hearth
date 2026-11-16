@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Hearth: a fire inside an arch. Cool stone and warm flame, the same
+       moonlight-and-torchlight palette the hub world is lit with. -->
+  <defs>
+    <linearGradient id="fire" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffe3b0"/>
+      <stop offset="0.55" stop-color="#ffb366"/>
+      <stop offset="1" stop-color="#ff7a2f"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.62" r="0.5">
+      <stop offset="0" stop-color="#ffb366" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#ffb366" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="#171c38"/>
+  <rect width="512" height="512" rx="112" fill="url(#glow)"/>
+  <g fill="none" stroke="#aec2ff" stroke-width="40" stroke-linecap="round">
+    <path d="M136 376 V240 A120 120 0 0 1 376 240 V376"/>
+    <path d="M104 396 H408"/>
+  </g>
+  <path d="M258 172 C266 218 300 238 312 272 C326 312 300 358 254 358 C210 358 188 324 194 292 C199 264 222 250 231 224 C240 246 250 251 256 243 C263 232 256 202 258 172 Z" fill="url(#fire)"/>
+  <path d="M254 256 C276 280 287 293 287 310 C287 328 272 341 254 341 C236 341 222 328 222 310 C222 293 233 280 254 256 Z" fill="#fff3d6" opacity="0.92"/>
+</svg>
