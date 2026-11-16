@@ -1138,13 +1138,17 @@ async fn admin_ban(
     let (me, by) = admin_of(&state, &headers)?;
     let id = target(&state, me, &body.handle)?;
     let ban = make_ban(&body, &by, token::now())?;
-    {
+    let handle = {
         let mut accounts = state.accounts.lock().unwrap();
         if accounts.get(id).is_some_and(|a| a.admin) {
             return Err(bad("take their admin away first"));
         }
         accounts.set_ban(id, Some(ban.clone()))?;
-    }
+        accounts.get(id).map(|a| a.handle.clone()).unwrap_or_default()
+    };
+    // Banned again (longer, shorter, for good): the addresses it already
+    // blocked end when the new ban does.
+    state.ip_bans.lock().unwrap().retime_by(&format!("automatic, for @{handle}"), ban.until);
     state.presence.lock().unwrap().clear(id);
     tracing::info!(admin = me, target = id, until = ban.until, "banned an account");
     Ok(Json(json!({ "ban": ban_json(&ban) })))

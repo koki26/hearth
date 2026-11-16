@@ -54,6 +54,19 @@ impl IpBans {
         gone
     }
 
+    /// Moves every ban set by `by` to end at `until` (0: for good).
+    pub fn retime_by(&mut self, by: &str, until: u64) -> usize {
+        let mut changed = 0;
+        for ban in self.bans.values_mut().filter(|b| b.by == by) {
+            ban.until = until;
+            changed += 1;
+        }
+        if changed > 0 {
+            self.save();
+        }
+        changed
+    }
+
     /// Bans in force; ones that ran out are dropped, address and all.
     pub fn list(&mut self, now: u64) -> &BTreeMap<String, Ban> {
         let before = self.bans.len();

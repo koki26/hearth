@@ -1091,6 +1091,11 @@ async fn a_banned_account_is_told_for_how_long_and_why_and_comes_back_when_unban
         .as_array().unwrap().iter().find(|a| a["handle"] == "bob").unwrap()["ban"]["until"]);
     let (_, bans) = call(&app, "GET", "/admin/bans", Some(&root), Value::Null).await;
     assert_eq!(bans[0]["ip"], "203.0.113.50");
+    // Made permanent: the blocked address is now for good as well.
+    let forever = json!({"handle": "bob", "minutes": 0, "reason": "cheating again"});
+    assert_eq!(call(&app, "POST", "/admin/ban", Some(&root), forever).await.0, StatusCode::OK);
+    let (_, bans) = call(&app, "GET", "/admin/bans", Some(&root), Value::Null).await;
+    assert_eq!(bans[0]["ban"]["until"], 0);
     // A wrong password from elsewhere blocks nothing.
     let wrong = json!({"handle": "bob", "password": "not the one"});
     call_from(&app, "203.0.113.51", "POST", "/sessions", None, wrong).await;
