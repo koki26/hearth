@@ -55,6 +55,10 @@ pub struct Claims {
     pub epoch: u64,
     pub iat: u64,
     pub exp: u64,
+    /// The session this belongs to (`Account::sessions`): ending the session
+    /// ends its tokens. Empty on tokens from before sessions were kept.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub sid: String,
 }
 
 impl Claims {
@@ -178,6 +182,11 @@ impl Keys {
 
     /// Mints a token. `kind` is `"access"` or `"refresh"`.
     pub fn mint(&self, account: u64, handle: &str, epoch: u64, kind: &str, now: u64) -> String {
+        self.mint_in(account, handle, epoch, kind, "", now)
+    }
+
+    /// The same, for one session.
+    pub fn mint_in(&self, account: u64, handle: &str, epoch: u64, kind: &str, sid: &str, now: u64) -> String {
         let claims = Claims {
             sub: account,
             handle: handle.to_owned(),
@@ -185,6 +194,7 @@ impl Keys {
             epoch,
             iat: now,
             exp: now + if kind == "refresh" { REFRESH_SECONDS } else { ACCESS_SECONDS },
+            sid: sid.to_owned(),
         };
         self.sign(&serde_json::to_vec(&claims).expect("claims are plain data"))
     }

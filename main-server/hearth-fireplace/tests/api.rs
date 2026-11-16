@@ -1198,3 +1198,68 @@ async fn a_banned_address_gets_the_banned_page_and_nothing_else() {
     assert_eq!(call(&app, "POST", "/admin/unban-ip", Some(&root), unban).await.0, StatusCode::OK);
     assert_eq!(call_from(&app, "198.51.100.23", "GET", "/health", None, Value::Null).await.0, StatusCode::OK);
 }
+
+#[tokio::test]
+async fn nobody_can_fill_an_inbox_or_send_a_flood() {
+    let (app, state) = fireplace_with_mail("mail-limits");
+    let account = |handle: &str, email: &str| {
+        json!({"handle": handle, "password": "a long one", "birthdate": "1990-05-04", "accept_terms": true, "email": email})
+    };
+    // Signing up with a stranger's address over and over, from many places:
+    // the stranger gets four emails this hour, then no more.
+    for n in 0..4 {
+        let ip = format!("203.0.113.{n}");
+        let (status, _) = call_from(&app, &ip, "POST", "/accounts", None, account(&format!("victim{n}"), "Victim@Example.org")).await;
+        assert_eq!(status, StatusCode::CREATED);
+    }
+    let (status, said) = call_from(&app, "203.0.113.99", "POST", "/accounts", None, account("victim9", "victim@example.org")).await;
+    assert_eq!(status, StatusCode::TOO_MANY_REQUESTS, "{said}");
+    assert!(state.accounts.lock().unwrap().by_handle("victim9").is_none(), "and no account is made");
+    assert_eq!(state.mail.sent().iter().filter(|s| s.to.eq_ignore_ascii_case("victim@example.org")).count(), 4);
+
+    // One place asking for email after email, to different addresses: eight an hour.
+    let mut made = 0;
+    for n in 0..12 {
+        let (status, _) = call_from(&app, "198.51.100.7", "POST", "/accounts", None, account(&format!("spam{n}"), &format!("s{n}@example.org"))).await;
+        made += usize::from(status == StatusCode::CREATED);
+    }
+    assert_eq!(made, 8);
+
+    // Asking for the confirmation again and again: refused well before an inbox fills.
+    let access = join(&app, "ada").await;
+    let mut resent = 0;
+    for _ in 0..10 {
+        resent += usize::from(call(&app, "POST", "/me/email/resend", Some(&access), Value::Null).await.0 == StatusCode::NO_CONTENT);
+    }
+    assert!(resent <= 3, "{resent}");
+}
+
+#[tokio::test]
+async fn a_session_can_be_seen_and_ended_on_its_own() {
+    let (app, _dir) = fireplace("sessions");
+    let phone = join(&app, "ada").await;
+    let (_, laptop) = call(&app, "POST", "/sessions", None, sign_in_as("ada")).await;
+    let laptop_access = laptop["access"].as_str().unwrap();
+
+    let (status, list) = call(&app, "GET", "/me/sessions", Some(laptop_access), Value::Null).await;
+    assert_eq!(status, StatusCode::OK);
+    let list = list.as_array().unwrap().clone();
+    assert_eq!(list.len(), 2);
+    assert_eq!(list.iter().filter(|s| s["current"] == true).count(), 1, "this one is marked");
+    let other = list.iter().find(|s| s["current"] == false).unwrap()["id"].as_str().unwrap().to_owned();
+
+    let (status, _) = call(&app, "POST", "/me/sessions/end", Some(laptop_access), json!({ "id": other })).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(call(&app, "GET", "/me", Some(&phone), Value::Null).await.0, StatusCode::UNAUTHORIZED, "ended at once");
+    assert_eq!(call(&app, "GET", "/me", Some(laptop_access), Value::Null).await.0, StatusCode::OK, "the rest carry on");
+
+    // Refreshing keeps the session; ending every other one leaves only this.
+    let (status, again) = call(&app, "POST", "/sessions/refresh", None, json!({ "refresh": laptop["refresh"] })).await;
+    assert_eq!(status, StatusCode::OK);
+    call(&app, "POST", "/sessions", None, sign_in_as("ada")).await;
+    let fresh = again["access"].as_str().unwrap();
+    let (_, ended) = call(&app, "POST", "/me/sessions/end", Some(fresh), json!({ "others": true })).await;
+    assert_eq!(ended["ended"], 1);
+    let (_, list) = call(&app, "GET", "/me/sessions", Some(fresh), Value::Null).await;
+    assert_eq!(list.as_array().unwrap().len(), 1);
+}

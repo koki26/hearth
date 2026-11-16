@@ -147,7 +147,36 @@ pub struct Fireplace {
     pub config: Config,
 }
 
+/// Emails one asking address may cause in an hour, whatever kind.
+pub const EMAILS_PER_SENDER_HOUR: u32 = 8;
+/// Emails one recipient may get: so nobody can fill a stranger's inbox by
+/// signing up or changing an address to theirs over and over.
+pub const EMAILS_PER_RECIPIENT_HOUR: u32 = 4;
+pub const EMAILS_PER_RECIPIENT_DAY: u32 = 10;
+/// Everything this Fireplace sends in an hour: a flood stops here before it
+/// costs the mail server its reputation.
+pub const EMAILS_PER_HOUR: u32 = 300;
+
 impl Fireplace {
+    /// Every email passes here first, and counts against all three limits:
+    /// the address asking (`from`, empty when the account itself is the
+    /// limit), the recipient, and the whole server. False: do not send.
+    /// Recipients are counted by a hash, so the counters hold no addresses.
+    pub fn may_email(&self, to: &str, from: &str, now: u64) -> bool {
+        let digest = ring::digest::digest(&ring::digest::SHA256, to.trim().to_lowercase().as_bytes());
+        let to: String = digest.as_ref()[..12].iter().map(|b| format!("{b:02x}")).collect();
+        let mut limits = self.limits.lock().unwrap();
+        let allowed = (from.is_empty()
+            || limits.allow(&format!("mail-from:{from}"), EMAILS_PER_SENDER_HOUR, limit::HOUR, now))
+            && limits.allow(&format!("mail-to:{to}"), EMAILS_PER_RECIPIENT_HOUR, limit::HOUR, now)
+            && limits.allow(&format!("mail-to-day:{to}"), EMAILS_PER_RECIPIENT_DAY, limit::DAY, now)
+            && limits.allow("mail-all", EMAILS_PER_HOUR, limit::HOUR, now);
+        if !allowed {
+            tracing::warn!("an email was not sent: over a sending limit");
+        }
+        allowed
+    }
+
     /// Reads what is on disk and makes what is missing. Called once, before
     /// anything is served.
     pub fn open(config: &Config) -> Result<Self> {

@@ -172,7 +172,7 @@ footer a:hover { color: var(--text); }
 .me-text b, .me-text small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .me-text small { color: var(--dim); font-size: .8rem; }
 
-.content { padding: 48px clamp(16px, 5vw, 64px) 64px; max-width: 820px; width: 100%; }
+.content { padding: 44px clamp(16px, 4vw, 56px) 64px; width: 100%; min-width: 0; }
 .view { animation: rise .45s var(--ease) both; }
 .view > header { margin-bottom: 28px; }
 .view > header h1 { display: flex; align-items: center; gap: 12px; }
@@ -182,7 +182,25 @@ footer a:hover { color: var(--text); }
 .card:nth-of-type(2) { animation-delay: .05s; } .card:nth-of-type(3) { animation-delay: .1s; }
 .card:nth-of-type(4) { animation-delay: .15s; }
 .stack label:first-child { margin-top: 0; }
-.stack input { max-width: 420px; }
+.pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 0 16px; }
+.pair label { margin-top: 0; }
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+.card-head h2 { margin: 0; }
+.card-head button { padding: 7px 12px; font-size: .86rem; }
+.actions.end { justify-content: flex-end; }
+button.danger.solid { background: var(--red); border-color: var(--red); color: #fff; font-weight: 600; }
+button.danger.solid:hover { background: color-mix(in srgb, var(--red) 88%, #000); }
+.places b .pill { margin-left: 8px; vertical-align: 1px; }
+.places b { font-weight: 500; display: block; }
+.code-row { margin-top: 14px; }
+.row .grow { flex: 1 1 240px; }
+.code-row .row .code-input { flex: 0 1 9.5em; min-width: 8em; }
+/* On Settings the code box is right there: no second one above it. */
+body[data-view="settings"] #confirm-banner { display: none; }
+.code-row .note { margin-bottom: 8px; }
+.sheet .stack label:first-child { margin-top: 4px; }
+.sheet h2 { margin-bottom: 6px; }
+.split > button { flex: none; }
 .split { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .split h2 { margin-bottom: 4px; }
 .danger-zone { border-color: color-mix(in srgb, var(--red) 30%, var(--line)); }
@@ -320,6 +338,9 @@ select:focus { outline: none; border-color: var(--fire); }
   .side .brand span, .me-text, .me .face { display: none; }
   .side .brand { padding: 0 4px; }
   .nav { display: flex; gap: 4px; }
+  .side { scrollbar-width: none; }
+  .side::-webkit-scrollbar { display: none; }
+  .code-row .row .code-input { flex: 1 1 100%; }
   .nav button { white-space: nowrap; padding: 8px 10px; }
   .nav button::before { display: none; }
   .me { margin: 0 0 0 auto; padding: 0; border: 0; background: none; }
@@ -328,6 +349,10 @@ select:focus { outline: none; border-color: var(--fire); }
   .ban-form { grid-template-columns: 1fr; }
   .acct-places { margin-left: 0; }
   .banner { flex-wrap: wrap; }
+  .banner form { flex-wrap: wrap; }
+  .banner form .code-input { flex: 1 1 8em; }
+  .actions.end { flex-direction: column-reverse; }
+  .actions.end button, .split > button { width: 100%; }
   h1 { font-size: 1.6rem; }
 }
 

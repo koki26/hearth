@@ -28,10 +28,13 @@ pub const REQUESTS_PER_HOUR: u32 = 60;
 /// by whoever made it big.
 const SWEEP_AT: usize = 10_000;
 
+pub const DAY: u64 = 24 * HOUR;
+
 #[derive(Default)]
 pub struct Limiter {
-    /// key -> (tries in this window, when the window started)
-    windows: HashMap<String, (u32, u64)>,
+    /// key -> (tries in this window, when the window started, how long it is).
+    /// Each keeps its own length, so a sweep never cuts a day short.
+    windows: HashMap<String, (u32, u64, u64)>,
 }
 
 impl Limiter {
@@ -39,11 +42,11 @@ impl Limiter {
     /// counts: otherwise the limit is only a limit on successes.
     pub fn allow(&mut self, key: &str, limit: u32, window: u64, now: u64) -> bool {
         if self.windows.len() > SWEEP_AT {
-            self.windows.retain(|_, (_, started)| now.saturating_sub(*started) < window);
+            self.windows.retain(|_, (_, started, length)| now.saturating_sub(*started) < *length);
         }
-        let entry = self.windows.entry(key.to_owned()).or_insert((0, now));
+        let entry = self.windows.entry(key.to_owned()).or_insert((0, now, window));
         if now.saturating_sub(entry.1) >= window {
-            *entry = (0, now);
+            *entry = (0, now, window);
         }
         entry.0 += 1;
         entry.0 <= limit
@@ -51,7 +54,7 @@ impl Limiter {
 
     /// For the test and for the log line: how many tries are on this key.
     pub fn tries(&self, key: &str) -> u32 {
-        self.windows.get(key).map(|(n, _)| *n).unwrap_or(0)
+        self.windows.get(key).map(|(n, _, _)| *n).unwrap_or(0)
     }
 }
 

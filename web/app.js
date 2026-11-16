@@ -183,21 +183,23 @@ async function load() {
   $("share").checked = me.share_location;
   $("policy-emails").checked = me.policy_emails;
   $("email").value = me.email || "";
+  $("email-box").hidden = !features.email;
+  $("email-pill").textContent = !me.email ? "none" : me.email_verified ? "confirmed" : "not confirmed";
+  $("email-pill").className = "pill " + (me.email_verified ? "ok" : "warn");
   $("email-state").textContent = !me.email ? "No email on this account yet: add one to play with it."
-    : me.email_verified ? "Confirmed." : "Waiting for the code we sent to " + me.email + " (see the box at the top).";
+    : me.email_verified ? "Your email is " + me.email + "." : "Waiting for the code we sent to " + me.email + ".";
+  if (me.email && !me.email_verified && $("email-code-form").hidden) showEmailCode(me.email);
+  if (me.email_verified) $("email-code-form").hidden = true;
   const unconfirmed = features.email_required && !me.email_verified;
   $("confirm-banner").hidden = !unconfirmed;
   $("email-flag").hidden = !unconfirmed;
   $("confirm-to").textContent = me.email || "your address";
   $("codes-left").textContent = me.recovery_codes_left + " of 8 left";
   $("two-step-card").hidden = !features.email;
-  $("two-step-state").textContent = me.two_factor ? "on" : "off";
-  $("two-step-state").className = "pill " + (me.two_factor ? "ok" : "");
-  $("two-step-go").textContent = me.two_factor ? "Turn off" : "Turn on";
-  $("two-step-go").className = me.two_factor ? "" : "main";
+  $("two-step").checked = !!me.two_factor;
   $("admin-nav").hidden = !me.admin;
   fillPlaces();
-  await loadFriends();
+  await Promise.all([loadFriends(), loadSessions()]);
 }
 
 function fillPlaces() {
@@ -343,7 +345,93 @@ $("pic-remove").onclick = async () => {
   catch (err) { say("pic-msg", err.message); }
 };
 
-// --- password, codes, email, data --------------------------------------------
+// --- one dialog for every question, instead of the browser's own boxes ------
+
+/**
+ * Asks, in the page's own dialog. With `password`, asks for it and resolves
+ * with what was typed; otherwise with true. Cancel resolves with null.
+ * `run(password)` may throw: the error is shown and the dialog stays open.
+ */
+function ask({ title, text = "", go = "OK", danger = false, password = false, run }) {
+  return new Promise((done) => {
+    $("ask-title").textContent = title;
+    $("ask-text").textContent = text;
+    $("ask-pw-row").hidden = !password;
+    $("ask-pw").value = "";
+    $("ask-pw").required = password;
+    $("ask-go").textContent = go;
+    $("ask-go").className = danger ? "danger solid" : "main";
+    say("ask-msg", "", true);
+    $("ask-box").hidden = false;
+    (password ? $("ask-pw") : $("ask-go")).focus();
+    const close = (value) => {
+      $("ask-box").hidden = true;
+      $("ask-form").onsubmit = null; $("ask-cancel").onclick = null; document.onkeydown = null;
+      done(value);
+    };
+    $("ask-cancel").onclick = () => close(null);
+    document.onkeydown = (e) => { if (e.key === "Escape") close(null); };
+    $("ask-form").onsubmit = async (e) => {
+      e.preventDefault();
+      const value = password ? $("ask-pw").value : true;
+      if (!run) return close(value);
+      $("ask-go").disabled = true;
+      try { await run(value); close(value); }
+      catch (err) { say("ask-msg", err.message); }
+      finally { $("ask-go").disabled = false; }
+    };
+  });
+}
+
+// --- security: sessions, two-step, password, codes ---------------------------
+
+async function loadSessions() {
+  const sessions = await api("GET", "/me/sessions");
+  $("sessions").replaceChildren(...sessions.map((s) => {
+    const li = el("li");
+    const text = el("div");
+    const name = el("b", null, s.client);
+    if (s.current) name.append(el("span", "pill ok", "this device"));
+    text.append(name, el("small", null, s.ip + " · signed in " + day(s.started) + " · last used " + when(s.last)));
+    li.append(text);
+    if (!s.current) {
+      const end = el("button", "small", "Sign out");
+      end.onclick = async () => {
+        end.disabled = true;
+        try { await api("POST", "/me/sessions/end", { id: s.id }); say("sessions-msg", s.client + " is signed out.", true); await loadSessions(); }
+        catch (err) { say("sessions-msg", err.message); end.disabled = false; }
+      };
+      li.append(end);
+    }
+    return li;
+  }));
+  $("end-others").hidden = sessions.length < 2;
+}
+
+$("end-others").onclick = async () => {
+  const yes = await ask({ title: "Sign out everywhere else?", text: "Every other device and the game will need to sign in again.", go: "Sign them out", danger: true });
+  if (!yes) return;
+  try {
+    const r = await api("POST", "/me/sessions/end", { others: true });
+    say("sessions-msg", r.ended === 1 ? "1 other session is signed out." : r.ended + " other sessions are signed out.", true);
+    await loadSessions();
+  } catch (err) { say("sessions-msg", err.message); }
+};
+
+$("two-step").onchange = async () => {
+  const on = $("two-step").checked;
+  $("two-step").checked = !on; // only changes once the password says so
+  const done = await ask({
+    title: on ? "Turn on two-step sign-in" : "Turn off two-step sign-in",
+    text: on ? "Every sign-in will need a code we email you." : "Only sign-ins from a new IP address will need a code.",
+    go: on ? "Turn on" : "Turn off", password: true,
+    run: (password) => api("POST", "/me/two-factor", { password, on }),
+  });
+  if (done == null) return;
+  $("two-step").checked = on;
+  say("two-step-msg", on ? "On. Every sign-in now needs a code from your email." : "Off. New places still need a code.", true);
+  await load();
+};
 
 $("pw-form").onsubmit = async (e) => {
   e.preventDefault();
@@ -351,17 +439,8 @@ $("pw-form").onsubmit = async (e) => {
     keep(await api("POST", "/me/password", { password: $("pw-old").value, new_password: $("pw-new").value }));
     $("pw-old").value = ""; $("pw-new").value = "";
     say("pw-msg", "Changed. You were signed out everywhere else, including the game.", true);
+    await loadSessions();
   } catch (err) { say("pw-msg", err.message); }
-};
-
-$("del-form").onsubmit = async (e) => {
-  e.preventDefault();
-  if (!confirm("Delete your Hearth account for good? This cannot be undone.")) return;
-  try {
-    await api("POST", "/me/delete", { password: $("del-pw").value });
-    signOut();
-    say("auth-msg", "Your account is gone.", true);
-  } catch (err) { say("del-msg", err.message); }
 };
 
 function showCodes(codes) {
@@ -371,51 +450,64 @@ function showCodes(codes) {
 }
 $("codes-done").onclick = () => { $("codes-box").hidden = true; $("codes").replaceChildren(); };
 
-$("codes-form").onsubmit = async (e) => {
-  e.preventDefault();
-  try {
-    const r = await api("POST", "/me/recovery", { password: $("codes-pw").value });
-    $("codes-pw").value = "";
-    say("codes-msg", "The old codes no longer work.", true);
-    showCodes(r.recovery_codes);
-    await load();
-  } catch (err) { say("codes-msg", err.message); }
+$("codes-new").onclick = async () => {
+  let codes = null;
+  const done = await ask({
+    title: "Make new recovery codes?", text: "The codes you have now stop working.", go: "Make new codes", password: true,
+    run: async (password) => { codes = (await api("POST", "/me/recovery", { password })).recovery_codes; },
+  });
+  if (done == null) return;
+  say("codes-msg", "", true);
+  showCodes(codes);
+  await load();
 };
 
-$("confirm-form").onsubmit = async (e) => {
-  e.preventDefault();
-  try {
-    await api("POST", "/me/email/confirm", { code: $("confirm-code").value.trim() });
-    $("confirm-code").value = "";
-    await load();
-    say("email-msg", "Confirmed.", true);
-  } catch (err) { say("confirm-msg", err.message); }
-};
-$("confirm-resend").onclick = async () => {
-  try { await api("POST", "/me/email/resend"); say("confirm-msg", "A new code is on its way.", true); }
-  catch (err) { say("confirm-msg", err.message); }
-};
+// --- settings: the email, with its code ----------------------------------------
 
-$("two-step-form").onsubmit = async (e) => {
-  e.preventDefault();
-  const on = !me.two_factor;
-  try {
-    await api("POST", "/me/two-factor", { password: $("two-step-pw").value, on });
-    $("two-step-pw").value = "";
-    await load();
-    say("two-step-msg", on ? "On. Every sign-in now needs a code from your email." : "Off. New places still need a code.", true);
-  } catch (err) { say("two-step-msg", err.message); }
-};
+function showEmailCode(address) {
+  $("email-code-form").hidden = false;
+  $("email-code-note").textContent = "Enter the 6-digit code we sent to " + address + ".";
+  $("email-code").value = "";
+  $("email-code").focus();
+}
 
 $("email-form").onsubmit = async (e) => {
   e.preventDefault();
-  try {
-    await api("POST", "/me/email", { password: $("email-pw").value, email: $("email").value.trim() });
-    $("email-pw").value = "";
-    say("email-msg", "Saved. Enter the code we sent to confirm it.", true);
-    await load();
-  } catch (err) { say("email-msg", err.message); }
+  const email = $("email").value.trim();
+  if (me.email && email.toLowerCase() === me.email.toLowerCase() && me.email_verified) {
+    return say("email-msg", "That is already your email.", true);
+  }
+  const done = await ask({
+    title: "Change your email", text: "We will send a code to " + email + " to make sure it is yours.",
+    go: "Send the code", password: true,
+    run: (password) => api("POST", "/me/email", { password, email }),
+  });
+  if (done == null) return;
+  say("email-msg", "", true);
+  await load();
+  showEmailCode(email);
 };
+
+async function confirmEmail(code, msg) {
+  try {
+    await api("POST", "/me/email/confirm", { code });
+    $("email-code-form").hidden = true;
+    $("email-code").value = ""; $("confirm-code").value = "";
+    await load();
+    say("email-msg", "Confirmed.", true);
+  } catch (err) { say(msg, err.message); }
+}
+$("email-code-form").onsubmit = (e) => { e.preventDefault(); confirmEmail($("email-code").value.trim(), "email-msg"); };
+$("confirm-form").onsubmit = (e) => { e.preventDefault(); confirmEmail($("confirm-code").value.trim(), "confirm-msg"); };
+
+async function resend(msg) {
+  try { await api("POST", "/me/email/resend"); say(msg, "A new code is on its way.", true); }
+  catch (err) { say(msg, err.message); }
+}
+$("email-resend").onclick = () => resend("email-msg");
+$("confirm-resend").onclick = () => resend("confirm-msg");
+
+// --- your data ------------------------------------------------------------------
 
 $("export").onclick = async () => {
   const data = await api("GET", "/me/export");
@@ -424,6 +516,17 @@ $("export").onclick = async () => {
   a.download = "hearth-account-" + data.handle + ".json";
   a.click();
   URL.revokeObjectURL(a.href);
+};
+
+$("delete-account").onclick = async () => {
+  const done = await ask({
+    title: "Delete your account?", text: "Your account, picture and friends list are deleted for good. This cannot be undone.",
+    go: "Delete for good", danger: true, password: true,
+    run: (password) => api("POST", "/me/delete", { password }),
+  });
+  if (done == null) return;
+  signOut();
+  say("auth-msg", "Your account is gone.", true);
 };
 
 // --- admin -------------------------------------------------------------------
@@ -482,7 +585,8 @@ function accountRow(a) {
     if (!a.ban) act(a.admin ? "Remove admin" : "Make admin", "", (b) => post(b, "/admin/set-admin", { handle: a.handle, admin: !a.admin },
       a.admin ? a.handle + " is no longer an admin." : a.handle + " is now an admin."));
     act("Delete", "danger", (b) => {
-      if (confirm("Delete " + a.handle + " for good? This cannot be undone.")) post(b, "/admin/delete", { handle: a.handle }, a.handle + " is deleted.");
+      ask({ title: "Delete " + a.handle + "?", text: "The account, its picture and its friends are deleted for good. This cannot be undone.", go: "Delete for good", danger: true })
+        .then((yes) => { if (yes) post(b, "/admin/delete", { handle: a.handle }, a.handle + " is deleted."); });
     });
   }
   head.append(actions);
@@ -559,6 +663,7 @@ function show(view) {
     if (b.dataset.view === view) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
   }
   for (const v of document.querySelectorAll(".view")) v.hidden = v.id !== "view-" + view;
+  document.body.dataset.view = view;
   if (view === "admin" && me && me.admin) loadAdmin();
   window.scrollTo(0, 0);
 }
@@ -575,7 +680,6 @@ function ageOn(date) {
 
 (async () => {
   try { features = { ...features, ...(await (await fetch("/features")).json()) }; } catch {}
-  $("email-nav").hidden = !features.email;
   $("policy-new-row").hidden = !features.email;
   $("new-email-row").hidden = !features.email_required;
   $("min-age").textContent = features.min_age;

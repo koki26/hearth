@@ -55,6 +55,8 @@ pub fn router(state: Arc<Fireplace>) -> Router {
         .route("/friends/remove", post(remove_friend))
         .route("/presence", post(report_presence))
         .route("/sessions/code", post(sign_in_with_code))
+        .route("/me/sessions", get(my_sessions))
+        .route("/me/sessions/end", post(end_session))
         .route("/me/email/confirm", post(confirm_email))
         .route("/me/email/resend", post(resend_confirmation))
         .route("/me/two-factor", post(set_two_factor))
@@ -105,6 +107,9 @@ async fn built_in_web(uri: axum::http::Uri) -> Response {
     ([(axum::http::header::CONTENT_TYPE, kind)], body).into_response()
 }
 
+/// What a refusal by `Fireplace::may_email` says.
+const TOO_MANY_EMAILS: &str = "too many emails to that address or from here: try again later";
+
 /// Sign-in codes an account can be sent in an hour.
 const CODES_PER_HOUR: u32 = 6;
 
@@ -124,7 +129,8 @@ fn needs_code(state: &Fireplace, id: u64, ip: &str, now: u64) -> Option<(String,
     if ask { address.map(|a| (a, new_place)) } else { None }
 }
 
-/// A code to type, and a link for when the page is gone.
+/// A code to type, and a link for when the page is gone. The caller has
+/// already asked `may_email`.
 fn send_confirmation(state: &Fireplace, id: u64, handle: &str, epoch: u64, address: &str, now: u64) {
     let link = format!("{}/verify/{}", state.mail.public_url, state.keys.mint_link("verify", id, epoch, address, now));
     let (_, code) = state.codes.lock().unwrap().issue("verify", id, address, now);
@@ -284,7 +290,12 @@ fn signed_in(state: &Fireplace, headers: &HeaderMap) -> Result<u64, ApiError> {
     }
     let accounts = state.accounts.lock().unwrap();
     match accounts.get(claims.sub) {
-        Some(account) if account.token_epoch == claims.epoch => Ok(claims.sub),
+        Some(account)
+            if account.token_epoch == claims.epoch
+                && (claims.sid.is_empty() || accounts.has_session(claims.sub, &claims.sid)) =>
+        {
+            Ok(claims.sub)
+        }
         _ => Err(unauthorised()),
     }
 }
@@ -347,6 +358,7 @@ struct NewAccount {
 async fn create_account(
     State(state): State<Arc<Fireplace>>,
     Caller(from): Caller,
+    headers: HeaderMap,
     Json(body): Json<NewAccount>,
 ) -> Result<Response, ApiError> {
     let now = token::now();
@@ -386,6 +398,9 @@ async fn create_account(
     {
         return Err(too_many("too many new accounts from here, try again later"));
     }
+    if state.mail.enabled() && !state.may_email(&address, &from, now) {
+        return Err(too_many(TOO_MANY_EMAILS));
+    }
     let hashed = hash_password(body.password).await?;
     let (codes, hashes) = accounts::new_recovery_codes();
     let (id, epoch) = {
@@ -405,7 +420,7 @@ async fn create_account(
     }
     tracing::info!(id, %handle, "a new account");
     // The codes are shown this once and never again: only their hashes stay.
-    let mut answer = tokens_for(&state, id, &handle, epoch, now);
+    let mut answer = open_session(&state, id, &handle, epoch, &from, &headers, now);
     answer["recovery_codes"] = json!(codes);
     Ok((StatusCode::CREATED, Json(answer)).into_response())
 }
@@ -413,6 +428,7 @@ async fn create_account(
 async fn sign_in(
     State(state): State<Arc<Fireplace>>,
     Caller(from): Caller,
+    headers: HeaderMap,
     Json(body): Json<SignIn>,
 ) -> Result<Response, ApiError> {
     let now = token::now();
@@ -473,6 +489,9 @@ async fn sign_in(
         if !state.limits.lock().unwrap().allow(&format!("code@{id}"), CODES_PER_HOUR, limit::HOUR, now) {
             return Err(too_many("that is a lot of codes: wait a while, then sign in again"));
         }
+        if !state.may_email(&address, &from, now) {
+            return Err(too_many(TOO_MANY_EMAILS));
+        }
         let (ticket, code) = state.codes.lock().unwrap().issue("sign-in", id, &from, now);
         state.mail.send(&address, state.mail.sign_in_letter(&handle, &from, &code, new_place));
         tracing::info!(id, new_place, "sent a sign-in code");
@@ -489,7 +508,7 @@ async fn sign_in(
     }
     state.presence.lock().unwrap().sweep(now);
     tracing::info!(id, %handle, "signed in");
-    Ok(Json(tokens_for(&state, id, &handle, epoch, now)).into_response())
+    Ok(Json(open_session(&state, id, &handle, epoch, &from, &headers, now)).into_response())
 }
 
 #[derive(serde::Deserialize)]
@@ -502,6 +521,8 @@ struct Refresh {
 /// than every evening.
 async fn refresh(
     State(state): State<Arc<Fireplace>>,
+    Caller(from): Caller,
+    headers: HeaderMap,
     Json(body): Json<Refresh>,
 ) -> Result<Json<Value>, ApiError> {
     let now = token::now();
@@ -510,24 +531,61 @@ async fn refresh(
         return Err(unauthorised());
     }
     let (handle, epoch) = {
-        let accounts = state.accounts.lock().unwrap();
+        let mut accounts = state.accounts.lock().unwrap();
         let account = accounts.get(claims.sub).ok_or_else(unauthorised)?;
         if account.token_epoch != claims.epoch {
             return Err(unauthorised());
         }
-        (account.handle.clone(), account.token_epoch)
+        let found = (account.handle.clone(), account.token_epoch);
+        // A session that was ended stays ended.
+        if !claims.sid.is_empty() && !accounts.touch_session(claims.sub, &claims.sid, &from, now) {
+            return Err(unauthorised());
+        }
+        found
     };
-    Ok(Json(tokens_for(&state, claims.sub, &handle, epoch, now)))
+    if claims.sid.is_empty() {
+        // From before sessions were kept: it becomes one now.
+        return Ok(Json(open_session(&state, claims.sub, &handle, epoch, &from, &headers, now)));
+    }
+    Ok(Json(tokens_for(&state, claims.sub, &handle, epoch, &claims.sid, now)))
 }
 
-pub(crate) fn tokens_for(state: &Fireplace, id: u64, handle: &str, epoch: u64, now: u64) -> Value {
+pub(crate) fn tokens_for(state: &Fireplace, id: u64, handle: &str, epoch: u64, sid: &str, now: u64) -> Value {
     json!({
         "id": id,
         "handle": handle,
-        "access": state.keys.mint(id, handle, epoch, "access", now),
-        "refresh": state.keys.mint(id, handle, epoch, "refresh", now),
+        "access": state.keys.mint_in(id, handle, epoch, "access", sid, now),
+        "refresh": state.keys.mint_in(id, handle, epoch, "refresh", sid, now),
         "expires_in": token::ACCESS_SECONDS,
     })
+}
+
+/// A new session for this sign-in, and its tokens.
+fn open_session(state: &Fireplace, id: u64, handle: &str, epoch: u64, ip: &str, headers: &HeaderMap, now: u64) -> Value {
+    let sid = state.accounts.lock().unwrap().start_session(id, &client_of(headers), ip, now);
+    tokens_for(state, id, handle, epoch, &sid, now)
+}
+
+/// What a device calls itself, made short: "Hearth game", "Firefox on Windows".
+fn client_of(headers: &HeaderMap) -> String {
+    let agent = headers.get(axum::http::header::USER_AGENT).and_then(|v| v.to_str().ok()).unwrap_or("");
+    if agent.contains("Godot") {
+        return "Hearth game".into();
+    }
+    let browser = [("Edg/", "Edge"), ("OPR/", "Opera"), ("Firefox/", "Firefox"), ("Chrome/", "Chrome"), ("Safari/", "Safari")]
+        .iter()
+        .find(|(mark, _)| agent.contains(mark))
+        .map(|(_, name)| *name);
+    let system = [("Windows", "Windows"), ("Android", "Android"), ("iPhone", "iPhone"), ("iPad", "iPad"), ("Mac OS", "macOS"), ("Linux", "Linux")]
+        .iter()
+        .find(|(mark, _)| agent.contains(mark))
+        .map(|(_, name)| *name);
+    match (browser, system) {
+        (Some(b), Some(s)) => format!("{b} on {s}"),
+        (Some(b), None) => b.to_owned(),
+        (None, Some(s)) => s.to_owned(),
+        (None, None) => "Unknown device".into(),
+    }
 }
 
 // --- signed in --------------------------------------------------------------
@@ -586,6 +644,7 @@ async fn export(State(state): State<Arc<Fireplace>>, headers: HeaderMap) -> Resu
         "terms_accepted": account.terms_accepted,
         "policy_emails": account.policy_emails,
         "places_signed_in_from": account.seen,
+        "sessions": account.sessions,
         "display_name_changes": account.renamed,
         "picture": (account.avatar > 0).then(|| format!("/avatars/{}.jpg", account.id)),
         "admin": account.admin,
@@ -610,6 +669,7 @@ struct SetEmail {
 /// a token left on somebody else's machine must not be enough to take it.
 async fn set_email(
     State(state): State<Arc<Fireplace>>,
+    Caller(from): Caller,
     headers: HeaderMap,
     Json(body): Json<SetEmail>,
 ) -> Result<Json<Value>, ApiError> {
@@ -629,6 +689,9 @@ async fn set_email(
         return Err(ApiError::new(StatusCode::UNAUTHORIZED, "that is not your password"));
     }
     let now = token::now();
+    if !state.may_email(address, &from, now) {
+        return Err(too_many(TOO_MANY_EMAILS));
+    }
     let (old, epoch) = {
         let mut accounts = state.accounts.lock().unwrap();
         let old = accounts.set_email(id, (!address.is_empty()).then_some(address), now)?;
@@ -636,7 +699,7 @@ async fn set_email(
     };
     // The old address hears about it, not the new one: that is the one an
     // account thief would want kept quiet.
-    if let Some(old) = old.filter(|old| !old.eq_ignore_ascii_case(address)) {
+    if let Some(old) = old.filter(|old| !old.eq_ignore_ascii_case(address) && state.may_email(old, "", now)) {
         state.mail.send(&old, state.mail.email_changed_letter(&handle));
     }
     if !address.is_empty() {
@@ -775,6 +838,7 @@ struct NewPassword {
 /// machine should not be enough to lock the owner out.
 async fn set_password(
     State(state): State<Arc<Fireplace>>,
+    Caller(from): Caller,
     headers: HeaderMap,
     Json(body): Json<NewPassword>,
 ) -> Result<Json<Value>, ApiError> {
@@ -793,7 +857,7 @@ async fn set_password(
     let epoch = state.accounts.lock().unwrap().get(id).ok_or_else(unauthorised)?.token_epoch;
     tracing::info!(id, "changed their password");
     // Every other sign-in just ended; this one carries on with fresh tokens.
-    Ok(Json(tokens_for(&state, id, &handle, epoch, token::now())))
+    Ok(Json(open_session(&state, id, &handle, epoch, &from, &headers, token::now())))
 }
 
 #[derive(serde::Deserialize)]
@@ -1299,6 +1363,7 @@ struct WithCode {
 async fn sign_in_with_code(
     State(state): State<Arc<Fireplace>>,
     Caller(from): Caller,
+    headers: HeaderMap,
     Json(body): Json<WithCode>,
 ) -> Result<Json<Value>, ApiError> {
     let now = token::now();
@@ -1319,7 +1384,7 @@ async fn sign_in_with_code(
         return Err(ApiError::new(StatusCode::FORBIDDEN, "this account is suspended"));
     }
     tracing::info!(id = pending.account, "signed in with a code");
-    Ok(Json(tokens_for(&state, pending.account, &handle, epoch, now)))
+    Ok(Json(open_session(&state, pending.account, &handle, epoch, &from, &headers, now)))
 }
 
 /// The code from the confirmation email, typed on the account page.
@@ -1338,7 +1403,11 @@ async fn confirm_email(
     Ok(Json(json!({ "email_verified": true })))
 }
 
-async fn resend_confirmation(State(state): State<Arc<Fireplace>>, headers: HeaderMap) -> Result<StatusCode, ApiError> {
+async fn resend_confirmation(
+    State(state): State<Arc<Fireplace>>,
+    Caller(from): Caller,
+    headers: HeaderMap,
+) -> Result<StatusCode, ApiError> {
     let id = signed_in(&state, &headers)?;
     let now = token::now();
     let (handle, epoch, email) = {
@@ -1351,6 +1420,9 @@ async fn resend_confirmation(State(state): State<Arc<Fireplace>>, headers: Heade
     };
     if !state.limits.lock().unwrap().allow(&format!("verify@{id}"), 3, limit::HOUR, now) {
         return Err(too_many("three a hour is plenty: check your spam folder"));
+    }
+    if !state.may_email(&email.address, &from, now) {
+        return Err(too_many(TOO_MANY_EMAILS));
     }
     send_confirmation(&state, id, &handle, epoch, &email.address, now);
     Ok(StatusCode::NO_CONTENT)
@@ -1384,4 +1456,58 @@ async fn set_two_factor(
     accounts.set_two_factor(id, body.on)?;
     tracing::info!(id, on = body.on, "changed two-step sign-in");
     Ok(Json(json!({ "two_factor": body.on })))
+}
+
+// --- sessions -------------------------------------------------------------------
+
+/// The session this request's token belongs to.
+fn current_session(state: &Fireplace, headers: &HeaderMap) -> Result<(u64, String), ApiError> {
+    let id = signed_in(state, headers)?;
+    let raw = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .unwrap_or("");
+    let sid = state.keys.verify(raw.trim(), token::now()).map(|c| c.sid).unwrap_or_default();
+    Ok((id, sid))
+}
+
+/// Everywhere this account is signed in, this one marked.
+async fn my_sessions(State(state): State<Arc<Fireplace>>, headers: HeaderMap) -> Result<Json<Value>, ApiError> {
+    let (id, sid) = current_session(&state, &headers)?;
+    let accounts = state.accounts.lock().unwrap();
+    let mut sessions = accounts.get(id).ok_or_else(unauthorised)?.sessions.clone();
+    sessions.sort_by_key(|s| std::cmp::Reverse(s.last));
+    Ok(Json(json!(sessions
+        .iter()
+        .map(|s| json!({
+            "id": s.id, "client": s.client, "ip": s.ip, "started": s.started, "last": s.last,
+            "current": s.id == sid,
+        }))
+        .collect::<Vec<_>>())))
+}
+
+#[derive(serde::Deserialize)]
+struct EndSession {
+    /// One session; empty, with `others`, every session but this one.
+    #[serde(default)]
+    id: String,
+    #[serde(default)]
+    others: bool,
+}
+
+/// Signs one session out, or every other one. Its tokens stop working at once.
+async fn end_session(
+    State(state): State<Arc<Fireplace>>,
+    headers: HeaderMap,
+    Json(body): Json<EndSession>,
+) -> Result<Json<Value>, ApiError> {
+    let (id, sid) = current_session(&state, &headers)?;
+    let ended = if body.others {
+        state.accounts.lock().unwrap().end_sessions(id, None, Some(&sid))
+    } else {
+        state.accounts.lock().unwrap().end_sessions(id, Some(body.id.trim()), None)
+    };
+    tracing::info!(id, ended, "ended sessions");
+    Ok(Json(json!({ "ended": ended })))
 }

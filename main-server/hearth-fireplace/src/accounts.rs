@@ -128,7 +128,24 @@ pub struct Account {
     /// new IP address.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub two_factor: bool,
+    /// Where it is signed in: one per sign-in, each ended on its own.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sessions: Vec<Session>,
 }
+
+/// One sign-in, kept while its refresh token could still be used.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Session {
+    pub id: String,
+    /// "Hearth game", "Firefox on Windows": what the device called itself.
+    pub client: String,
+    pub ip: String,
+    pub started: u64,
+    pub last: u64,
+}
+
+/// At most this many sessions per account; the one used longest ago goes.
+const MAX_SESSIONS: usize = 20;
 
 /// One place an account signed in from.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -287,6 +304,7 @@ impl Accounts {
                 admin: false,
                 ban: None,
                 two_factor: false,
+                sessions: Vec::new(),
             },
         );
         self.save();
@@ -411,6 +429,7 @@ impl Accounts {
         let account = self.by_id.get_mut(&me).ok_or(Refused::NoSuchAccount)?;
         account.password = hashed;
         account.token_epoch += 1;
+        account.sessions.clear();
         let epoch = account.token_epoch;
         self.save();
         Ok(epoch)
@@ -548,6 +567,7 @@ impl Accounts {
         let account = self.by_id.get_mut(&me).ok_or(Refused::NoSuchAccount)?;
         if ban.is_some() {
             account.token_epoch += 1;
+            account.sessions.clear();
         }
         account.ban = ban;
         self.save();
@@ -556,9 +576,58 @@ impl Accounts {
 
     /// Every token issued so far stops working.
     pub fn sign_out_everywhere(&mut self, me: u64) -> Result<(), Refused> {
-        self.by_id.get_mut(&me).ok_or(Refused::NoSuchAccount)?.token_epoch += 1;
+        let account = self.by_id.get_mut(&me).ok_or(Refused::NoSuchAccount)?;
+        account.token_epoch += 1;
+        account.sessions.clear();
         self.save();
         Ok(())
+    }
+
+    /// A new sign-in; its id goes into the tokens. Sessions nobody could
+    /// still refresh are dropped on the way.
+    pub fn start_session(&mut self, me: u64, client: &str, ip: &str, now: u64) -> String {
+        let Some(account) = self.by_id.get_mut(&me) else {
+            return String::new();
+        };
+        account.sessions.retain(|s| now.saturating_sub(s.last) < crate::token::REFRESH_SECONDS);
+        account.sessions.sort_by_key(|s| std::cmp::Reverse(s.last));
+        account.sessions.truncate(MAX_SESSIONS - 1);
+        let mut bytes = [0u8; 9];
+        ring::rand::SecureRandom::fill(&ring::rand::SystemRandom::new(), &mut bytes).expect("randomness");
+        let id: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
+        account.sessions.push(Session { id: id.clone(), client: client.to_owned(), ip: ip.to_owned(), started: now, last: now });
+        self.save();
+        id
+    }
+
+    /// Whether `sid` is still a session of this account.
+    pub fn has_session(&self, me: u64, sid: &str) -> bool {
+        self.by_id.get(&me).is_some_and(|a| a.sessions.iter().any(|s| s.id == sid))
+    }
+
+    /// A refresh: the session was used now, from here.
+    pub fn touch_session(&mut self, me: u64, sid: &str, ip: &str, now: u64) -> bool {
+        let Some(session) = self.by_id.get_mut(&me).and_then(|a| a.sessions.iter_mut().find(|s| s.id == sid)) else {
+            return false;
+        };
+        session.last = now;
+        session.ip = ip.to_owned();
+        self.save();
+        true
+    }
+
+    /// Ends one session, or with `keep`, every one but that.
+    pub fn end_sessions(&mut self, me: u64, only: Option<&str>, keep: Option<&str>) -> usize {
+        let Some(account) = self.by_id.get_mut(&me) else {
+            return 0;
+        };
+        let before = account.sessions.len();
+        account.sessions.retain(|s| only.is_some_and(|o| o != s.id) || keep.is_some_and(|k| k == s.id));
+        let ended = before - account.sessions.len();
+        if ended > 0 {
+            self.save();
+        }
+        ended
     }
 
     pub fn all(&self) -> impl Iterator<Item = &Account> {

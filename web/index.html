@@ -29,6 +29,7 @@
   <symbol id="i-check" viewBox="0 0 64 64"><path d="M14 33l12 12 24-26"/></symbol>
   <symbol id="i-globe" viewBox="0 0 64 64"><circle cx="32" cy="32" r="23"/><path d="M9 32h46M32 9c7 7 7 39 0 46c-7-7-7-39 0-46"/></symbol>
   <symbol id="i-gear" viewBox="0 0 64 64"><circle cx="32" cy="32" r="10"/><path d="M32 6v9M32 49v9M6 32h9M49 32h9M14 14l6 6M44 44l6 6M50 14l-6 6M20 44l-6 6"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 64 64"><path d="M32 8l20 7v15c0 13-9 22-20 26C21 52 12 43 12 30V15z"/><path d="M24 32l6 6 11-12"/></symbol>
   <symbol id="i-close" viewBox="0 0 64 64"><path d="M18 18l28 28M46 18L18 46"/></symbol>
   <symbol id="i-camera" viewBox="0 0 64 64"><path d="M8 22a5 5 0 0 1 5-5h8l4-6h14l4 6h8a5 5 0 0 1 5 5v24a5 5 0 0 1-5 5H13a5 5 0 0 1-5-5z"/><circle cx="32" cy="33" r="10"/></symbol>
 </svg>
@@ -176,9 +177,9 @@
       <li><button data-view="profile" aria-current="page"><svg class="ic"><use href="#i-user"/></svg>Profile</button></li>
       <li><button data-view="friends"><svg class="ic"><use href="#i-people"/></svg>Friends<b class="count" id="incoming-count" hidden></b></button></li>
       <li><button data-view="security"><svg class="ic"><use href="#i-lock"/></svg>Security</button></li>
-      <li id="email-nav" hidden><button data-view="email"><svg class="ic"><use href="#i-send"/></svg>Email<b class="count warn" id="email-flag" hidden>!</b></button></li>
+      <li><button data-view="settings"><svg class="ic"><use href="#i-gear"/></svg>Settings<b class="count warn" id="email-flag" hidden>!</b></button></li>
       <li><button data-view="data"><svg class="ic"><use href="#i-folder"/></svg>Your data</button></li>
-      <li id="admin-nav" hidden><button data-view="admin"><svg class="ic"><use href="#i-gear"/></svg>Admin</button></li>
+      <li id="admin-nav" hidden><button data-view="admin"><svg class="ic"><use href="#i-shield"/></svg>Admin</button></li>
     </ul>
     <div class="me">
       <span class="face" id="me-face"></span>
@@ -255,62 +256,70 @@
     </section>
 
     <section class="view" id="view-security" hidden>
-      <header><h1>Security</h1><p>Your password, your recovery codes, and everywhere you signed in from.</p></header>
+      <header><h1>Security</h1><p>Where you are signed in, how you sign in, and how to get back in.</p></header>
       <div class="card">
-        <h2>Where you signed in from</h2>
-        <p class="note">Kept for 90 days after each was last used, only for security: a new address needs a
-          code from your email. Not you? Change your password below.</p>
-        <ul class="places" id="places"></ul>
+        <div class="card-head">
+          <h2>Where you are signed in</h2>
+          <button class="danger" id="end-others">Sign out everywhere else</button>
+        </div>
+        <ul class="places" id="sessions"></ul>
+        <p class="msg" id="sessions-msg" role="status"></p>
       </div>
       <div class="card" id="two-step-card" hidden>
-        <h2>Two-step sign-in <span class="pill" id="two-step-state"></span></h2>
-        <p class="note">With it on, every sign-in needs a code we email you, not just the password. A sign-in
-          from a new IP address always needs one, on or off.</p>
-        <form id="two-step-form" class="stack">
-          <label for="two-step-pw">Password</label>
-          <input id="two-step-pw" type="password" autocomplete="current-password" required>
-          <div class="actions"><button class="main" id="two-step-go">Turn on</button></div>
-          <p class="msg" id="two-step-msg" role="status"></p>
-        </form>
+        <label class="switch"><input type="checkbox" id="two-step" role="switch"><span class="track"></span>
+          <span><b>Two-step sign-in</b><small>Every sign-in needs a code we email you, not just the password.
+            A sign-in from a new IP address always needs one, on or off.</small></span></label>
+        <p class="msg" id="two-step-msg" role="status"></p>
       </div>
       <div class="card">
         <h2>Change password</h2>
         <form id="pw-form" class="stack">
-          <label for="pw-old">Current password</label>
-          <input id="pw-old" type="password" autocomplete="current-password" required>
-          <label for="pw-new">New password</label>
-          <input id="pw-new" type="password" autocomplete="new-password" required minlength="8" maxlength="128">
+          <div class="pair">
+            <div><label for="pw-old">Current password</label>
+              <input id="pw-old" type="password" autocomplete="current-password" required></div>
+            <div><label for="pw-new">New password</label>
+              <input id="pw-new" type="password" autocomplete="new-password" required minlength="8" maxlength="128"></div>
+          </div>
           <div class="actions"><button class="main">Change password</button></div>
           <p class="msg" id="pw-msg" role="status"></p>
         </form>
       </div>
+      <div class="card split">
+        <div><h2>Recovery codes <span class="pill" id="codes-left"></span></h2>
+          <p class="note">Each gets you back in once if you forget your password. A new set turns the old ones off.</p></div>
+        <button id="codes-new">Make a new set</button>
+      </div>
+      <p class="msg" id="codes-msg" role="status"></p>
       <div class="card">
-        <h2>Recovery codes <span class="pill" id="codes-left"></span></h2>
-        <p class="note">Making a new set turns every old code off.</p>
-        <form id="codes-form" class="stack">
-          <label for="codes-pw">Password</label>
-          <input id="codes-pw" type="password" autocomplete="current-password" required>
-          <div class="actions"><button>Make a new set</button></div>
-          <p class="msg" id="codes-msg" role="status"></p>
-        </form>
+        <h2>IP addresses you signed in from</h2>
+        <p class="note">Kept for 90 days after each was last used, only for security: a new one needs a code
+          from your email. Not you? Change your password and sign out everywhere else.</p>
+        <ul class="places" id="places"></ul>
       </div>
     </section>
 
-    <section class="view" id="view-email" hidden>
-      <header><h1>Email</h1>
-        <p>Needed to confirm sign-ins from new places and for password resets; also short notices when your
-          password or email changes, and, only if you ask, word of changes to the terms or privacy notice.
-          Never marketing.</p></header>
+    <section class="view" id="view-settings" hidden>
+      <header><h1>Settings</h1><p>Your email address, and what we may send to it.</p></header>
       <div class="card" id="email-box">
+        <h2>Email <span class="pill" id="email-pill"></span></h2>
         <p class="state" id="email-state"></p>
-        <form id="email-form" class="stack">
-          <label for="email">Email address</label>
-          <input id="email" type="email" autocomplete="email" maxlength="254" required>
-          <label for="email-pw">Password</label>
-          <input id="email-pw" type="password" autocomplete="current-password" required>
-          <div class="actions row"><button class="main" id="email-save">Save email</button></div>
-          <p class="msg" id="email-msg" role="status"></p>
+        <form class="row" id="email-form">
+          <div class="field grow"><svg class="ic"><use href="#i-send"/></svg>
+            <input id="email" type="email" autocomplete="email" maxlength="254" required aria-label="Email address"></div>
+          <button class="main" id="email-save">Change email</button>
         </form>
+        <form class="code-row" id="email-code-form" hidden>
+          <p class="note" id="email-code-note"></p>
+          <div class="row">
+            <input id="email-code" class="code-input small" inputmode="numeric" autocomplete="one-time-code"
+              pattern="[0-9]{6}" maxlength="6" required placeholder="000000" aria-label="Code from the email">
+            <button class="main">Confirm</button>
+            <button type="button" id="email-resend">Send again</button>
+          </div>
+        </form>
+        <p class="msg" id="email-msg" role="status"></p>
+        <p class="note">Used to confirm sign-ins from new places, for password resets, and for short notices
+          when your password or email changes. Never marketing.</p>
       </div>
       <div class="card">
         <label class="switch"><input type="checkbox" id="policy-emails" role="switch"><span class="track"></span>
@@ -324,20 +333,16 @@
       <header><h1>Your data</h1><p>Take it with you, or take it away.</p></header>
       <div class="card split">
         <div><h2>Download my data</h2><p class="note">Everything this server keeps about your account, sign-in
-          addresses included, as a JSON file.</p></div>
+          addresses and sessions included, as a JSON file.</p></div>
         <button id="export"><svg class="ic"><use href="#i-folder"/></svg>Download</button>
       </div>
-      <div class="card danger-zone">
-        <h2>Delete account</h2>
-        <p class="note">This removes your account, your picture and your friends list for good. Servers keep
-          nothing that points back to you.</p>
-        <form id="del-form" class="stack">
-          <label for="del-pw">Password</label>
-          <input id="del-pw" type="password" autocomplete="current-password" required>
-          <div class="actions"><button class="danger">Delete my account</button></div>
-          <p class="msg" id="del-msg" role="status"></p>
-        </form>
+      <div class="card split danger-zone">
+        <div><h2>Delete account</h2>
+          <p class="note">Removes your account, your picture and your friends list for good. Servers keep
+            nothing that points back to you.</p></div>
+        <button class="danger" id="delete-account">Delete my account</button>
       </div>
+      <p class="msg" id="del-msg" role="status"></p>
       <footer><a href="/privacy">Privacy</a><a href="/terms">Terms</a></footer>
     </section>
 
@@ -374,6 +379,22 @@
     <ul class="rail-list" id="rail"></ul>
     <button class="wide quiet" data-view="friends" id="rail-more"><svg class="ic"><use href="#i-plus"/></svg>Add friends</button>
   </aside>
+</div>
+
+<!-- Every "are you sure" and every "enter your password", instead of the browser's own boxes. -->
+<div class="overlay" id="ask-box" hidden>
+  <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="ask-title">
+    <h2 id="ask-title"></h2>
+    <p class="note" id="ask-text"></p>
+    <form id="ask-form" class="stack">
+      <div id="ask-pw-row">
+        <label for="ask-pw">Password</label>
+        <input id="ask-pw" type="password" autocomplete="current-password">
+      </div>
+      <p class="msg" id="ask-msg" role="status"></p>
+      <div class="actions row end"><button type="button" id="ask-cancel">Cancel</button><button id="ask-go" class="main">OK</button></div>
+    </form>
+  </section>
 </div>
 
 <!-- An admin's ban: who, for how long, why. -->

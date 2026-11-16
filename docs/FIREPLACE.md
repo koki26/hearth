@@ -88,7 +88,19 @@ used, and every time once `POST /me/two-factor {"password", "on": true}` has
 turned on two-step sign-in -- answers `403 {"code_needed": true, "ticket",
 "new_place"}` and emails a code. `POST /sessions/code {"ticket", "code"}` from
 the same address then answers with the tokens, as `/sessions` would have.
-Codes last 15 minutes, work once, and die after 5 wrong tries. A suspended account's sign-in
+Codes last 15 minutes, work once, and die after 5 wrong tries.
+
+Every sign-in is a **session** (`GET /me/sessions`: device, IP, started, last
+used, which one is asking). `POST /me/sessions/end {"id"}` signs one out and
+`{"others": true}` every other one; their tokens stop working at once. A new
+password, a ban or an admin's sign-out ends them all.
+
+**Email limits.** Whatever the reason, an email is only sent if the address
+asking has caused fewer than 8 this hour, the recipient has had fewer than 4
+this hour and 10 today, and the whole server fewer than 300 this hour
+(`Fireplace::may_email`). Otherwise the request is refused with `429` --
+or, for a password reset, silently, so it still says nothing about who has
+an account. A suspended account's sign-in
 answers `403` with `"banned": {"until", "until_text", "reason"}`, and a
 blocked IP gets the same shape (or a page, to a browser) for every request.
 A display name changes at most twice in 30 days (`429` after that).

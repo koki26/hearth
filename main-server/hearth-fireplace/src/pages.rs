@@ -159,7 +159,9 @@ async fn ask_for_reset(
             .collect()
     };
     for (id, handle, epoch, address) in found {
-        if !state.limits.lock().unwrap().allow(&format!("reset@{id}"), RESETS_PER_ACCOUNT, limit::HOUR, now) {
+        if !state.limits.lock().unwrap().allow(&format!("reset@{id}"), RESETS_PER_ACCOUNT, limit::HOUR, now)
+            || !state.may_email(&address, &from, now)
+        {
             continue;
         }
         let link =
@@ -268,7 +270,7 @@ pub fn change_password(state: &Fireplace, id: u64, epoch: Option<u64>, hashed: S
         }
         notify
     };
-    if let Some((address, handle)) = notify {
+    if let Some((address, handle)) = notify.filter(|(address, _)| state.may_email(address, "", token::now())) {
         state.mail.send(&address, state.mail.password_changed_letter(&handle));
     }
     true
@@ -431,6 +433,12 @@ pub fn privacy_html(config: &crate::Config) -> String {
         row("Handle, display name, when the account was made", "Your account, and what other players see", contract, until_deleted),
         row("Password and recovery codes, only as one-way hashes", "Signing in, and getting back in", contract, until_deleted),
         row("Friends, friend requests, whether friends may see which server you are on", "Friends", contract, until_deleted),
+        row(
+            "Where you are signed in: each session's device type (like \"Firefox on Windows\"), IP address, and when it started and was last used",
+            "So you can see your sessions and sign any of them out (Security)",
+            security,
+            "Until you sign it out, or 30 days after it was last used",
+        ),
         row("Whether two-step sign-in is on", "Asking for a code from your email on every sign-in", contract, until_deleted),
         row("When you last changed your display name (the last 30 days)", "Display names change at most twice a month, so nobody can hide behind a new one every day", security, "30 days"),
         row("Your picture, if you upload one", "Shown to other players next to your name; anyone with its link can see it", contract, "Until you remove it or delete your account"),
@@ -475,6 +483,8 @@ pub fn privacy_html(config: &crate::Config) -> String {
          at least {age} (Art. 8). Used for that check and thrown away: never stored, never logged.</li>\
          <li>Which server you are on: kept in memory only, if you share it, for 2 minutes after your game last \
          said so, and gone on restart.</li>\
+         <li>Counts of how many emails went to an address, so nobody can use this server to flood an inbox: \
+         memory only, keyed by a one-way hash of the address rather than the address, for at most a day.</li>\
          <li>The 6-digit codes we email you: kept in memory only, as a one-way hash, for 15 minutes or until \
          used, and gone on restart.</li>\
          <li>Counters of attempts per IP address, which stop people guessing passwords: memory only, at most \
