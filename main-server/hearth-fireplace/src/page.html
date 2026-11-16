@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<title>Hearth Account</title>
+<style>
+  :root {
+    --bg: #17130f; --panel: #221c16; --line: #3a3027; --text: #f1e7da; --dim: #a8998a;
+    --amber: #e6b45a; --red: #e6786e; --green: #5ac878;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #f6f1ea; --panel: #fffaf3; --line: #e2d6c6; --text: #2b241d; --dim: #7a6b5c;
+            --amber: #b07a1c; --red: #b8483e; --green: #2f8a4c; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  h1 span { color: var(--amber); }
+  h2 { font-size: 1.05rem; margin: 0 0 12px; }
+  .sub { color: var(--dim); margin: 0 0 24px; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+            padding: 18px; margin-bottom: 16px; }
+  label { display: block; font-size: .85rem; color: var(--dim); margin: 10px 0 4px; }
+  input { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line);
+          background: var(--bg); color: var(--text); font: inherit; }
+  input:focus-visible, button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+  button { padding: 9px 16px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg);
+           color: var(--text); font: inherit; cursor: pointer; }
+  button.main { background: var(--amber); border-color: var(--amber); color: #1b140c; font-weight: 600; }
+  button.danger { color: var(--red); border-color: var(--red); }
+  button:disabled { opacity: .5; cursor: default; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .row input { flex: 1; min-width: 0; }
+  .actions { margin-top: 14px; }
+  .msg { min-height: 1.5em; margin: 8px 0 0; font-size: .9rem; }
+  .msg.bad { color: var(--red); } .msg.good { color: var(--green); }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { display: flex; justify-content: space-between; align-items: center; gap: 8px;
+       padding: 10px 0; border-top: 1px solid var(--line); }
+  li:first-child { border-top: 0; }
+  .who b { display: block; }
+  .who small { color: var(--dim); }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--dim);
+         margin-right: 6px; vertical-align: middle; }
+  .dot.on { background: var(--green); }
+  .empty { color: var(--dim); font-size: .9rem; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 4px; }
+  .tabs button[aria-selected="true"] { border-color: var(--amber); color: var(--amber); }
+  .top { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
+  [hidden] { display: none !important; }
+  .check { display: flex; gap: 10px; align-items: center; cursor: pointer; }
+  .check input { width: auto; }
+</style>
+</head>
+<body>
+<main>
+  <div class="top">
+    <div>
+      <h1><span>Hearth</span> account</h1>
+      <p class="sub" id="whoami">Sign in to manage your account.</p>
+    </div>
+    <button id="signout" hidden>Sign out</button>
+  </div>
+
+  <!-- Signed out -->
+  <section id="auth">
+    <div class="tabs" role="tablist">
+      <button role="tab" aria-selected="true" id="tab-in">Sign in</button>
+      <button role="tab" aria-selected="false" id="tab-new">Create account</button>
+    </div>
+    <form id="auth-form">
+      <label for="handle">Handle</label>
+      <input id="handle" autocomplete="username" required maxlength="20">
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" required minlength="8" maxlength="128">
+      <div class="actions"><button class="main" id="auth-go">Sign in</button></div>
+      <p class="msg" id="auth-msg" role="status"></p>
+    </form>
+  </section>
+
+  <!-- Signed in -->
+  <div id="signed-in" hidden>
+    <section>
+      <h2>Display name</h2>
+      <form class="row" id="name-form">
+        <input id="display" maxlength="32" aria-label="Display name" required>
+        <button class="main">Save</button>
+      </form>
+      <p class="msg" id="name-msg" role="status"></p>
+      <label class="check"><input type="checkbox" id="share"> Let friends see which server I am on</label>
+    </section>
+
+    <section>
+      <h2>Friends</h2>
+      <form class="row" id="add-form">
+        <input id="add-handle" placeholder="Add by handle" aria-label="Friend's handle" maxlength="20" required>
+        <button>Add</button>
+      </form>
+      <p class="msg" id="friend-msg" role="status"></p>
+      <div id="incoming-box" hidden>
+        <label>Asking to be your friend</label>
+        <ul id="incoming"></ul>
+      </div>
+      <label>Friends</label>
+      <ul id="friends"></ul>
+      <div id="outgoing-box" hidden>
+        <label>Waiting for them</label>
+        <ul id="outgoing"></ul>
+      </div>
+    </section>
+
+    <section>
+      <h2>Password</h2>
+      <form id="pw-form">
+        <label for="pw-old">Current password</label>
+        <input id="pw-old" type="password" autocomplete="current-password" required>
+        <label for="pw-new">New password</label>
+        <input id="pw-new" type="password" autocomplete="new-password" required minlength="8" maxlength="128">
+        <div class="actions"><button class="main">Change password</button></div>
+        <p class="msg" id="pw-msg" role="status"></p>
+      </form>
+    </section>
+
+    <section>
+      <h2>Delete account</h2>
+      <p class="empty">This removes your account and your friends list for good. Servers keep nothing
+        that points back to you.</p>
+      <form id="del-form">
+        <label for="del-pw">Password</label>
+        <input id="del-pw" type="password" autocomplete="current-password" required>
+        <div class="actions"><button class="danger">Delete my account</button></div>
+        <p class="msg" id="del-msg" role="status"></p>
+      </form>
+    </section>
+  </div>
+</main>
+
+<script>
+"use strict";
+// Tokens live for this tab only. Everything below talks to the same JSON
+// routes the game uses (docs/FIREPLACE.md).
+const store = {
+  get(k) { try { return sessionStorage.getItem(k) || ""; } catch { return ""; } },
+  set(k, v) { try { v ? sessionStorage.setItem(k, v) : sessionStorage.removeItem(k); } catch {} },
+};
+const $ = (id) => document.getElementById(id);
+let creating = false;
+
+async function api(method, path, body) {
+  const headers = { "Content-Type": "application/json" };
+  const token = store.get("access");
+  if (token) headers.Authorization = "Bearer " + token;
+  let res = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : undefined });
+  // An access token lasts an hour; trade the refresh one for another once.
+  if (res.status === 401 && store.get("refresh") && path !== "/sessions/refresh") {
+    const again = await fetch("/sessions/refresh", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh: store.get("refresh") }) });
+    if (again.ok) {
+      keep(await again.json());
+      headers.Authorization = "Bearer " + store.get("access");
+      res = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : undefined });
+    }
+  }
+  const data = res.status === 204 ? {} : await res.json().catch(() => ({}));
+  if (!res.ok) {
+    if (res.status === 401 && path !== "/sessions" && path !== "/me/password" && path !== "/me/delete") signOut();
+    throw new Error(data.error || "something went wrong");
+  }
+  return data;
+}
+
+function keep(tokens) { store.set("access", tokens.access); store.set("refresh", tokens.refresh); }
+function say(id, text, good) { const el = $(id); el.textContent = text; el.className = "msg " + (good ? "good" : "bad"); }
+
+function signOut() {
+  store.set("access", ""); store.set("refresh", "");
+  $("signed-in").hidden = true; $("auth").hidden = false; $("signout").hidden = true;
+  $("whoami").textContent = "Sign in to manage your account.";
+}
+
+function setTab(newAccount) {
+  creating = newAccount;
+  $("tab-in").setAttribute("aria-selected", String(!newAccount));
+  $("tab-new").setAttribute("aria-selected", String(newAccount));
+  $("auth-go").textContent = newAccount ? "Create account" : "Sign in";
+  $("password").autocomplete = newAccount ? "new-password" : "current-password";
+  say("auth-msg", "", true);
+}
+$("tab-in").onclick = () => setTab(false);
+$("tab-new").onclick = () => setTab(true);
+
+$("auth-form").onsubmit = async (e) => {
+  e.preventDefault();
+  try {
+    keep(await api("POST", creating ? "/accounts" : "/sessions",
+      { handle: $("handle").value.trim(), password: $("password").value }));
+    $("password").value = "";
+    await load();
+  } catch (err) { say("auth-msg", err.message); }
+};
+
+$("signout").onclick = signOut;
+
+async function load() {
+  const me = await api("GET", "/me");
+  $("auth").hidden = true; $("signed-in").hidden = false; $("signout").hidden = false;
+  $("whoami").textContent = "Signed in as @" + me.handle;
+  $("display").value = me.display_name;
+  $("share").checked = me.share_location;
+  await loadFriends();
+}
+
+function person(p, extra) {
+  const li = document.createElement("li");
+  const who = document.createElement("div"); who.className = "who";
+  const name = document.createElement("b");
+  if (extra && "online" in extra) {
+    const dot = document.createElement("span"); dot.className = "dot" + (extra.online ? " on" : "");
+    name.append(dot);
+  }
+  name.append(p.display_name || p.handle);
+  const sub = document.createElement("small");
+  sub.textContent = "@" + p.handle + (extra && extra.where ? " · " + extra.where : "");
+  who.append(name, sub);
+  const buttons = document.createElement("div"); buttons.className = "row";
+  for (const [label, route, cls] of (extra && extra.buttons) || []) {
+    const b = document.createElement("button"); b.textContent = label; if (cls) b.className = cls;
+    b.onclick = async () => {
+      b.disabled = true;
+      try { await api("POST", route, { handle: p.handle }); await loadFriends(); }
+      catch (err) { say("friend-msg", err.message); b.disabled = false; }
+    };
+    buttons.append(b);
+  }
+  li.append(who, buttons);
+  return li;
+}
+
+async function loadFriends() {
+  const f = await api("GET", "/friends");
+  const fill = (id, rows, make) => {
+    const ul = $(id); ul.replaceChildren(...rows.map(make));
+    if (!rows.length) { const li = document.createElement("li"); li.className = "empty"; li.textContent = "Nobody yet."; ul.append(li); }
+  };
+  fill("friends", f.friends, (p) => person(p, {
+    online: p.online,
+    where: p.online ? (p.world ? "in " + p.world : "online") : "",
+    buttons: [["Remove", "/friends/remove"]],
+  }));
+  $("incoming-box").hidden = !f.incoming.length;
+  fill("incoming", f.incoming, (p) => person(p, { buttons: [["Accept", "/friends/accept", "main"], ["Decline", "/friends/remove"]] }));
+  $("outgoing-box").hidden = !f.outgoing.length;
+  fill("outgoing", f.outgoing, (p) => person(p, { buttons: [["Cancel", "/friends/remove"]] }));
+}
+
+$("add-form").onsubmit = async (e) => {
+  e.preventDefault();
+  try {
+    const r = await api("POST", "/friends/add", { handle: $("add-handle").value.trim() });
+    say("friend-msg", r.state === "friends" ? "You are now friends." : "Request sent.", true);
+    $("add-handle").value = "";
+    await loadFriends();
+  } catch (err) { say("friend-msg", err.message); }
+};
+
+$("name-form").onsubmit = async (e) => {
+  e.preventDefault();
+  try {
+    const r = await api("POST", "/me/name", { display_name: $("display").value });
+    $("display").value = r.display_name;
+    say("name-msg", "Saved. Servers see it the next time you join.", true);
+  } catch (err) { say("name-msg", err.message); }
+};
+
+$("share").onchange = async () => {
+  try { await api("POST", "/settings", { share_location: $("share").checked }); say("name-msg", "", true); }
+  catch (err) { say("name-msg", err.message); $("share").checked = !$("share").checked; }
+};
+
+$("pw-form").onsubmit = async (e) => {
+  e.preventDefault();
+  try {
+    keep(await api("POST", "/me/password", { password: $("pw-old").value, new_password: $("pw-new").value }));
+    $("pw-old").value = ""; $("pw-new").value = "";
+    say("pw-msg", "Changed. You were signed out everywhere else, including the game.", true);
+  } catch (err) { say("pw-msg", err.message); }
+};
+
+$("del-form").onsubmit = async (e) => {
+  e.preventDefault();
+  if (!confirm("Delete your Hearth account for good? This cannot be undone.")) return;
+  try {
+    await api("POST", "/me/delete", { password: $("del-pw").value });
+    signOut();
+    say("auth-msg", "Your account is gone.", true);
+  } catch (err) { say("del-msg", err.message); }
+};
+
+if (store.get("access") || store.get("refresh")) load().catch(signOut);
+</script>
+</body>
+</html>

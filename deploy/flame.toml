@@ -1,13 +1,12 @@
 # Hearth server configuration. Every key is optional; the values below are the defaults.
+# The server window writes this file itself as you change its settings.
 
 # UDP port to listen on (QUIC).
 port = 7777
 
-# Players allowed in the room at once.
-max_players = 16
-
 # Directory for the server's TLS certificate and key (created on first run).
-# Keep it across restarts: clients will pin this certificate.
+# Keep it across restarts: clients will pin this certificate, and players'
+# saves are tied to it -- a new certificate means everybody starts over.
 data_dir = "data"
 
 # Packed worlds the server hands out, one `<slug>.hworld` file each.
@@ -18,8 +17,30 @@ data_dir = "data"
 # file is not an error: players then see their own built-in room instead.
 hub_world = "hub"
 
+# --- Who may join -----------------------------------------------------------
+
+# The Fireplace whose accounts this server accepts. It checks who somebody is;
+# this server only ever learns their display name and an id that means
+# nothing anywhere else. Set it to "" for no accounts at all (guests only).
+fireplace = "https://fireplace.kokiland-services.eu"
+
+# Let people in without an account. They can play, but nothing a world saves
+# for them is kept -- saves belong to accounts.
+allow_guests = true
+
 # Let players start their own instance of a world from a hub portal.
 client_instancing = false
 
-# Instances that may run at once, the hub included.
+# --- Limits: -1 means no limit -----------------------------------------------
+
+# Everybody connected at once.
+max_players = 16
+
+# In any one instance, the hub included.
+max_players_per_instance = -1
+
+# Instances running at once, the hub included.
 max_instances = 8
+
+# Instances one player may have started and still running. 0 means none.
+max_instances_per_player = 1

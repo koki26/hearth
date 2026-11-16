@@ -21,8 +21,8 @@ That is not where the code is today, and the gap is worth being honest about:
 | what you hold | **server decides** (D29) | as is |
 | `locked` items | client enforces (D29) | the Flame, once it reads world metadata |
 | health, death | — | the Flame |
-| stored data | — | the Flame, written to disk |
-| who you are | an account on the Fireplace; a Flame still sees only a typed name | a signed token in `Hello`, verified by the Flame |
+| stored data | **the Flame**, on disk, per account; guests get none | as is |
+| who you are | **a join ticket** from the Fireplace, checked by the Flame; a guest is a typed name | as is |
 
 ## Shooting
 
@@ -156,14 +156,23 @@ tokens. Every endpoint is in `docs/FIREPLACE.md`. What that buys today: a
 handle people can add you by, a friends list, and where your friends are --
 which Flame and which ember -- so you can go and stand next to them.
 
-What it does **not** buy yet: **the Fireplace is still the only thing that
-checks a token.** `Hello` carries a version and a name, exactly as before, so
-a Flame needs no change, cannot tell who anybody is, and keeps working with
-no Fireplace at all. That is deliberate, and it is the next milestone rather
-than an oversight -- it waits on certificate pinning (D3), because a token
-handed to a Flame that nothing authenticates can be replayed by that Flame to
-another one. Scoping a token to one Flame needs the client to know which
-Flame it is talking to before it speaks.
+**Flames check who you are.** A signed-in client, after the TLS handshake,
+asks the Fireplace for a *join ticket* naming the certificate that Flame just
+showed it, and sends it in `Hello`. The Flame checks the signature offline with
+the key it fetched from its Fireplace once (`fireplace` in `flame.toml`), and
+learns a display name and a player id that is **only meaningful on that
+Flame** -- never the account, never the handle (`docs/FIREPLACE.md`).
+
+That answers the replay problem without waiting for pinning (D3): a ticket
+names one certificate, so a Flame handed one cannot use it on another, and a
+man in the middle showing its own certificate gets a ticket for itself and
+nobody else.
+
+**Saves belong to accounts.** The per-player store is keyed on that per-Flame
+id. A guest -- no ticket -- still plays, if the Flame lets guests in
+(`allow_guests`), but nothing is kept for them, `Welcome` tells their client
+so (`welcome::SAVES`), and a world can check `saves_kept()` to say "sign in to
+keep your progress". Typing somebody's name no longer gets you their saves.
 
 Two consequences worth stating plainly:
 
@@ -172,5 +181,6 @@ Two consequences worth stating plainly:
   path of everybody's game. The cost is that a client can claim to be
   somewhere it is not; it can only ever lie about itself.
 * **`friends` and `friends+` embers are still unenforced** (D58). A Flame
-  cannot tell whose friend anybody is, because it does not know who anybody
-  is. The kind is carried and shown; the lock arrives with the token.
+  knows a per-Flame id now, but not who anybody's friends are, and asking the
+  Fireplace mid-match is exactly what this design refuses. That needs the
+  ticket to carry something friend-shaped; it does not yet.

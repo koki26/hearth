@@ -22,10 +22,9 @@ var player_name := ""
 ## Where accounts come from. Changing it hands whoever runs that host your
 ## sign-in, which is why it is behind a warning in the interface.
 var account_server := DEFAULT_FIREPLACE
-## Join with nothing but a name: no account, and nothing checking who anybody
-## is. The only way there is today, because nothing issues tokens yet -- the
-## setting exists so the default can flip when something does.
-var direct := true
+## Join as a guest even when signed in: just a name, and no saves on the
+## server. Off by default -- signed in, you join as your account.
+var direct := false
 ## Signed in as, and the two tokens that say so: one for asking things, one
 ## for getting another of those without typing a password on a keyboard that
 ## floats in mid-air. Saved in plain text on this machine, which is the same
@@ -46,7 +45,8 @@ func _init() -> void:
 	# The default moved; settings saved before that still hold the old one.
 	if account_server.strip_edges() == "https://accounts.kokiland-services.eu":
 		account_server = DEFAULT_FIREPLACE
-	direct = bool(settings.get_value("advanced", "direct", true))
+	# A new key: the old "direct" was a placeholder that was on for everybody.
+	direct = bool(settings.get_value("advanced", "guest", false))
 	account_handle = str(settings.get_value("account", "handle", ""))
 	account_token = str(settings.get_value("account", "token", ""))
 	account_refresh = str(settings.get_value("account", "refresh", ""))
@@ -77,7 +77,9 @@ func save() -> void:
 	settings.set_value("last", "address", address.strip_edges())
 	settings.set_value("last", "name", player_name.strip_edges())
 	settings.set_value("advanced", "account_server", account_server.strip_edges())
-	settings.set_value("advanced", "direct", direct)
+	settings.set_value("advanced", "guest", direct)
+	if settings.has_section_key("advanced", "direct"):
+		settings.erase_section_key("advanced", "direct")
 	settings.set_value("account", "handle", account_handle)
 	settings.set_value("account", "token", account_token)
 	settings.set_value("account", "refresh", account_refresh)

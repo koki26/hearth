@@ -16,7 +16,9 @@ opus = "0.4.0"
 quinn.workspace = true
 ring = "0.17.14"
 rustls.workspace = true
+serde_json = "1.0.154"
 tokio.workspace = true
+ureq = { version = "3.5", features = ["json"] }
 
 [dev-dependencies]
 hearth-flame = { path = "../../server/hearth-flame" }

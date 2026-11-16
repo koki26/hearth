@@ -33,12 +33,17 @@ const NOBODY: &str =
 
 pub fn router(state: Arc<Fireplace>) -> Router {
     Router::new()
+        .route("/", get(page))
         .route("/health", get(health))
         .route("/key", get(public_key))
         .route("/accounts", post(create_account))
         .route("/sessions", post(sign_in))
         .route("/sessions/refresh", post(refresh))
         .route("/me", get(me))
+        .route("/me/name", post(set_name))
+        .route("/me/password", post(set_password))
+        .route("/me/delete", post(delete_account))
+        .route("/join", post(join))
         .route("/settings", post(settings))
         .route("/friends", get(friends))
         .route("/friends/add", post(add_friend))
@@ -74,7 +79,7 @@ impl IntoResponse for ApiError {
 impl From<Refused> for ApiError {
     fn from(refused: Refused) -> Self {
         let status = match refused {
-            Refused::BadHandle | Refused::Yourself => StatusCode::BAD_REQUEST,
+            Refused::BadHandle | Refused::Yourself | Refused::BadDisplayName => StatusCode::BAD_REQUEST,
             Refused::HandleTaken | Refused::AlreadyFriends => StatusCode::CONFLICT,
             Refused::NoSuchAccount => StatusCode::NOT_FOUND,
             Refused::TooManyFriends | Refused::TooManyRequests => StatusCode::CONFLICT,
@@ -149,6 +154,12 @@ fn signed_in(state: &Fireplace, headers: &HeaderMap) -> Result<u64, ApiError> {
 }
 
 // --- open routes ------------------------------------------------------------
+
+/// The account page: sign in, friends, display name, password, delete. One
+/// file with no build step, calling the same JSON routes the game does.
+async fn page() -> axum::response::Html<&'static str> {
+    axum::response::Html(include_str!("page.html"))
+}
 
 /// Unchanged, and deliberately text: the deploy guide curls it, and so does
 /// anything watching the box.
@@ -290,6 +301,7 @@ async fn me(State(state): State<Arc<Fireplace>>, headers: HeaderMap) -> Result<J
     Ok(Json(json!({
         "id": account.id,
         "handle": account.handle,
+        "display_name": account.display(),
         "share_location": account.share_location,
         "friends": account.friends.len(),
     })))
@@ -334,6 +346,7 @@ async fn friends(State(state): State<Arc<Fireplace>>, headers: HeaderMap) -> Res
         friends.push(json!({
             "id": account.id,
             "handle": account.handle,
+            "display_name": account.display(),
             "online": seen.is_some(),
             "flame": seen.map(|w| w.flame.clone()),
             "ember": seen.map(|w| w.ember),
@@ -344,13 +357,115 @@ async fn friends(State(state): State<Arc<Fireplace>>, headers: HeaderMap) -> Res
     let names = |ids: &Vec<u64>| -> Vec<Value> {
         ids.iter()
             .filter_map(|id| accounts.get(*id))
-            .map(|a| json!({ "id": a.id, "handle": a.handle }))
+            .map(|a| json!({ "id": a.id, "handle": a.handle, "display_name": a.display() }))
             .collect()
     };
     Ok(Json(json!({
         "friends": friends,
         "incoming": names(&mine.incoming),
         "outgoing": names(&mine.outgoing),
+    })))
+}
+
+#[derive(serde::Deserialize)]
+struct DisplayName {
+    display_name: String,
+}
+
+async fn set_name(
+    State(state): State<Arc<Fireplace>>,
+    headers: HeaderMap,
+    Json(body): Json<DisplayName>,
+) -> Result<Json<Value>, ApiError> {
+    let id = signed_in(&state, &headers)?;
+    let mut accounts = state.accounts.lock().unwrap();
+    accounts.set_display_name(id, &body.display_name)?;
+    Ok(Json(json!({ "display_name": accounts.get(id).map(|a| a.display()) })))
+}
+
+#[derive(serde::Deserialize)]
+struct NewPassword {
+    password: String,
+    new_password: String,
+}
+
+/// The old password as well as a token: a token left on somebody else's
+/// machine should not be enough to lock the owner out.
+async fn set_password(
+    State(state): State<Arc<Fireplace>>,
+    headers: HeaderMap,
+    Json(body): Json<NewPassword>,
+) -> Result<Json<Value>, ApiError> {
+    let id = signed_in(&state, &headers)?;
+    if !accounts::password_is_usable(&body.new_password) {
+        return Err(bad("a password is 8 to 128 characters"));
+    }
+    let (hashed, handle) = password_of(&state, id)?;
+    if !check_password(hashed, body.password).await {
+        return Err(ApiError::new(StatusCode::UNAUTHORIZED, "that is not your current password"));
+    }
+    let new = hash_password(body.new_password).await?;
+    let epoch = state.accounts.lock().unwrap().set_password(id, new)?;
+    tracing::info!(id, "changed their password");
+    // Every other sign-in just ended; this one carries on with fresh tokens.
+    Ok(Json(tokens_for(&state, id, &handle, epoch, token::now())))
+}
+
+#[derive(serde::Deserialize)]
+struct Confirm {
+    password: String,
+}
+
+async fn delete_account(
+    State(state): State<Arc<Fireplace>>,
+    headers: HeaderMap,
+    Json(body): Json<Confirm>,
+) -> Result<StatusCode, ApiError> {
+    let id = signed_in(&state, &headers)?;
+    let (hashed, handle) = password_of(&state, id)?;
+    if !check_password(hashed, body.password).await {
+        return Err(ApiError::new(StatusCode::UNAUTHORIZED, "that is not your password"));
+    }
+    state.accounts.lock().unwrap().delete(id)?;
+    state.presence.lock().unwrap().clear(id);
+    tracing::info!(id, %handle, "deleted their account");
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// Copied out so the lock is not held across the hash (D9).
+fn password_of(state: &Fireplace, id: u64) -> Result<(String, String), ApiError> {
+    let accounts = state.accounts.lock().unwrap();
+    let account = accounts.get(id).ok_or_else(unauthorised)?;
+    Ok((account.password.clone(), account.handle.clone()))
+}
+
+#[derive(serde::Deserialize)]
+struct Join {
+    /// The SHA-256 of the Flame's certificate, as the client saw it.
+    flame: String,
+}
+
+/// A ticket into one Flame (`docs/TRUST.md`). The client asks after the TLS
+/// handshake, naming the certificate it was shown, so the ticket is good on
+/// that Flame and nowhere else, and tells it a display name and an id that
+/// only means something there.
+async fn join(
+    State(state): State<Arc<Fireplace>>,
+    headers: HeaderMap,
+    Json(body): Json<Join>,
+) -> Result<Json<Value>, ApiError> {
+    let id = signed_in(&state, &headers)?;
+    let flame = body.flame.trim();
+    if flame.len() != 64 || !flame.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
+        return Err(bad("that is not a certificate hash"));
+    }
+    let name = {
+        let accounts = state.accounts.lock().unwrap();
+        accounts.get(id).ok_or_else(unauthorised)?.display().to_owned()
+    };
+    Ok(Json(json!({
+        "ticket": state.keys.mint_join(id, &name, flame, token::now()),
+        "expires_in": token::JOIN_SECONDS,
     })))
 }
 

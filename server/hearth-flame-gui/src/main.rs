@@ -7,11 +7,12 @@
 use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use eframe::egui;
 use hearth_flame::log::Log;
 use hearth_flame::worlds::Repository;
-use hearth_flame::{Config, Roster, Server, command};
+use hearth_flame::{Config, Limit, Roster, Server, command};
 use tokio::sync::watch;
 use tracing_subscriber::fmt::writer::MakeWriterExt;
 
@@ -53,12 +54,21 @@ struct App {
     runtime: tokio::runtime::Runtime,
     config_path: PathBuf,
     port: u16,
-    max_players: u16,
     data_dir: String,
     worlds_dir: String,
     hub_world: String,
     client_instancing: bool,
-    max_instances: u16,
+    allow_guests: bool,
+    fireplace: String,
+    max_players: Limit,
+    max_players_per_instance: Limit,
+    max_instances: Limit,
+    max_instances_per_player: Limit,
+    /// What is in the file now, so a change is saved once and only once.
+    saved: String,
+    /// When the settings last changed; they are written a moment later, so
+    /// dragging a number does not write the file on every frame.
+    changed_at: Option<Instant>,
     /// The repository as the window sees it; the running server has its own
     /// scan of the same directory.
     repo: Repository,
@@ -80,12 +90,18 @@ impl App {
             runtime: tokio::runtime::Runtime::new().expect("tokio runtime"),
             config_path,
             port: config.port,
-            max_players: config.max_players,
             data_dir: config.data_dir.display().to_string(),
             worlds_dir: worlds_dir.display().to_string(),
+            saved: config.to_toml(),
             hub_world: config.hub_world,
             client_instancing: config.client_instancing,
+            allow_guests: config.allow_guests,
+            fireplace: config.fireplace,
+            max_players: config.max_players,
+            max_players_per_instance: config.max_players_per_instance,
             max_instances: config.max_instances,
+            max_instances_per_player: config.max_instances_per_player,
+            changed_at: None,
             repo: Repository::open(worlds_dir),
             running: None,
             message: String::new(),
@@ -98,28 +114,33 @@ impl App {
     fn config(&self) -> Config {
         Config {
             port: self.port,
-            max_players: self.max_players,
             data_dir: PathBuf::from(&self.data_dir),
             worlds_dir: Some(PathBuf::from(&self.worlds_dir)),
             hub_world: self.hub_world.clone(),
             client_instancing: self.client_instancing,
+            allow_guests: self.allow_guests,
+            fireplace: self.fireplace.trim().to_owned(),
+            max_players: self.max_players,
+            max_players_per_instance: self.max_players_per_instance,
             max_instances: self.max_instances,
+            max_instances_per_player: self.max_instances_per_player,
         }
     }
 
     fn start(&mut self) -> anyhow::Result<()> {
         hearth_protocol::validate_slug(&self.hub_world)
             .map_err(|_| anyhow::anyhow!("The hub world name may only use a-z, 0-9, - and _"))?;
+        let config = self.config();
+        config.check()?;
         // quinn needs a tokio context to bind its socket.
         let _guard = self.runtime.enter();
-        let config = self.config();
         let (cert, key) = hearth_flame::load_or_create_cert(Path::new(&self.data_dir))?;
-        let endpoint = hearth_flame::endpoint(self.port, cert, key)?;
+        let endpoint = hearth_flame::endpoint(self.port, cert.clone(), key)?;
         let addr = endpoint.local_addr()?.to_string();
         let (tx, roster) = watch::channel(Roster::new());
-        let server = Server::new(&config, tx);
+        let server = Server::new(&config, &cert, tx);
         self.runtime.spawn(hearth_flame::serve_with(endpoint.clone(), server.clone()));
-        tracing::info!(%addr, max_players = self.max_players, "the Flame is lit");
+        tracing::info!(%addr, max_players = %self.max_players, guests = self.allow_guests, "the Flame is lit");
         self.running = Some(Running { endpoint, server, roster, addr });
         Ok(())
     }
@@ -131,22 +152,41 @@ impl App {
         }
     }
 
+    /// Writes the settings when they changed. Something the server would
+    /// refuse to start with is not written, so the file always loads.
     fn save_config(&mut self) {
-        let text = format!(
-            "port = {}\nmax_players = {}\ndata_dir = {:?}\nworlds_dir = {:?}\nhub_world = {:?}\n\
-             client_instancing = {}\nmax_instances = {}\n",
-            self.port,
-            self.max_players,
-            self.data_dir,
-            self.worlds_dir,
-            self.hub_world,
-            self.client_instancing,
-            self.max_instances
-        );
-        self.message = match std::fs::write(&self.config_path, text) {
-            Ok(()) => format!("Saved {}", self.config_path.display()),
-            Err(err) => format!("Could not save {}: {err}", self.config_path.display()),
-        };
+        let config = self.config();
+        let text = config.to_toml();
+        self.changed_at = None;
+        if text == self.saved {
+            return;
+        }
+        if let Err(err) = config.check() {
+            self.message = format!("Not saved: {err:#}");
+            return;
+        }
+        match std::fs::write(&self.config_path, &text) {
+            Ok(()) => {
+                self.saved = text;
+                self.message.clear();
+            }
+            Err(err) => self.message = format!("Could not save {}: {err}", self.config_path.display()),
+        }
+    }
+
+    /// Notices a change and saves it half a second after the last one.
+    fn autosave(&mut self, ctx: &egui::Context) {
+        if self.config().to_toml() != self.saved && self.changed_at.is_none() {
+            self.changed_at = Some(Instant::now());
+        }
+        if let Some(at) = self.changed_at {
+            let wait = Duration::from_millis(500).saturating_sub(at.elapsed());
+            if wait.is_zero() {
+                self.save_config();
+            } else {
+                ctx.request_repaint_after(wait);
+            }
+        }
     }
 
     /// Copies a packed world into the repository, and tells a running server.
@@ -370,9 +410,6 @@ impl eframe::App for App {
                 ui.label("Port");
                 ui.add(egui::DragValue::new(&mut self.port).range(1..=65535));
                 ui.end_row();
-                ui.label("Max players");
-                ui.add(egui::DragValue::new(&mut self.max_players).range(1..=u16::MAX));
-                ui.end_row();
                 ui.label("Data folder");
                 ui.text_edit_singleline(&mut self.data_dir);
                 ui.end_row();
@@ -382,9 +419,20 @@ impl eframe::App for App {
                 ui.label("Hub world");
                 ui.text_edit_singleline(&mut self.hub_world);
                 ui.end_row();
-                ui.label("Max instances");
-                ui.add(egui::DragValue::new(&mut self.max_instances).range(1..=u16::MAX));
+                ui.label("Accounts from");
+                ui.add(egui::TextEdit::singleline(&mut self.fireplace).hint_text("no accounts, guests only"));
                 ui.end_row();
+                ui.label("");
+                ui.checkbox(&mut self.allow_guests, "Let people in without an account (they get no saves)");
+                ui.end_row();
+            });
+            ui.add_space(6.0);
+            ui.label("Limits");
+            egui::Grid::new("limits").num_columns(2).spacing([12.0, 6.0]).show(ui, |ui| {
+                limit_ui(ui, "Players on the server", &mut self.max_players, 1, 16);
+                limit_ui(ui, "Players per instance", &mut self.max_players_per_instance, 1, 16);
+                limit_ui(ui, "Instances on the server", &mut self.max_instances, 1, 8);
+                limit_ui(ui, "Instances per player", &mut self.max_instances_per_player, 0, 1);
             });
         });
 
@@ -407,9 +455,7 @@ impl eframe::App for App {
             } else if ui.add(egui::Button::new("Stop").min_size([80.0, 28.0].into())).clicked() {
                 self.stop();
             }
-            if ui.button("Save config").clicked() {
-                self.save_config();
-            }
+            ui.weak(format!("Settings save to {} as you change them", self.config_path.display()));
         });
 
         if !self.message.is_empty() {
@@ -436,14 +482,32 @@ impl eframe::App for App {
             self.add_world(&path);
         }
 
+        self.autosave(&ctx);
         if self.running.is_some() {
             ctx.request_repaint_after(std::time::Duration::from_millis(500));
         }
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        self.save_config();
         self.stop();
     }
+}
+
+/// One limit: a number, or a "no limit" box that turns it off -- the window's
+/// way of writing the `-1` a headless server's config uses.
+fn limit_ui(ui: &mut egui::Ui, label: &str, limit: &mut Limit, min: u32, default: u32) {
+    ui.label(label);
+    ui.horizontal(|ui| {
+        let mut none = limit.0.is_none();
+        if ui.checkbox(&mut none, "No limit").changed() {
+            *limit = if none { Limit::NONE } else { Limit::of(default) };
+        }
+        if let Some(max) = &mut limit.0 {
+            ui.add(egui::DragValue::new(max).range(min..=u16::MAX as u32));
+        }
+    });
+    ui.end_row();
 }
 
 fn size_text(bytes: u32) -> String {
@@ -471,7 +535,8 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let mut app = App::new(dir.join("flame.toml"), Log::new());
         app.port = 0; // any free port
-        app.max_players = 3;
+        app.max_players = Limit::of(3);
+        app.fireplace.clear(); // no Fireplace to reach in a test
         app.data_dir = dir.join("data").display().to_string();
         app.worlds_dir = dir.join("worlds").display().to_string();
         app.repo = Repository::open(&app.worlds_dir);
@@ -491,9 +556,15 @@ mod tests {
         app.stop();
         assert!(app.running.is_none());
 
+        app.max_players_per_instance = Limit::NONE;
+        app.allow_guests = false;
+        app.fireplace = "https://example.org".into();
         app.save_config();
         let saved = Config::parse(&std::fs::read_to_string(dir.join("flame.toml")).unwrap()).unwrap();
-        assert_eq!((saved.port, saved.max_players), (0, 3));
+        assert_eq!((saved.port, saved.max_players), (0, Limit::of(3)));
+        assert_eq!(saved.max_players_per_instance, Limit::NONE, "written as -1");
+        assert!(!saved.allow_guests);
+        assert_eq!(saved.fireplace, "https://example.org");
         assert_eq!(saved.data_dir.display().to_string(), app.data_dir);
         assert_eq!(saved.worlds_dir().display().to_string(), app.worlds_dir);
         assert!(saved.client_instancing);
@@ -551,6 +622,31 @@ mod tests {
         assert!(app.log.lines().last().unwrap().contains("close the window"));
         assert!(app.running.is_some(), "a typed quit does not close the window");
         app.stop();
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn a_change_is_saved_on_its_own_and_a_bad_one_is_not() {
+        let (dir, mut app) = app("autosave");
+        let ctx = egui::Context::default();
+        app.save_config();
+        let path = dir.join("flame.toml");
+        let before = std::fs::read_to_string(&path).unwrap();
+
+        app.max_instances_per_player = Limit::of(4);
+        app.autosave(&ctx); // noticed, not yet written
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), before);
+        app.changed_at = Some(Instant::now() - Duration::from_secs(1));
+        app.autosave(&ctx);
+        let saved = Config::parse(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(saved.max_instances_per_player, Limit::of(4));
+
+        // Nobody could ever join this one, so it is not written.
+        app.allow_guests = false;
+        app.fireplace.clear();
+        app.save_config();
+        assert!(app.message.starts_with("Not saved"), "{}", app.message);
+        assert!(Config::parse(&std::fs::read_to_string(&path).unwrap()).unwrap().allow_guests);
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

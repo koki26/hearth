@@ -35,7 +35,21 @@ business.
 | `POST /accounts` | `{"handle": "ada", "password": "..."}` → `201` |
 | `POST /sessions` | the same body → `200` |
 | `POST /sessions/refresh` | `{"refresh": "v1...."}` → `200` |
-| `GET /me` | → `{"id", "handle", "share_location", "friends"}` |
+| `GET /me` | → `{"id", "handle", "display_name", "share_location", "friends"}` |
+| `POST /me/name` | `{"display_name": "Ada L"}` → `200` |
+| `POST /me/password` | `{"password", "new_password"}` → `200`, a fresh token pair; every other sign-in ends |
+| `POST /me/delete` | `{"password"}` → `204`; the account and every friendship it was in are gone |
+
+A **display name** is what Flames and friends see: 1–32 bytes, no control
+characters, need not be unique, and the handle until one is chosen. Changing
+the password or deleting the account asks for the current password as well as
+a token, so a token left on somebody else's machine cannot lock the owner out.
+
+**The account page.** `GET /` serves one HTML page that does all of this in a
+browser: sign in or make an account, see friends and requests, change the
+display name, the password and location sharing, and delete the account. It
+calls the same routes the game does, keeps its tokens in the tab's session
+storage, and needs no build step (`src/page.html`).
 
 The first three answer with the same thing:
 
@@ -74,9 +88,30 @@ cannot ask for anything, and an access token cannot be refreshed with.
 { "algorithm": "ed25519", "key": "<64 hex characters>" }
 ```
 
-Nothing but the Fireplace verifies a token today. That endpoint is what lets a
-Flame do it offline later — holding the key, never calling here — which is the
-whole point of signing them (TRUST.md).
+A Flame fetches it once, keeps it in its own `data/fireplace.key`, and checks
+join tickets with it offline — it never calls here to ask about a player.
+
+## Joining a Flame
+
+| | |
+|---|---|
+| `POST /join` | `{"flame": "<sha256 of the Flame's certificate, 64 hex>"}` → `{"ticket", "expires_in"}` |
+
+The client asks right after the TLS handshake, naming the certificate it was
+shown, and puts the ticket in `Hello`. The ticket is signed like a token but
+says much less:
+
+```json
+{ "typ": "join", "aud": "<certificate hash>", "pid": "<32 hex>", "name": "Ada L", "iat": 1762, "exp": 1882 }
+```
+
+* `aud` is the Flame. It refuses a ticket naming any certificate but its own,
+  so a Flame that was handed one cannot replay it to another.
+* `pid` is an HMAC of the account and the Flame under `data/pid.key`: stable on
+  that Flame, so it can keep somebody's saves, and unrelated on every other.
+  No Flame ever learns the account id or the handle.
+* `name` is the display name. It lasts two minutes, because it is spent the
+  moment the client says `Hello`.
 
 ## Friends
 
@@ -174,11 +209,13 @@ which is a way to be attacked rather than a defence.
 ```
 data/
   key.pk8        the Ed25519 signing key, 0600, made on first run
+  pid.key        the secret per-Flame player ids are derived with, 0600
   people.json    every account and every friendship
 ```
 
-Both matter. Losing `people.json` loses everybody; losing `key.pk8` signs
-everybody out at once and cannot be undone. Back them up before the first
+All three matter. Losing `people.json` loses everybody; losing `key.pk8` signs
+everybody out at once and cannot be undone; losing `pid.key` gives every
+player a new id on every Flame, which orphans all of their saves. Back them up before the first
 account that is not yours, and keep the backup off the box.
 
 `people.json` carries a `version`, and an account record may **only ever gain

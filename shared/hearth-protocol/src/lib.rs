@@ -3,11 +3,14 @@
 
 use std::fmt;
 
-pub const PROTOCOL_VERSION: u16 = 6;
+pub const PROTOCOL_VERSION: u16 = 7;
 /// Unchanged across protocol versions on purpose: a version mismatch should
 /// reach the client as a `Reject`, not as an opaque TLS failure.
 pub const ALPN: &[u8] = b"hearth/1";
 pub const MAX_NAME_LEN: usize = 32;
+/// A join ticket from the Fireplace (docs/TRUST.md). Printable ASCII; an
+/// empty one means a guest.
+pub const MAX_TICKET_LEN: usize = 1024;
 /// World slugs are file stems in the server's repository, so they stay short
 /// and filesystem-safe.
 pub const MAX_SLUG_LEN: usize = 32;
@@ -64,6 +67,9 @@ pub mod ember {
 pub mod welcome {
     /// Players may start their own instance of a world in the repository.
     pub const CLIENT_INSTANCING: u8 = 1 << 0;
+    /// You joined with an account, so the server keeps what worlds store for
+    /// you. A guest has this clear, and every `Store` is ignored.
+    pub const SAVES: u8 = 1 << 1;
 }
 
 /// The hub instance. Always running, cannot be stopped, everyone starts here.
@@ -130,6 +136,7 @@ pub enum DecodeError {
     BadValue,
     BadEmberKind(u8),
     BadChat,
+    BadTicket,
 }
 
 impl fmt::Display for DecodeError {
@@ -149,6 +156,7 @@ impl fmt::Display for DecodeError {
             Self::BadValue => f.write_str("stored value too large"),
             Self::BadEmberKind(k) => write!(f, "unknown ember kind {k}"),
             Self::BadChat => f.write_str("chat line empty, too long or with control characters"),
+            Self::BadTicket => f.write_str("join ticket too long or not printable"),
         }
     }
 }
@@ -250,6 +258,10 @@ pub enum RejectReason {
     ServerFull = 1,
     BadVersion = 2,
     BadName = 3,
+    /// This server only lets in people signed in to an account.
+    AccountRequired = 4,
+    /// The join ticket did not check out, or the server could not check it.
+    BadTicket = 5,
 }
 
 /// A rejected join carries its reason twice: as a `Reject` message, and in the
@@ -265,6 +277,8 @@ impl RejectReason {
             1 => Some(Self::ServerFull),
             2 => Some(Self::BadVersion),
             3 => Some(Self::BadName),
+            4 => Some(Self::AccountRequired),
+            5 => Some(Self::BadTicket),
             _ => None,
         }
     }
@@ -284,6 +298,8 @@ pub enum Control {
     Hello {
         version: u16,
         name: String,
+        /// From the Fireplace, for this server only; empty for a guest.
+        ticket: String,
     },
     /// `instance` is where you were put (always the hub); `flags` is `welcome::*`.
     Welcome {
@@ -455,6 +471,15 @@ pub fn validate_name(name: &str) -> Result<(), DecodeError> {
     Ok(())
 }
 
+/// A ticket is opaque to everything but the Flame checking it; this only
+/// keeps it printable and bounded.
+pub fn validate_ticket(ticket: &str) -> Result<(), DecodeError> {
+    if ticket.len() > MAX_TICKET_LEN || !ticket.bytes().all(|b| b.is_ascii_graphic()) {
+        return Err(DecodeError::BadTicket);
+    }
+    Ok(())
+}
+
 /// A chat line: some text, no control characters (so no newlines and no
 /// terminal escapes in the Flame's log), and not more than `MAX_CHAT_LEN`.
 pub fn validate_chat(text: &str) -> Result<(), DecodeError> {
@@ -490,10 +515,13 @@ impl Control {
         let start = out.len();
         out.extend_from_slice(&[0, 0]);
         match self {
-            Self::Hello { version, name } => {
+            Self::Hello { version, name, ticket } => {
                 out.push(ty::HELLO);
                 out.extend_from_slice(&version.to_le_bytes());
                 put_name(out, name);
+                debug_assert!(validate_ticket(ticket).is_ok(), "encoding invalid ticket");
+                out.extend_from_slice(&(ticket.len() as u16).to_le_bytes());
+                out.extend_from_slice(ticket.as_bytes());
             }
             Self::Welcome { your_id, tick_hz, instance, flags } => {
                 out.push(ty::WELCOME);
@@ -630,7 +658,13 @@ impl Control {
         }
         let mut r = Reader(body);
         let msg = match r.u8()? {
-            ty::HELLO => Self::Hello { version: r.u16()?, name: r.name()? },
+            // An older client's Hello ends at the name; it still decodes, so
+            // it can be told `BadVersion` rather than dropped as garbage.
+            ty::HELLO => Self::Hello {
+                version: r.u16()?,
+                name: r.name()?,
+                ticket: if r.0.is_empty() { String::new() } else { r.ticket()? },
+            },
             ty::WELCOME => {
                 Self::Welcome { your_id: r.u16()?, tick_hz: r.u8()?, instance: r.u16()?, flags: r.u8()? }
             }
@@ -872,6 +906,17 @@ impl<'a> Reader<'a> {
         validate_chat(text)?;
         Ok(text.to_owned())
     }
+    fn ticket(&mut self) -> Result<String, DecodeError> {
+        let len = self.u16()? as usize;
+        if self.0.len() < len {
+            return Err(DecodeError::Truncated);
+        }
+        let (bytes, rest) = self.0.split_at(len);
+        self.0 = rest;
+        let ticket = std::str::from_utf8(bytes).map_err(|_| DecodeError::BadTicket)?;
+        validate_ticket(ticket)?;
+        Ok(ticket.to_owned())
+    }
     fn value(&mut self) -> Result<Vec<u8>, DecodeError> {
         let len = self.u16()? as usize;
         if len > MAX_VALUE_LEN {
@@ -1019,15 +1064,22 @@ mod tests {
 
     #[test]
     fn control_messages_round_trip() {
-        control_round_trip(Control::Hello { version: PROTOCOL_VERSION, name: "Ada".into() });
-        control_round_trip(Control::Hello { version: 7, name: "ž".repeat(16) }); // 32 bytes of UTF-8
+        control_round_trip(Control::Hello { version: PROTOCOL_VERSION, name: "Ada".into(), ticket: String::new() });
+        control_round_trip(Control::Hello { version: 7, name: "ž".repeat(16), ticket: "v1.abc.def".into() }); // 32 bytes of UTF-8
+        control_round_trip(Control::Hello { version: 7, name: "Ada".into(), ticket: "x".repeat(MAX_TICKET_LEN) });
         control_round_trip(Control::Welcome {
             your_id: 65535,
             tick_hz: 20,
             instance: HUB_INSTANCE,
             flags: welcome::CLIENT_INSTANCING,
         });
-        for reason in [RejectReason::ServerFull, RejectReason::BadVersion, RejectReason::BadName] {
+        for reason in [
+            RejectReason::ServerFull,
+            RejectReason::BadVersion,
+            RejectReason::BadName,
+            RejectReason::AccountRequired,
+            RejectReason::BadTicket,
+        ] {
             control_round_trip(Control::Reject { reason });
         }
         control_round_trip(Control::PeerJoined(Peer { id: 3, name: "Bob".into() }));
@@ -1055,7 +1107,13 @@ mod tests {
 
     #[test]
     fn reject_reasons_survive_the_close_frame() {
-        for reason in [RejectReason::ServerFull, RejectReason::BadVersion, RejectReason::BadName] {
+        for reason in [
+            RejectReason::ServerFull,
+            RejectReason::BadVersion,
+            RejectReason::BadName,
+            RejectReason::AccountRequired,
+            RejectReason::BadTicket,
+        ] {
             assert_eq!(RejectReason::from_close_frame(&reason.close_frame()), Some(reason));
         }
         assert_eq!(RejectReason::from_close_frame(b"rejected:"), None);
@@ -1161,8 +1219,18 @@ mod tests {
     #[test]
     fn hello_golden_bytes() {
         let mut buf = Vec::new();
-        Control::Hello { version: 1, name: "Ada".into() }.encode(&mut buf);
-        assert_eq!(buf, [0x07, 0x00, 0x01, 0x01, 0x00, 0x03, b'A', b'd', b'a']);
+        Control::Hello { version: 1, name: "Ada".into(), ticket: String::new() }.encode(&mut buf);
+        assert_eq!(buf, [0x09, 0x00, 0x01, 0x01, 0x00, 0x03, b'A', b'd', b'a', 0x00, 0x00]);
+        // An older client's Hello stops after the name, and still decodes,
+        // so it can be refused with `BadVersion`.
+        assert_eq!(
+            Control::decode(&buf[2..9]),
+            Ok(Control::Hello { version: 1, name: "Ada".into(), ticket: String::new() })
+        );
+        // A ticket with a space or a control character in it is not one.
+        let mut bad = buf[2..9].to_vec();
+        bad.extend_from_slice(&[2, 0, b'a', b' ']);
+        assert_eq!(Control::decode(&bad), Err(DecodeError::BadTicket));
     }
 
     #[test]

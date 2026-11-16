@@ -163,7 +163,10 @@ pub struct Client {
 impl Client {
     /// Starts connecting in the background; failures arrive as `Disconnected`.
     /// Downloaded worlds are cached in `cache_dir`, named by their hash.
-    pub fn connect(host: String, port: u16, name: String, cache_dir: PathBuf) -> Self {
+    /// With an `account` -- a Fireplace URL and an access token -- the client
+    /// asks that Fireplace for a ticket into this one server and joins with
+    /// it; without one it joins as a guest.
+    pub fn connect(host: String, port: u16, name: String, account: Option<Account>, cache_dir: PathBuf) -> Self {
         let (event_tx, events) = channel();
         let (outgoing, outgoing_rx) = unbounded_channel();
         std::thread::spawn(move || {
@@ -174,7 +177,7 @@ impl Client {
                     return;
                 }
             };
-            let result = runtime.block_on(run(host, port, name, cache_dir, &event_tx, outgoing_rx));
+            let result = runtime.block_on(run(host, port, name, account, cache_dir, &event_tx, outgoing_rx));
             let _ = event_tx.send(Event::Disconnected(match result {
                 Ok(()) => "connection closed".into(),
                 Err(err) => format!("{err:#}"),
@@ -192,20 +195,39 @@ impl Client {
     }
 }
 
+/// Where a signed-in player's account lives, and their proof of it.
+#[derive(Debug, Clone)]
+pub struct Account {
+    pub fireplace: String,
+    pub token: String,
+}
+
 async fn run(
     host: String,
     port: u16,
     name: String,
+    account: Option<Account>,
     cache_dir: PathBuf,
     events: &Sender<Event>,
     mut outgoing: tokio::sync::mpsc::UnboundedReceiver<Outgoing>,
 ) -> anyhow::Result<()> {
     hearth_protocol::validate_name(&name)?;
     let (endpoint, conn) = connect(&host, port).await?;
+    let ticket = match account {
+        Some(account) => {
+            let certificate = server_certificate(&conn)?;
+            // ureq blocks, and this runtime has one thread that also drives
+            // the connection, so the request goes to the blocking pool.
+            tokio::task::spawn_blocking(move || ask_for_ticket(&account, &certificate))
+                .await?
+                .context("could not get a ticket from your account server")?
+        }
+        None => String::new(),
+    };
 
     let (mut send, mut recv) = conn.open_bi().await?;
     let mut buf = Vec::new();
-    Control::Hello { version: PROTOCOL_VERSION, name }.encode(&mut buf);
+    Control::Hello { version: PROTOCOL_VERSION, name, ticket }.encode(&mut buf);
     send.write_all(&buf).await?;
 
     // The control stream is read in a task of its own rather than in the
@@ -330,6 +352,38 @@ async fn connect(host: &str, port: u16) -> anyhow::Result<(quinn::Endpoint, quin
     }
     Err(last.unwrap_or_else(|| anyhow::anyhow!("host resolved to no address")))
         .with_context(|| format!("connecting to {host}:{port}"))
+}
+
+/// The SHA-256 of the certificate this server showed us, hex. The ticket
+/// names it, so it is good on this server and on no other -- even one that
+/// sits in the middle and shows us its own certificate (docs/TRUST.md).
+fn server_certificate(conn: &quinn::Connection) -> anyhow::Result<String> {
+    let identity = conn.peer_identity().context("the server showed no certificate")?;
+    let chain = identity
+        .downcast::<Vec<CertificateDer<'static>>>()
+        .map_err(|_| anyhow::anyhow!("the server's certificate is not one we can read"))?;
+    let leaf = chain.first().context("the server showed no certificate")?;
+    let digest = ring::digest::digest(&ring::digest::SHA256, leaf.as_ref());
+    Ok(digest.as_ref().iter().map(|b| format!("{b:02x}")).collect())
+}
+
+fn ask_for_ticket(account: &Account, certificate: &str) -> anyhow::Result<String> {
+    let url = format!("{}/join", account.fireplace.trim().trim_end_matches('/'));
+    let mut response = ureq::post(&url)
+        .config()
+        .timeout_global(Some(std::time::Duration::from_secs(10)))
+        .http_status_as_error(false)
+        .build()
+        .header("Authorization", &format!("Bearer {}", account.token))
+        .send_json(serde_json::json!({ "flame": certificate }))?;
+    let status = response.status();
+    let body: serde_json::Value = serde_json::from_str(&response.body_mut().read_to_string()?).unwrap_or_default();
+    if !status.is_success() {
+        bail!("{}", body["error"].as_str().unwrap_or("it said no"));
+    }
+    let ticket = body["ticket"].as_str().context("it sent no ticket")?.to_owned();
+    hearth_protocol::validate_ticket(&ticket)?;
+    Ok(ticket)
 }
 
 fn send_event(events: &Sender<Event>, event: Event) -> anyhow::Result<()> {

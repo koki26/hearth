@@ -295,3 +295,75 @@ async fn everybody_is_still_here_after_a_restart() {
     assert_eq!(mine["friends"][0]["handle"], "bob");
     assert_eq!(mine["friends"][0]["online"], false, "and presence does not survive it");
 }
+
+#[tokio::test]
+async fn a_join_ticket_carries_the_display_name_and_needs_a_certificate_hash() {
+    let (app, _dir) = fireplace("join");
+    let ada = join(&app, "ada").await;
+    let flame = "ab".repeat(32);
+
+    let (status, _) = call(&app, "POST", "/join", None, json!({"flame": flame})).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED, "a ticket is for somebody signed in");
+    for bad in ["", "not hex", &"AB".repeat(32), &"ab".repeat(31)] {
+        let (status, _) = call(&app, "POST", "/join", Some(&ada), json!({"flame": bad})).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{bad:?}");
+    }
+
+    let (status, body) = call(&app, "POST", "/me/name", Some(&ada), json!({"display_name": "Ada L"})).await;
+    assert_eq!((status, body["display_name"].as_str()), (StatusCode::OK, Some("Ada L")));
+    let (status, body) = call(&app, "POST", "/join", Some(&ada), json!({"flame": flame})).await;
+    assert_eq!(status, StatusCode::OK);
+    let ticket = body["ticket"].as_str().unwrap();
+    assert!(ticket.starts_with("v1.") && ticket.len() <= hearth_protocol::MAX_TICKET_LEN);
+    // A ticket opens nothing here: it is for a Flame, not for the Fireplace.
+    let (status, _) = call(&app, "GET", "/me", Some(ticket), Value::Null).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn a_new_password_signs_out_everywhere_and_deleting_needs_the_password() {
+    let (app, _dir) = fireplace("password-delete");
+    let ada = join(&app, "ada").await;
+    let bob = join(&app, "bob").await;
+    call(&app, "POST", "/friends/add", Some(&bob), json!({"handle": "ada"})).await;
+
+    let (status, _) = call(
+        &app,
+        "POST",
+        "/me/password",
+        Some(&ada),
+        json!({"password": "wrong one!", "new_password": "a new long one"}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    let (status, fresh) = call(
+        &app,
+        "POST",
+        "/me/password",
+        Some(&ada),
+        json!({"password": "a long one", "new_password": "a new long one"}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, _) = call(&app, "GET", "/me", Some(&ada), Value::Null).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED, "the old token died with the old password");
+    let ada = fresh["access"].as_str().unwrap().to_owned();
+
+    let (status, _) = call(&app, "POST", "/me/delete", Some(&ada), json!({"password": "a long one"})).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    let (status, _) = call(&app, "POST", "/me/delete", Some(&ada), json!({"password": "a new long one"})).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let (status, _) = call(&app, "GET", "/me", Some(&ada), Value::Null).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    let (_, friends) = call(&app, "GET", "/friends", Some(&bob), Value::Null).await;
+    assert_eq!(friends["outgoing"], json!([]), "nobody is left waiting on an account that is gone");
+}
+
+#[tokio::test]
+async fn the_account_page_is_served() {
+    let (app, _dir) = fireplace("page");
+    let response = app.clone().oneshot(Request::builder().uri("/").body(Body::empty()).unwrap()).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    assert!(String::from_utf8_lossy(&bytes).contains("<title>Hearth Account</title>"));
+}

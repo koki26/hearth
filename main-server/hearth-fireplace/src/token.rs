@@ -24,6 +24,10 @@ pub const ACCESS_SECONDS: u64 = 60 * 60;
 /// because typing a password on a keyboard floating in mid-air is miserable
 /// and nobody should do it twice a day.
 pub const REFRESH_SECONDS: u64 = 30 * 24 * 60 * 60;
+/// A join ticket is spent the moment the client says `Hello`, so it only has
+/// to outlive one round trip -- and anything longer is a longer window for a
+/// copied one, even though it only works on the one Flame it names.
+pub const JOIN_SECONDS: u64 = 120;
 
 const PREFIX: &str = "v1.";
 const BASE64: base64::engine::general_purpose::GeneralPurpose =
@@ -56,9 +60,32 @@ impl Claims {
     }
 }
 
-/// The signing key, read from `data/key.pk8` or made on first run.
+/// What a Flame is handed so it can let somebody in (`docs/TRUST.md`).
+///
+/// It says nothing about the account. `pid` is a stable id **for this one
+/// Flame only** -- a keyed hash of the account and the Flame's certificate --
+/// so a Flame can keep somebody's saves without ever learning who they are,
+/// and two Flames comparing notes cannot tell they have the same player.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct JoinClaims {
+    /// Always `join`, so a ticket is never mistaken for an access token.
+    pub typ: String,
+    /// The SHA-256 of the Flame's TLS certificate, hex. The Flame refuses a
+    /// ticket naming any certificate but its own, which is what stops a Flame
+    /// that was handed one from replaying it to another.
+    pub aud: String,
+    pub pid: String,
+    /// The display name, which is all of the account a Flame ever sees.
+    pub name: String,
+    pub iat: u64,
+    pub exp: u64,
+}
+
+/// The signing key, read from `data/key.pk8` or made on first run, and the
+/// secret the per-Flame player ids are derived with, from `data/pid.key`.
 pub struct Keys {
     pair: Ed25519KeyPair,
+    pid: ring::hmac::Key,
 }
 
 impl Keys {
@@ -78,7 +105,42 @@ impl Keys {
         };
         let pair = Ed25519KeyPair::from_pkcs8(&pkcs8)
             .map_err(|_| anyhow::anyhow!("{} is not a usable signing key", path.display()))?;
-        Ok(Self { pair })
+        // Losing this changes every player id on every Flame, which orphans
+        // everybody's saves, so it is made once and never overwritten.
+        let pid_path = dir.join("pid.key");
+        let secret = match std::fs::read(&pid_path) {
+            Ok(bytes) => bytes,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                let mut made = [0u8; 32];
+                ring::rand::SecureRandom::fill(&ring::rand::SystemRandom::new(), &mut made)
+                    .map_err(|_| anyhow::anyhow!("could not generate the player id secret"))?;
+                write_private(&pid_path, &made)
+                    .with_context(|| format!("could not write {}", pid_path.display()))?;
+                made.to_vec()
+            }
+            Err(err) => return Err(err).with_context(|| format!("could not read {}", pid_path.display())),
+        };
+        Ok(Self { pair, pid: ring::hmac::Key::new(ring::hmac::HMAC_SHA256, &secret) })
+    }
+
+    /// A ticket for one Flame, named by its certificate hash.
+    pub fn mint_join(&self, account: u64, name: &str, flame: &str, now: u64) -> String {
+        let tag = ring::hmac::sign(&self.pid, format!("{account}:{flame}").as_bytes());
+        let claims = JoinClaims {
+            typ: "join".into(),
+            aud: flame.to_owned(),
+            pid: tag.as_ref()[..16].iter().map(|b| format!("{b:02x}")).collect(),
+            name: name.to_owned(),
+            iat: now,
+            exp: now + JOIN_SECONDS,
+        };
+        self.sign(&serde_json::to_vec(&claims).expect("claims are plain data"))
+    }
+
+    fn sign(&self, json: &[u8]) -> String {
+        let signed = format!("{PREFIX}{}", BASE64.encode(json));
+        let signature = BASE64.encode(self.pair.sign(signed.as_bytes()).as_ref());
+        format!("{signed}.{signature}")
     }
 
     /// The public half, hex, for a Flame to hold and verify against.
@@ -96,10 +158,7 @@ impl Keys {
             iat: now,
             exp: now + if kind == "refresh" { REFRESH_SECONDS } else { ACCESS_SECONDS },
         };
-        let payload = BASE64.encode(serde_json::to_vec(&claims).expect("claims are plain data"));
-        let signed = format!("{PREFIX}{payload}");
-        let signature = BASE64.encode(self.pair.sign(signed.as_bytes()).as_ref());
-        format!("{signed}.{signature}")
+        self.sign(&serde_json::to_vec(&claims).expect("claims are plain data"))
     }
 
     /// Signature, shape and expiry. The caller still has to check the epoch
@@ -199,6 +258,27 @@ mod tests {
         let token = theirs.mint(1, "ada", 1, "access", 1_000);
         assert!(ours.verify(&token, 1_000).is_err());
         assert_ne!(ours.public_hex(), theirs.public_hex());
+    }
+
+    #[test]
+    fn a_join_ticket_names_one_flame_and_hides_the_account() {
+        let keys = Keys::open(&temp("join")).unwrap();
+        let (a, b) = ("a".repeat(64), "b".repeat(64));
+        let claims = |ticket: &str| -> JoinClaims {
+            let payload = ticket.strip_prefix(PREFIX).unwrap().split_once('.').unwrap().0;
+            serde_json::from_slice(&BASE64.decode(payload).unwrap()).unwrap()
+        };
+        let on_a = claims(&keys.mint_join(7, "Ada", &a, 1_000));
+        assert_eq!((on_a.typ.as_str(), on_a.aud.as_str(), on_a.name.as_str()), ("join", a.as_str(), "Ada"));
+        assert_eq!(on_a.exp, 1_000 + JOIN_SECONDS);
+        // The same player is the same id on the same Flame, every time...
+        assert_eq!(claims(&keys.mint_join(7, "Ada", &a, 2_000)).pid, on_a.pid);
+        // ...a different one on another Flame, and never the account number.
+        assert_ne!(claims(&keys.mint_join(7, "Ada", &b, 1_000)).pid, on_a.pid);
+        assert_ne!(claims(&keys.mint_join(8, "Bob", &a, 1_000)).pid, on_a.pid);
+        assert_eq!(on_a.pid.len(), 32);
+        // A ticket is not an access token, so it opens nothing here.
+        assert!(keys.verify(&keys.mint_join(7, "Ada", &a, 1_000), 1_000).is_err());
     }
 
     #[test]

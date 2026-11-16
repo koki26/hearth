@@ -19,6 +19,7 @@ use tracing::{debug, info, warn};
 pub mod command;
 pub mod log;
 pub mod store;
+pub mod ticket;
 pub mod worlds;
 
 use worlds::Repository;
@@ -28,11 +29,57 @@ const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
 /// Certificate subject name; clients use it as the TLS server name.
 pub const CERT_NAME: &str = "hearth";
 
+/// The Fireplace a Flame checks accounts against unless told otherwise.
+pub const DEFAULT_FIREPLACE: &str = "https://fireplace.kokiland-services.eu";
+
+/// A cap on something, or none. Written as a number in `flame.toml`, where
+/// `-1` means no limit -- so a headless server says it the same way the
+/// window's "no limit" box does.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Limit(pub Option<u32>);
+
+impl Limit {
+    pub const NONE: Self = Self(None);
+
+    pub const fn of(max: u32) -> Self {
+        Self(Some(max))
+    }
+
+    /// Whether one more fits when there are `count` already.
+    pub fn allows(self, count: usize) -> bool {
+        self.0.is_none_or(|max| count < max as usize)
+    }
+
+    /// How it is written in `flame.toml`.
+    pub fn to_toml(self) -> i64 {
+        self.0.map_or(-1, i64::from)
+    }
+}
+
+impl std::fmt::Display for Limit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.0 {
+            Some(max) => write!(f, "{max}"),
+            None => f.write_str("no limit"),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Limit {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        match i64::deserialize(deserializer)? {
+            -1 => Ok(Self::NONE),
+            n => u32::try_from(n)
+                .map(Self::of)
+                .map_err(|_| serde::de::Error::custom("a limit is -1 for none, or 0 and up")),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Config {
     pub port: u16,
-    pub max_players: u16,
     pub data_dir: PathBuf,
     /// Where the packed worlds live. Defaults to `data_dir/worlds`.
     pub worlds_dir: Option<PathBuf>,
@@ -40,19 +87,36 @@ pub struct Config {
     pub hub_world: String,
     /// Whether players may start their own instance of a world.
     pub client_instancing: bool,
-    pub max_instances: u16,
+    /// Whether people without an account may join. They play, but nothing a
+    /// world stores for them is kept: saves belong to accounts.
+    pub allow_guests: bool,
+    /// The Fireplace whose accounts this Flame accepts. Empty for none, which
+    /// leaves only guests.
+    pub fireplace: String,
+    /// Everybody connected at once.
+    pub max_players: Limit,
+    /// In any one instance, the hub included.
+    pub max_players_per_instance: Limit,
+    /// Running at once, the hub included.
+    pub max_instances: Limit,
+    /// Instances one player may have started that are still running.
+    pub max_instances_per_player: Limit,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
             port: 7777,
-            max_players: 16,
             data_dir: "data".into(),
             worlds_dir: None,
             hub_world: "hub".into(),
             client_instancing: false,
-            max_instances: 8,
+            allow_guests: true,
+            fireplace: DEFAULT_FIREPLACE.into(),
+            max_players: Limit::of(16),
+            max_players_per_instance: Limit::NONE,
+            max_instances: Limit::of(8),
+            max_instances_per_player: Limit::of(1),
         }
     }
 }
@@ -60,15 +124,49 @@ impl Default for Config {
 impl Config {
     pub fn parse(text: &str) -> anyhow::Result<Self> {
         let config: Self = toml::from_str(text)?;
-        if config.max_players == 0 {
-            bail!("max_players must be at least 1");
-        }
-        if config.max_instances == 0 {
-            bail!("max_instances must be at least 1 (the hub)");
-        }
-        hearth_protocol::validate_slug(&config.hub_world)
-            .context("hub_world must be a world name: a-z, 0-9, - and _")?;
+        config.check()?;
         Ok(config)
+    }
+
+    /// What `parse` refuses, for settings that did not come from a file.
+    pub fn check(&self) -> anyhow::Result<()> {
+        if self.max_players == Limit::of(0) {
+            bail!("max_players must be at least 1, or -1 for no limit");
+        }
+        if self.max_players_per_instance == Limit::of(0) {
+            bail!("max_players_per_instance must be at least 1, or -1 for no limit");
+        }
+        if self.max_instances == Limit::of(0) {
+            bail!("max_instances must be at least 1 (the hub), or -1 for no limit");
+        }
+        if !self.allow_guests && self.fireplace.trim().is_empty() {
+            bail!("with no fireplace and no guests, nobody could ever join");
+        }
+        hearth_protocol::validate_slug(&self.hub_world)
+            .context("hub_world must be a world name: a-z, 0-9, - and _")?;
+        Ok(())
+    }
+
+    /// The whole config as `flame.toml` text, every key written out, so what
+    /// the window saves is exactly what a headless server would read.
+    pub fn to_toml(&self) -> String {
+        format!(
+            "port = {}\ndata_dir = {:?}\nworlds_dir = {:?}\nhub_world = {:?}\n\
+             allow_guests = {}\nfireplace = {:?}\nclient_instancing = {}\n\
+             # Limits: -1 means no limit.\nmax_players = {}\nmax_players_per_instance = {}\n\
+             max_instances = {}\nmax_instances_per_player = {}\n",
+            self.port,
+            self.data_dir.display().to_string(),
+            self.worlds_dir().display().to_string(),
+            self.hub_world,
+            self.allow_guests,
+            self.fireplace,
+            self.client_instancing,
+            self.max_players.to_toml(),
+            self.max_players_per_instance.to_toml(),
+            self.max_instances.to_toml(),
+            self.max_instances_per_player.to_toml(),
+        )
     }
 
     pub fn worlds_dir(&self) -> PathBuf {
@@ -141,6 +239,10 @@ pub async fn read_control(recv: &mut quinn::RecvStream) -> anyhow::Result<Contro
 
 struct Player {
     name: String,
+    /// Who they are on this Flame, from their Fireplace ticket; `None` for a
+    /// guest. Saves are keyed on this and nothing else, so a guest has none
+    /// and nobody can claim somebody else's by typing their name.
+    account: Option<String>,
     conn: quinn::Connection,
     control: mpsc::Sender<Control>,
     instance: u16,
@@ -161,6 +263,8 @@ struct Instance {
     /// Player-made instances close when the last player leaves; the ones the
     /// host started from the window stay until the host stops them.
     temporary: bool,
+    /// The player who started it, for `max_instances_per_player`.
+    owner: Option<u16>,
     /// Who holds which item, by the item's index in the world's object list.
     /// The server never reads the world, so an item is just a number to it:
     /// its whole job is that exactly one player holds one at a time.
@@ -264,14 +368,19 @@ impl State {
         self.players.get(&id).map_or(0, |p| p.hp)
     }
 
-    /// The name a player joined under and the world they are standing in.
-    /// A store write is namespaced by both, and the client names neither.
-    fn whereabouts(&self, id: u16) -> (String, String) {
+    /// The account a player's saves belong to, if they have one, and the
+    /// world they are standing in. A store write is namespaced by both, and
+    /// the client names neither.
+    fn whereabouts(&self, id: u16) -> (Option<String>, String) {
         let Some(player) = self.players.get(&id) else {
-            return (String::new(), String::new());
+            return (None, String::new());
         };
         let world = self.instances.get(&player.instance).map_or_else(|| "hub".to_owned(), |i| i.slug.clone());
-        (player.name.clone(), world)
+        (player.account.clone(), world)
+    }
+
+    fn name_of(&self, id: u16) -> String {
+        self.players.get(&id).map(|p| p.name.clone()).unwrap_or_default()
     }
 
     fn send(&self, id: u16, msg: Control) {
@@ -358,9 +467,16 @@ impl State {
 }
 
 pub struct Server {
-    pub max_players: u16,
-    max_instances: u16,
+    pub max_players: Limit,
+    pub max_players_per_instance: Limit,
+    pub max_instances: Limit,
+    pub max_instances_per_player: Limit,
+    pub allow_guests: bool,
     client_instancing: AtomicBool,
+    /// Checks the Fireplace tickets of people with accounts.
+    pub tickets: Arc<ticket::Tickets>,
+    /// Whether this Flame takes accounts at all.
+    pub accounts: bool,
     repo: Mutex<Repository>,
     state: Mutex<State>,
     roster: watch::Sender<Roster>,
@@ -369,7 +485,9 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn new(config: &Config, roster: watch::Sender<Roster>) -> Arc<Self> {
+    /// `certificate` is the one the endpoint serves: a ticket is good here
+    /// only if it names it.
+    pub fn new(config: &Config, certificate: &[u8], roster: watch::Sender<Roster>) -> Arc<Self> {
         let repo = Repository::open(config.worlds_dir());
         let mut state = State::default();
         // The hub exists even when its world file does not: clients then keep
@@ -381,14 +499,27 @@ impl Server {
                 name: config.hub_world.clone(),
                 kind: ember::PUBLIC,
                 temporary: false,
+                owner: None,
                 held: HashMap::new(),
             },
         );
         state.next_instance = HUB_INSTANCE.wrapping_add(1);
+        let tickets = Arc::new(ticket::Tickets::new(certificate));
+        let accounts = !config.fireplace.trim().is_empty();
+        if accounts {
+            ticket::fetch_key(tickets.clone(), config.fireplace.trim().to_owned(), config.data_dir.clone());
+        }
         let server = Arc::new(Self {
             max_players: config.max_players,
-            max_instances: config.max_instances.max(1),
+            max_players_per_instance: config.max_players_per_instance,
+            // The hub always runs, so zero would mean nothing else ever can.
+            max_instances: if config.max_instances == Limit::of(0) { Limit::of(1) } else { config.max_instances },
+            max_instances_per_player: config.max_instances_per_player,
+            // No Fireplace means nobody can have an account here.
+            allow_guests: config.allow_guests || !accounts,
             client_instancing: AtomicBool::new(config.client_instancing),
+            tickets,
+            accounts,
             repo: Mutex::new(repo),
             state: Mutex::new(state),
             roster,
@@ -441,7 +572,7 @@ impl Server {
             bail!("no world called {slug:?} in the repository");
         }
         let mut state = self.state.lock().unwrap();
-        self.open_instance(&mut state, slug, slug, ember::PUBLIC, false)
+        self.open_instance(&mut state, slug, slug, ember::PUBLIC, None)
             .context("too many instances are running")
     }
 
@@ -481,11 +612,13 @@ impl Server {
         slug: &str,
         name: &str,
         kind: u8,
-        temporary: bool,
+        owner: Option<u16>,
     ) -> Option<u16> {
-        if state.instances.len() >= self.max_instances as usize {
+        if !self.max_instances.allows(state.instances.len()) {
             return None;
         }
+        // The ones players start are the ones that close when they empty.
+        let temporary = owner.is_some();
         // Instance ids are never reused while running, and wrap at u16.
         let id = (0..=u16::MAX)
             .map(|step| state.next_instance.wrapping_add(step))
@@ -493,7 +626,14 @@ impl Server {
         state.next_instance = id.wrapping_add(1);
         state.instances.insert(
             id,
-            Instance { slug: slug.to_owned(), name: name.to_owned(), kind, temporary, held: HashMap::new() },
+            Instance {
+                slug: slug.to_owned(),
+                name: name.to_owned(),
+                kind,
+                temporary,
+                owner,
+                held: HashMap::new(),
+            },
         );
         state.broadcast(
             None,
@@ -574,8 +714,9 @@ impl Server {
     fn create_for_player(&self, state: &mut State, id: u16, slug: &str, name: &str, kind: u8) {
         let current = state.players.get(&id).map(|p| p.instance).unwrap_or(HUB_INSTANCE);
         let known = self.repo.lock().unwrap().get(slug).is_some();
-        let opened = (self.client_instancing() && known)
-            .then(|| self.open_instance(state, slug, name, kind, true))
+        let theirs = state.instances.values().filter(|i| i.owner == Some(id)).count();
+        let opened = (self.client_instancing() && known && self.max_instances_per_player.allows(theirs))
+            .then(|| self.open_instance(state, slug, name, kind, Some(id)))
             .flatten();
         match opened {
             Some(instance) => self.move_player(state, id, instance),
@@ -634,8 +775,8 @@ fn view(state: &State) -> Roster {
         .collect()
 }
 
-pub async fn serve(endpoint: quinn::Endpoint, config: &Config) {
-    let server = Server::new(config, watch::channel(Roster::new()).0);
+pub async fn serve(endpoint: quinn::Endpoint, config: &Config, certificate: &[u8]) {
+    let server = Server::new(config, certificate, watch::channel(Roster::new()).0);
     serve_with(endpoint, server).await
 }
 
@@ -662,8 +803,8 @@ async fn handle_connection(incoming: quinn::Incoming, server: Arc<Server>) -> an
         timeout(HANDSHAKE_TIMEOUT, conn.accept_bi()).await.context("handshake timeout")??;
     let hello = timeout(HANDSHAKE_TIMEOUT, read_control(&mut recv)).await.context("handshake timeout")?;
 
-    let name = match hello {
-        Ok(Control::Hello { version: PROTOCOL_VERSION, name }) => name,
+    let (name, ticket) = match hello {
+        Ok(Control::Hello { version: PROTOCOL_VERSION, name, ticket }) => (name, ticket),
         Ok(Control::Hello { version, .. }) => {
             info!(%addr, version, "rejected: wrong protocol version");
             return reject(&conn, send, RejectReason::BadVersion).await;
@@ -676,19 +817,52 @@ async fn handle_connection(incoming: quinn::Incoming, server: Arc<Server>) -> an
         Err(err) => return Err(err),
     };
 
-    // The queue holds the whole join burst: Welcome, every world, every
-    // instance, and one PeerJoined per player already in the hub.
+    // An account replaces the typed name with the one the Fireplace vouches
+    // for; no ticket is a guest, if guests are welcome.
+    let (name, account) = if ticket.is_empty() || !server.accounts {
+        if !server.allow_guests {
+            info!(%addr, %name, "rejected: guests are not allowed");
+            return reject(&conn, send, RejectReason::AccountRequired).await;
+        }
+        (name, None)
+    } else {
+        match server.tickets.check(&ticket) {
+            Ok(player) => (player.name, Some(player.id)),
+            Err(why) => {
+                info!(%addr, %name, ?why, "rejected: bad join ticket");
+                return reject(&conn, send, RejectReason::BadTicket).await;
+            }
+        }
+    };
+
     let worlds = server.worlds();
-    // Two hands per player, so the arrival burst can carry that many `Held`.
-    let (control_tx, mut control_rx) =
-        mpsc::channel(server.max_players as usize * 3 + worlds.len() + server.max_instances as usize + 16);
     let joined = {
         let mut state = server.state.lock().unwrap();
-        let free_id = (state.players.len() < server.max_players as usize)
-            .then(|| (1..=u16::MAX).find(|id| !state.players.contains_key(id)))
-            .flatten();
+        // Signing in again somewhere else ends the older session, so one
+        // account never has two sets of saves being written at once.
+        if let Some(account) = &account {
+            for (old, player) in &state.players {
+                if player.account.as_ref() == Some(account) {
+                    info!(id = old, "signed in again elsewhere; closing the older session");
+                    player.conn.close(0u8.into(), b"signed in elsewhere");
+                }
+            }
+        }
+        let room = server.max_players.allows(state.players.len())
+            && server.max_players_per_instance.allows(state.count(HUB_INSTANCE) as usize);
+        let free_id = room.then(|| (1..=u16::MAX).find(|id| !state.players.contains_key(id))).flatten();
+        // The queue holds the whole join burst -- Welcome, every world, every
+        // instance, one PeerJoined and two hands' `Held` per player already
+        // here -- with room for what follows while they are being read.
+        let headroom = server.max_players.0.map_or(64, |max| max as usize);
+        let (control_tx, control_rx) = mpsc::channel(
+            (state.players.len().max(headroom)) * 3 + worlds.len() + state.instances.len() + 16,
+        );
         if let Some(id) = free_id {
-            let flags = if server.client_instancing() { welcome::CLIENT_INSTANCING } else { 0 };
+            let mut flags = if server.client_instancing() { welcome::CLIENT_INSTANCING } else { 0 };
+            if account.is_some() {
+                flags |= welcome::SAVES;
+            }
             control_tx.try_send(Control::Welcome {
                 your_id: id,
                 tick_hz: TICK_HZ,
@@ -715,6 +889,7 @@ async fn handle_connection(incoming: quinn::Incoming, server: Arc<Server>) -> an
                 id,
                 Player {
                     name: name.clone(),
+                    account: account.clone(),
                     conn: conn.clone(),
                     control: control_tx,
                     instance: HUB_INSTANCE,
@@ -726,9 +901,9 @@ async fn handle_connection(incoming: quinn::Incoming, server: Arc<Server>) -> an
             server.announce_counts(&state, id, &[HUB_INSTANCE]);
             server.publish(&state);
         }
-        free_id
+        free_id.map(|id| (id, control_rx))
     };
-    let Some(id) = joined else {
+    let Some((id, mut control_rx)) = joined else {
         info!(%addr, %name, "rejected: server full");
         return reject(&conn, send, RejectReason::ServerFull).await;
     };
@@ -847,11 +1022,14 @@ async fn relay(
                 }
                 let mut state = server.state.lock().unwrap();
                 match msg {
-                    Control::JoinInstance { instance } if state.instances.contains_key(&instance) => {
+                    Control::JoinInstance { instance }
+                        if state.instances.contains_key(&instance)
+                            && server.max_players_per_instance.allows(state.count(instance) as usize) =>
+                    {
                         server.move_player(&mut state, id, instance);
                     }
                     Control::JoinInstance { .. } => {
-                        // Gone already: tell them where they still are.
+                        // Gone already, or full: tell them where they still are.
                         let current = state.players.get(&id).map(|p| p.instance).unwrap_or(HUB_INSTANCE);
                         state.send(id, Control::Moved { instance: current });
                     }
@@ -863,28 +1041,34 @@ async fn relay(
                     Control::Hit { target } if hit_limit.allow(Instant::now()) => state.hit(id, target),
                     Control::Hit { .. } => debug!(id, "dropped a hit: firing too fast"),
                     Control::Spawned { .. } => state.respawn(id),
-                    Control::Store { key, value } => {
-                        let (name, world) = state.whereabouts(id);
-                        let mut store = server.store.lock().unwrap();
-                        if let Err(refused) = store.put(&name, &world, &key, value) {
-                            debug!(id, ?refused, key, "refused a write");
-                            // Hand back what is actually stored, so a world
-                            // that was refused is not left believing itself.
-                            let value = store.get(&name, &world, &key);
-                            state.send(id, Control::Value { key, value });
+                    Control::Store { key, value } => match state.whereabouts(id) {
+                        (Some(account), world) => {
+                            let mut store = server.store.lock().unwrap();
+                            if let Err(refused) = store.put(&account, &world, &key, value) {
+                                debug!(id, ?refused, key, "refused a write");
+                                // Hand back what is actually stored, so a world
+                                // that was refused is not left believing itself.
+                                let value = store.get(&account, &world, &key);
+                                state.send(id, Control::Value { key, value });
+                            }
                         }
-                    }
+                        // A guest's saves go nowhere, and the world is told the
+                        // same way as for any refused write: nothing is there.
+                        (None, _) => state.send(id, Control::Value { key, value: Vec::new() }),
+                    },
                     Control::Say { text } if chat_limit.allow(Instant::now()) => {
                         let instance = state.players.get(&id).map(|p| p.instance).unwrap_or(HUB_INSTANCE);
-                        let (name, _) = state.whereabouts(id);
+                        let name = state.name_of(id);
                         info!(id, instance, "{name}: {text}");
                         // Sender included: the echo is their receipt.
                         state.broadcast(Some(instance), NOBODY, Control::Said { from: id, text });
                     }
                     Control::Say { .. } => debug!(id, "dropped a chat line: talking too fast"),
                     Control::Fetch { key } => {
-                        let (name, world) = state.whereabouts(id);
-                        let value = server.store.lock().unwrap().get(&name, &world, &key);
+                        let value = match state.whereabouts(id) {
+                            (Some(account), world) => server.store.lock().unwrap().get(&account, &world, &key),
+                            (None, _) => Vec::new(),
+                        };
                         state.send(id, Control::Value { key, value });
                     }
                     other => bail!("unexpected control message {other:?}"),
@@ -984,9 +1168,29 @@ mod tests {
     #[test]
     fn config_parsing() {
         let config = Config::parse("port = 9000\nmax_players = 2").unwrap();
-        assert_eq!((config.port, config.max_players), (9000, 2));
+        assert_eq!((config.port, config.max_players), (9000, Limit::of(2)));
         assert_eq!(Config::parse("").unwrap().port, 7777);
         assert!(Config::parse("max_players = 0").is_err());
+        // -1 is how a headless server says "no limit", for every limit.
+        let open = Config::parse(
+            "max_players = -1\nmax_players_per_instance = -1\nmax_instances = -1\nmax_instances_per_player = -1",
+        )
+        .unwrap();
+        assert_eq!(
+            [open.max_players, open.max_players_per_instance, open.max_instances, open.max_instances_per_player],
+            [Limit::NONE; 4]
+        );
+        assert!(Config::parse("max_players = -2").is_err());
+        assert!(Config::parse("max_instances_per_player = 0").is_ok(), "nobody may start one");
+        assert!(Config::parse("allow_guests = false\nfireplace = \"\"").is_err(), "nobody could join");
+        assert!(Config::parse("allow_guests = false").is_ok());
+        // The config that ships is one the server takes.
+        let shipped = Config::parse(include_str!("../../../deploy/flame.toml")).unwrap();
+        assert_eq!(shipped.max_players_per_instance, Limit::NONE);
+        // What the window saves reads back the same.
+        let saved = Config::parse(&open.to_toml()).unwrap();
+        assert_eq!(saved.max_players_per_instance, Limit::NONE);
+        assert_eq!((saved.fireplace.as_str(), saved.allow_guests), (DEFAULT_FIREPLACE, true));
         assert!(Config::parse("prot = 1").is_err()); // typo is an error, not silently ignored
 
         // Worlds live under the data folder unless told otherwise.
@@ -1004,8 +1208,13 @@ mod tests {
         for slug in worlds {
             std::fs::write(dir.join(format!("{slug}.hworld")), b"a world").unwrap();
         }
-        let config = Config { worlds_dir: Some(dir.clone()), max_instances: 3, ..Config::default() };
-        (dir, Server::new(&config, watch::channel(Roster::new()).0))
+        let config = Config {
+            worlds_dir: Some(dir.clone()),
+            max_instances: Limit::of(3),
+            fireplace: String::new(),
+            ..Config::default()
+        };
+        (dir, Server::new(&config, b"cert", watch::channel(Roster::new()).0))
     }
 
     #[test]

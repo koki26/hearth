@@ -29,6 +29,9 @@ signal failed(what: String, message: String)
 const HEARTBEAT := 45.0
 ## Give up on a request that has not finished in this long.
 const TIMEOUT := 10.0
+## An access token lasts an hour; trade the refresh one for another well
+## before then, or a heartbeat gets a 401 and signs the player out.
+const RENEW := 50.0 * 60.0
 
 ## The token for asking things, the one that renews it, and who we are.
 var token := ""
@@ -50,6 +53,7 @@ var _sending := false
 ## What the request in flight was for, so the answer can be understood.
 var _tag := ""
 var _beat := 0.0
+var _renew := RENEW
 ## Where we last said we were, re-sent on every heartbeat.
 var _where := {}
 
@@ -79,6 +83,10 @@ func is_signed_in() -> bool:
 func _process(delta: float) -> void:
 	if not is_signed_in():
 		return
+	_renew -= delta
+	if _renew <= 0.0 and _details.account_refresh != "":
+		_renew = RENEW
+		_send("POST", "/sessions/refresh", {"refresh": _details.account_refresh}, "renew")
 	_beat -= delta
 	if _beat > 0.0:
 		return
@@ -288,8 +296,15 @@ func _took(tag: String, answer: Dictionary) -> void:
 			_details.account_refresh = str(answer.get("refresh", ""))
 			_details.save()
 			_beat = 0.0
+			_renew = RENEW
 			signed_in.emit(handle)
 			refresh_friends()
+		"renew":
+			# Quietly: the player is still signed in, nothing to announce.
+			token = str(answer.get("access", token))
+			_details.account_token = token
+			_details.account_refresh = str(answer.get("refresh", _details.account_refresh))
+			_details.save()
 		"friends":
 			friends = answer.get("friends", [])
 			incoming = answer.get("incoming", [])

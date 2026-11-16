@@ -5,10 +5,11 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use hearth_flame::{CERT_NAME, Config, Roster, Server, read_control};
+use hearth_flame::ticket::testing::Issuer;
+use hearth_flame::{CERT_NAME, Config, Limit, Roster, Server, read_control};
 use hearth_protocol::{
     ALPN, Control, Datagram, HUB_INSTANCE, PROTOCOL_VERSION, Peer, Pose, RejectReason, Transform, World,
-    ember,
+    ember, welcome,
 };
 use quinn::crypto::rustls::QuicClientConfig;
 use rustls::pki_types::CertificateDer;
@@ -30,6 +31,16 @@ struct Client {
 
 impl Client {
     async fn connect(addr: SocketAddr, cert: &CertificateDer<'static>, version: u16, name: &str) -> Self {
+        Self::connect_with(addr, cert, version, name, "").await
+    }
+
+    async fn connect_with(
+        addr: SocketAddr,
+        cert: &CertificateDer<'static>,
+        version: u16,
+        name: &str,
+        ticket: &str,
+    ) -> Self {
         let mut roots = rustls::RootCertStore::empty();
         roots.add(cert.clone()).unwrap();
         let mut crypto =
@@ -51,6 +62,8 @@ impl Client {
         buf.extend_from_slice(&version.to_le_bytes());
         buf.push(name.len() as u8);
         buf.extend_from_slice(name.as_bytes());
+        buf.extend_from_slice(&(ticket.len() as u16).to_le_bytes());
+        buf.extend_from_slice(ticket.as_bytes());
         let body_len = (buf.len() - 2) as u16;
         buf[..2].copy_from_slice(&body_len.to_le_bytes());
         send.write_all(&buf).await.unwrap();
@@ -84,9 +97,20 @@ impl Client {
 
     /// Joins, then eats the Welcome, the worlds and the instance list.
     async fn join(addr: SocketAddr, cert: &CertificateDer<'static>, name: &str) -> (Self, u16, Vec<World>) {
-        let mut client = Self::connect(addr, cert, PROTOCOL_VERSION, name).await;
-        let (id, instance) = match client.next().await {
-            Control::Welcome { your_id, instance, .. } => (your_id, instance),
+        let (client, id, worlds, _) = Self::join_with(addr, cert, name, "").await;
+        (client, id, worlds)
+    }
+
+    /// The same, with a ticket, and the Welcome's flags as well.
+    async fn join_with(
+        addr: SocketAddr,
+        cert: &CertificateDer<'static>,
+        name: &str,
+        ticket: &str,
+    ) -> (Self, u16, Vec<World>, u8) {
+        let mut client = Self::connect_with(addr, cert, PROTOCOL_VERSION, name, ticket).await;
+        let (id, instance, flags) = match client.next().await {
+            Control::Welcome { your_id, instance, flags, .. } => (your_id, instance, flags),
             other => panic!("expected Welcome, got {other:?}"),
         };
         assert_eq!(instance, HUB_INSTANCE, "everyone starts in the hub");
@@ -101,7 +125,7 @@ impl Client {
                 other => panic!("expected the world list, got {other:?}"),
             }
         }
-        (client, id, worlds)
+        (client, id, worlds, flags)
     }
 
     /// Downloads a world on a stream of its own, as the real client does.
@@ -117,6 +141,8 @@ impl Client {
 struct Harness {
     addr: SocketAddr,
     cert: CertificateDer<'static>,
+    /// Stands in for the Fireplace: the server holds its public key.
+    issuer: Issuer,
     server: Arc<Server>,
     roster: watch::Receiver<Roster>,
     dir: PathBuf,
@@ -126,21 +152,41 @@ impl Harness {
     /// Starts a server with `worlds` in its repository, each holding its own
     /// recognisable bytes.
     async fn start(tag: &str, max_players: u16, worlds: &[&str]) -> Self {
+        Self::start_with(tag, worlds, |config| config.max_players = Limit::of(max_players.into())).await
+    }
+
+    async fn start_with(tag: &str, worlds: &[&str], tweak: impl FnOnce(&mut Config)) -> Self {
         let dir = std::env::temp_dir().join(format!("hearth-relay-{tag}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         for slug in worlds {
             std::fs::write(dir.join(format!("{slug}.hworld")), format!("packed world {slug}")).unwrap();
         }
-        let config =
-            Config { max_players, worlds_dir: Some(dir.clone()), max_instances: 3, ..Config::default() };
+        let mut config = Config {
+            worlds_dir: Some(dir.clone()),
+            data_dir: dir.join("data"),
+            max_instances: Limit::of(3),
+            max_instances_per_player: Limit::NONE,
+            // Nothing listens here: the key comes from the issuer below, and
+            // the background fetch just keeps failing quietly.
+            fireplace: "http://127.0.0.1:9".into(),
+            ..Config::default()
+        };
+        tweak(&mut config);
         let (cert, key) = hearth_flame::generate_cert().unwrap();
         let endpoint = hearth_flame::endpoint(0, cert.clone(), key).unwrap();
         let port = endpoint.local_addr().unwrap().port();
         let (tx, roster) = watch::channel(Roster::new());
-        let server = Server::new(&config, tx);
+        let server = Server::new(&config, &cert, tx);
+        let issuer = Issuer::default();
+        server.tickets.set_key(issuer.public_key());
         tokio::spawn(hearth_flame::serve_with(endpoint, server.clone()));
-        Self { addr: ([127, 0, 0, 1], port).into(), cert, server, roster, dir }
+        Self { addr: ([127, 0, 0, 1], port).into(), cert, issuer, server, roster, dir }
+    }
+
+    /// A ticket for this server, as the Fireplace would mint one.
+    fn ticket(&self, pid: &str, name: &str) -> String {
+        self.issuer.fresh(self.server.tickets.certificate(), pid, name)
     }
 
     async fn join(&self, name: &str) -> (Client, u16, Vec<World>) {
@@ -540,7 +586,9 @@ async fn a_hit_claimed_from_far_away_or_at_yourself_is_dropped() {
 #[tokio::test]
 async fn stored_data_comes_back() {
     let harness = Harness::start("store", 4, &["hub"]).await;
-    let (mut ada, _, _) = harness.join("Ada").await;
+    let (mut ada, _, _, flags) =
+        Client::join_with(harness.addr, &harness.cert, "typed", &harness.ticket("a1", "Ada")).await;
+    assert_ne!(flags & welcome::SAVES, 0, "an account gets saves");
 
     // Nothing stored yet.
     ada.say(Control::Fetch { key: "score".into() }).await;
@@ -550,8 +598,9 @@ async fn stored_data_comes_back() {
     ada.say(Control::Fetch { key: "score".into() }).await;
     assert_eq!(ada.next().await, Control::Value { key: "score".into(), value: vec![4, 2] });
 
-    // Somebody else joining under another name sees their own nothing.
-    let (mut bob, _, _) = harness.join("Bob").await;
+    // Somebody else, with an account of their own, sees their own nothing.
+    let (mut bob, _, _, _) =
+        Client::join_with(harness.addr, &harness.cert, "Bob", &harness.ticket("b2", "Bob")).await;
     // Bob hears about Ada before he hears his own answer.
     assert!(matches!(bob.next().await, Control::PeerJoined(Peer { .. })));
     bob.say(Control::Fetch { key: "score".into() }).await;
@@ -602,4 +651,121 @@ async fn chat_reaches_the_ember_and_a_flood_is_trimmed() {
         }
     }
     assert_eq!(heard, 4, "one line of the burst went on the first message");
+}
+
+#[tokio::test]
+async fn a_guest_plays_but_nothing_is_saved_and_typing_a_name_claims_nothing() {
+    let harness = Harness::start("guest-saves", 4, &["hub"]).await;
+    let (mut ada, _, _, _) =
+        Client::join_with(harness.addr, &harness.cert, "x", &harness.ticket("a1", "Ada")).await;
+    ada.say(Control::Store { key: "score".into(), value: vec![9] }).await;
+
+    // A guest typing the same display name is somebody else entirely.
+    let (mut guest, _, _, flags) = Client::join_with(harness.addr, &harness.cert, "Ada", "").await;
+    assert_eq!(flags & welcome::SAVES, 0, "a guest is told there are no saves");
+    assert!(matches!(guest.next().await, Control::PeerJoined(Peer { .. })));
+    guest.say(Control::Fetch { key: "score".into() }).await;
+    assert_eq!(guest.next().await, Control::Value { key: "score".into(), value: Vec::new() });
+    // And a write is answered with what is kept for them: nothing.
+    guest.say(Control::Store { key: "score".into(), value: vec![1] }).await;
+    assert_eq!(guest.next().await, Control::Value { key: "score".into(), value: Vec::new() });
+
+    // The account's name is the Fireplace's, not the one typed.
+    assert!(harness.hub_players().iter().any(|(_, name)| name == "Ada"));
+    assert!(!harness.hub_players().iter().any(|(_, name)| name == "x"));
+}
+
+#[tokio::test]
+async fn saves_follow_the_account_across_a_reconnect() {
+    let harness = Harness::start("saves-reconnect", 4, &["hub"]).await;
+    let ticket = harness.ticket("a1", "Ada");
+    let (mut ada, _, _, _) = Client::join_with(harness.addr, &harness.cert, "x", &ticket).await;
+    ada.say(Control::Store { key: "score".into(), value: vec![7] }).await;
+    ada.say(Control::Fetch { key: "score".into() }).await;
+    assert_eq!(ada.next().await, Control::Value { key: "score".into(), value: vec![7] });
+
+    // Signing in again from somewhere else ends the first session.
+    let (mut again, _, _, _) =
+        Client::join_with(harness.addr, &harness.cert, "x", &harness.ticket("a1", "Ada")).await;
+    timeout(T, ada.conn.closed()).await.expect("the older session is closed");
+    again.say(Control::Fetch { key: "score".into() }).await;
+    loop {
+        match again.next().await {
+            Control::Value { value, .. } => break assert_eq!(value, vec![7], "the save came along"),
+            _ => continue,
+        }
+    }
+}
+
+#[tokio::test]
+async fn guests_can_be_turned_away_and_a_bad_ticket_always_is() {
+    let harness = Harness::start_with("no-guests", &[], |config| config.allow_guests = false).await;
+    let mut guest = Client::connect(harness.addr, &harness.cert, PROTOCOL_VERSION, "Ada").await;
+    assert_eq!(guest.next().await, Control::Reject { reason: RejectReason::AccountRequired });
+
+    // A ticket for another Flame -- the replay this design exists to stop.
+    let elsewhere = harness.issuer.fresh(&"ab".repeat(32), "a1", "Ada");
+    let mut replayed =
+        Client::connect_with(harness.addr, &harness.cert, PROTOCOL_VERSION, "Ada", &elsewhere).await;
+    assert_eq!(replayed.next().await, Control::Reject { reason: RejectReason::BadTicket });
+    // One signed by somebody who is not our Fireplace.
+    let forged = Issuer::default().fresh(harness.server.tickets.certificate(), "a1", "Ada");
+    let mut forger = Client::connect_with(harness.addr, &harness.cert, PROTOCOL_VERSION, "Ada", &forged).await;
+    assert_eq!(forger.next().await, Control::Reject { reason: RejectReason::BadTicket });
+
+    // And the real thing gets in.
+    let (_, _, _, flags) =
+        Client::join_with(harness.addr, &harness.cert, "Ada", &harness.ticket("a1", "Ada")).await;
+    assert_ne!(flags & welcome::SAVES, 0);
+}
+
+#[tokio::test]
+async fn an_instance_can_be_full_and_a_player_can_start_only_so_many() {
+    let harness = Harness::start_with("instance-limits", &["forest"], |config| {
+        config.max_players_per_instance = Limit::of(2);
+        config.max_instances_per_player = Limit::of(1);
+        config.max_instances = Limit::NONE;
+        config.client_instancing = true;
+    })
+    .await;
+    let (mut ada, _, _) = harness.join("Ada").await;
+    let (mut bob, _, _) = harness.join("Bob").await;
+    // The hub holds two, so a third is turned away at the door.
+    let mut cy = Client::connect(harness.addr, &harness.cert, PROTOCOL_VERSION, "Cy").await;
+    assert_eq!(cy.next().await, Control::Reject { reason: RejectReason::ServerFull });
+
+    assert!(matches!(ada.next().await, Control::PeerJoined(_)));
+    ada.say(create("forest", "one", ember::PUBLIC)).await;
+    let first = loop {
+        match ada.next().await {
+            Control::Moved { instance } => break instance,
+            _ => continue,
+        }
+    };
+    assert_ne!(first, HUB_INSTANCE);
+    // Ada already has one running, so a second is refused where she stands.
+    ada.say(create("forest", "two", ember::PUBLIC)).await;
+    loop {
+        match ada.next().await {
+            Control::Moved { instance } => break assert_eq!(instance, first),
+            _ => continue,
+        }
+    }
+
+    // Bob may join Ada's; it then holds two, and is full.
+    bob.say(Control::JoinInstance { instance: first }).await;
+    loop {
+        match bob.next().await {
+            Control::Moved { instance } => break assert_eq!(instance, first),
+            _ => continue,
+        }
+    }
+    let (mut cy, _, _) = harness.join("Cy").await;
+    cy.say(Control::JoinInstance { instance: first }).await;
+    loop {
+        match cy.next().await {
+            Control::Moved { instance } => break assert_eq!(instance, HUB_INSTANCE, "full, so Cy stays"),
+            _ => continue,
+        }
+    }
 }

@@ -16,10 +16,9 @@
 //! can type ever reaches the filesystem. Lines are `world/key<TAB>hex`, which
 //! needs no dependency to parse and stays readable when something goes wrong.
 //!
-//! shortcut: keyed on the name typed at the connect panel, so anybody can
-//! claim anybody's data. That is exactly the hole accounts close
-//! (docs/TRUST.md); the store is built now so the identity can be swapped
-//! underneath it later without a protocol change.
+//! Keyed on the player's per-Flame id from their Fireplace ticket
+//! (`ticket.rs`), never on a typed name, so nobody can claim anybody else's
+//! data. Guests have no id and so no store at all.
 
 use std::collections::HashMap;
 use std::io::Write;

@@ -65,12 +65,19 @@ fn status(server: &Arc<Server>) -> String {
     let instances = server.instances();
     let here: usize = instances.iter().map(|instance| instance.players.len()).sum();
     format!(
-        "{here}/{} players in {} instance(s), {} world(s) in {}, players may start their own: {}",
+        "{here}/{} players in {} instance(s), {} world(s) in {}, players may start their own: {}, \
+         guests: {}, accounts: {}",
         server.max_players,
         instances.len(),
         server.worlds().len(),
         server.worlds_dir().display(),
         if server.client_instancing() { "yes" } else { "no" },
+        if server.allow_guests { "yes" } else { "no" },
+        match (server.accounts, server.tickets.has_key()) {
+            (false, _) => "off",
+            (true, true) => "on",
+            (true, false) => "waiting for the Fireplace",
+        },
     )
 }
 
@@ -171,8 +178,13 @@ mod tests {
         for slug in worlds {
             std::fs::write(dir.join(format!("{slug}.hworld")), b"packed").unwrap();
         }
-        let config = Config { worlds_dir: Some(dir.clone()), max_instances: 3, ..Config::default() };
-        (dir, Server::new(&config, tokio::sync::watch::channel(Roster::new()).0))
+        let config = Config {
+            worlds_dir: Some(dir.clone()),
+            max_instances: crate::Limit::of(3),
+            fireplace: String::new(),
+            ..Config::default()
+        };
+        (dir, Server::new(&config, b"cert", tokio::sync::watch::channel(Roster::new()).0))
     }
 
     #[test]

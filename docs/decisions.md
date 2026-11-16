@@ -1026,3 +1026,37 @@ would expect from a finished game, and still one file to reskin
   leaves out. It is local only: other players do not see your camera yet,
   because that would be a pose for a held thing that is not an item, and
   there is no message for it.
+
+## D62 — Accounts are the key to saves, and a Flame only ever sees a ticket
+
+A Flame now checks who somebody is, and what it learns is as little as that
+can be (docs/TRUST.md, docs/FIREPLACE.md).
+
+* **A join ticket, bound to the Flame's certificate.** After the TLS
+  handshake the client asks the Fireplace (`POST /join`) for a ticket naming
+  the SHA-256 of the certificate it was just shown, and sends it in `Hello`
+  (protocol v7). The Flame refuses any ticket naming another certificate. That
+  is what makes handing a ticket to a Flame safe before pinning exists (D3): a
+  copied ticket works nowhere else, and a man in the middle gets one for
+  itself.
+* **The Flame learns a display name and a per-Flame id, nothing more.** The id
+  is an HMAC of the account and the certificate under a secret only the
+  Fireplace holds, so it is stable on one Flame and unrelated on every other.
+  Two hosts comparing notes cannot tell they share a player, and no host ever
+  sees an account number or a handle.
+* **Checked offline.** The Flame fetches the Fireplace's public key once and
+  keeps it in `data/fireplace.key`; a Fireplace that is down does not stop a
+  Flame that has seen it before from letting people in.
+* **Saves belong to accounts.** The store is keyed on the per-Flame id. A
+  guest plays if `allow_guests` is on, but every `Store` is answered with an
+  empty `Value`, `Welcome` says so (`welcome::SAVES`), and worlds can ask
+  `saves_kept()`. Signing in again elsewhere closes the older session, so one
+  account never writes its saves from two places.
+* **Every limit can be off.** Players on the server, players per instance,
+  instances on the server, instances per player. `-1` in `flame.toml` is "no
+  limit", which is the same thing the window's "No limit" box writes, and the
+  window saves every change itself, half a second after the last one, and
+  never a config the server would refuse to start with.
+* **Not yet:** `friends` embers are still unenforced, because a ticket says
+  nothing about friends; and a world scripting language (FireSharp) is its
+  own piece of work.

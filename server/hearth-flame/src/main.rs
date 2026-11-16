@@ -29,16 +29,18 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let (cert, key) = hearth_flame::load_or_create_cert(&config.data_dir)?;
-    let endpoint = hearth_flame::endpoint(config.port, cert, key)?;
+    let endpoint = hearth_flame::endpoint(config.port, cert.clone(), key)?;
     info!(
         addr = %endpoint.local_addr()?,
-        max_players = config.max_players,
+        max_players = %config.max_players,
+        guests = config.allow_guests,
+        fireplace = %config.fireplace,
         worlds = %config.worlds_dir().display(),
         hub = %config.hub_world,
         "the Flame is lit"
     );
 
-    let state = Server::new(&config, tokio::sync::watch::channel(Vec::new()).0);
+    let state = Server::new(&config, &cert, tokio::sync::watch::channel(Vec::new()).0);
     let server = tokio::spawn(hearth_flame::serve_with(endpoint.clone(), state.clone()));
     let quit = prompt(state);
     tokio::select! {

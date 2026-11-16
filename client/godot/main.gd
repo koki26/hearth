@@ -523,10 +523,10 @@ func _warning_rows() -> Array:
 func _advanced_rows() -> Array:
 	return [
 		{"id": "accounts", "label": "Accounts", "text": _details.account_server, "icon": "res://icons/globe.svg"},
-		{"id": "direct", "label": "No account", "toggle": _details.direct, "icon": "res://icons/lock.svg"},
+		{"id": "direct", "label": "Join as a guest", "toggle": _details.direct, "icon": "res://icons/lock.svg"},
 		{"label": ""},
-		{"label": "Nothing issues accounts yet, so joining"},
-		{"label": "is direct whatever this says."},
+		{"label": "A guest plays, but servers keep no"},
+		{"label": "saves for them, and some let none in."},
 		{"label": ""},
 		{"id": "back", "label": "Back", "icon": "res://icons/back.svg"},
 	]
@@ -599,7 +599,16 @@ func _join() -> void:
 	# top when the failure arrived. `_on_connected` sends it down instead.
 	_status("Connecting to %s:%d..." % [parsed["host"], int(parsed["port"])])
 	_refresh_panel()
-	$Client.connect_to_server(str(parsed["host"]), int(parsed["port"]), _details.player_name.strip_edges())
+	# Signed in, the server is told who you are by a ticket from the
+	# Fireplace, and keeps your saves; otherwise you join as a guest.
+	var as_account := _fireplace.is_signed_in() and not _details.direct
+	$Client.connect_to_server(
+		str(parsed["host"]),
+		int(parsed["port"]),
+		_details.player_name.strip_edges(),
+		_fireplace.base_url() if as_account else "",
+		_fireplace.token if as_account else ""
+	)
 
 
 func _on_panel_chosen(id: String) -> void:

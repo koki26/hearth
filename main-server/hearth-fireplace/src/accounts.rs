@@ -44,6 +44,7 @@ pub enum Refused {
     TooManyFriends,
     TooManyRequests,
     Full,
+    BadDisplayName,
 }
 
 impl std::fmt::Display for Refused {
@@ -57,6 +58,7 @@ impl std::fmt::Display for Refused {
             Self::TooManyFriends => "that is as many friends as an account may have",
             Self::TooManyRequests => "that account has too many requests waiting",
             Self::Full => "this Fireplace is full",
+            Self::BadDisplayName => "a display name is 1 to 32 bytes, with no control characters",
         })
     }
 }
@@ -70,6 +72,10 @@ pub struct Account {
     pub id: u64,
     /// As it was typed, for showing. Matching is always case-insensitive.
     pub handle: String,
+    /// What Flames and friends see. Empty means the handle. Unlike a handle
+    /// it may change and need not be unique: it is a name, not a login.
+    #[serde(default)]
+    pub display_name: String,
     /// argon2id, in PHC form -- which carries its own parameters, so they can
     /// be raised later and old accounts rehashed as people sign in.
     pub password: String,
@@ -174,6 +180,7 @@ impl Accounts {
             Account {
                 id,
                 handle: handle.to_owned(),
+                display_name: String::new(),
                 password: hashed,
                 created: now,
                 token_epoch: 1,
@@ -269,6 +276,43 @@ impl Accounts {
         Ok(())
     }
 
+    pub fn set_display_name(&mut self, me: u64, name: &str) -> Result<(), Refused> {
+        let name = name.trim();
+        if hearth_protocol::validate_name(name).is_err() {
+            return Err(Refused::BadDisplayName);
+        }
+        let account = self.by_id.get_mut(&me).ok_or(Refused::NoSuchAccount)?;
+        account.display_name = name.to_owned();
+        self.save();
+        Ok(())
+    }
+
+    /// A new password signs out everywhere: the epoch moves, so every token
+    /// minted under the old one stops working. Returns the new epoch.
+    pub fn set_password(&mut self, me: u64, hashed: String) -> Result<u64, Refused> {
+        let account = self.by_id.get_mut(&me).ok_or(Refused::NoSuchAccount)?;
+        account.password = hashed;
+        account.token_epoch += 1;
+        let epoch = account.token_epoch;
+        self.save();
+        Ok(epoch)
+    }
+
+    /// Gone for good, and out of everybody else's lists in the same save, so
+    /// nobody is left friends with an id that means nothing. The handle is
+    /// free again afterwards.
+    pub fn delete(&mut self, me: u64) -> Result<(), Refused> {
+        let account = self.by_id.remove(&me).ok_or(Refused::NoSuchAccount)?;
+        self.by_handle.remove(&account.handle.to_lowercase());
+        for other in self.by_id.values_mut() {
+            other.friends.retain(|id| *id != me);
+            other.incoming.retain(|id| *id != me);
+            other.outgoing.retain(|id| *id != me);
+        }
+        self.save();
+        Ok(())
+    }
+
     fn must_exist(&self, id: u64) -> Result<(), Refused> {
         if self.by_id.contains_key(&id) { Ok(()) } else { Err(Refused::NoSuchAccount) }
     }
@@ -302,6 +346,13 @@ fn write_atomically(path: &Path, book: &Book) -> Result<()> {
 /// Letters, digits, `-` and `_`, starting with a letter. No dots, no
 /// separators, nothing that could be read as a path -- and nothing that could
 /// pass for somebody else's name at a glance.
+impl Account {
+    /// What everybody else sees.
+    pub fn display(&self) -> &str {
+        if self.display_name.is_empty() { &self.handle } else { &self.display_name }
+    }
+}
+
 pub fn handle_is_usable(handle: &str) -> bool {
     let ok = |c: char| c.is_ascii_alphanumeric() || c == '-' || c == '_';
     handle.len() >= MIN_HANDLE
@@ -449,5 +500,25 @@ mod tests {
         let dir = temp("broken");
         std::fs::write(dir.join("people.json"), "{ this is not json").unwrap();
         assert!(Accounts::open(&dir).is_err(), "better to refuse to start than to overwrite everybody");
+    }
+
+    #[test]
+    fn a_display_name_changes_and_a_deleted_account_leaves_no_trace() {
+        let mut store = Accounts::open(&temp("display-delete")).unwrap();
+        let (ada, bob) = (make(&mut store, "ada"), make(&mut store, "bob"));
+        assert_eq!(store.get(ada).unwrap().display(), "ada", "the handle until one is chosen");
+        store.set_display_name(ada, "  Ada Lovelace ").unwrap();
+        assert_eq!(store.get(ada).unwrap().display(), "Ada Lovelace");
+        assert_eq!(store.set_display_name(ada, "   "), Err(Refused::BadDisplayName));
+        assert_eq!(store.set_display_name(ada, &"x".repeat(33)), Err(Refused::BadDisplayName));
+
+        assert_eq!(store.set_password(ada, "$argon2id$new".into()), Ok(2), "everybody signed out");
+
+        store.request(ada, bob).unwrap();
+        store.accept(bob, ada).unwrap();
+        store.delete(ada).unwrap();
+        assert!(store.get(ada).is_none() && store.by_handle("ada").is_none());
+        assert!(store.get(bob).unwrap().friends.is_empty(), "not friends with nobody");
+        make(&mut store, "ada"); // The handle is free again.
     }
 }

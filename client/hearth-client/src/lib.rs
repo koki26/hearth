@@ -47,6 +47,9 @@ pub struct HearthClient {
     /// Last send time per item, so carrying two things does not double the
     /// rate of either. Only ever holds the handful of items we carry.
     last_item: HashMap<u16, Instant>,
+    /// Whether this server keeps what worlds store for us: we joined with an
+    /// account (`welcome::SAVES`). A guest's writes go nowhere.
+    saves: bool,
 }
 
 #[godot_api]
@@ -63,6 +66,7 @@ impl INode for HearthClient {
             worlds: HashMap::new(),
             cache_dir: PathBuf::from("."),
             last_item: HashMap::new(),
+            saves: false,
         }
     }
 
@@ -71,6 +75,7 @@ impl INode for HearthClient {
             match event {
                 net::Event::Connected { your_id, tick_hz, instance, flags } => {
                     self.interval = Duration::from_secs_f64(1.0 / tick_hz.max(1) as f64);
+                    self.saves = flags & hearth_protocol::welcome::SAVES != 0;
                     self.signals().connected().emit(
                         your_id as i32,
                         tick_hz as i32,
@@ -80,7 +85,7 @@ impl INode for HearthClient {
                 }
                 net::Event::Rejected(reason) => {
                     self.client = None;
-                    self.signals().rejected().emit(&GString::from(format!("{reason:?}").as_str()));
+                    self.signals().rejected().emit(&GString::from(describe(reason)));
                 }
                 net::Event::Disconnected(reason) => {
                     self.client = None;
@@ -379,14 +384,20 @@ impl HearthClient {
     }
 
     /// Replaces any existing connection. Progress arrives as signals.
+    /// `fireplace` and `token` are the account to join with; leave `token`
+    /// empty to join as a guest, whose saves the server does not keep.
     #[func]
-    fn connect_to_server(&mut self, host: GString, port: i32, player_name: GString) {
+    fn connect_to_server(&mut self, host: GString, port: i32, player_name: GString, fireplace: GString, token: GString) {
         self.worlds.clear();
         self.last_item.clear();
+        self.saves = false;
+        let account = (!token.is_empty() && !fireplace.is_empty())
+            .then(|| net::Account { fireplace: fireplace.to_string(), token: token.to_string() });
         self.client = Some(net::Client::connect(
             host.to_string(),
             port as u16,
             player_name.to_string(),
+            account,
             self.cache_dir.clone(),
         ));
         self.last_pose = None;
@@ -395,6 +406,15 @@ impl HearthClient {
     #[func]
     fn disconnect_from_server(&mut self) {
         self.client = None;
+        self.saves = false;
+    }
+
+    /// For world makers: whether `store` will be kept. False for a guest --
+    /// the server answers their writes with nothing -- so a world can say
+    /// "sign in to keep your progress" instead of silently forgetting.
+    #[func]
+    fn saves_kept(&self) -> bool {
+        self.saves
     }
 
     /// Captured stereo 48 kHz samples straight from `AudioEffectCapture`; any
@@ -447,6 +467,18 @@ impl HearthClient {
             left: from_godot(left),
             right: from_godot(right),
         }));
+    }
+}
+
+/// What a refusal means, in words a player can act on.
+fn describe(reason: hearth_protocol::RejectReason) -> &'static str {
+    use hearth_protocol::RejectReason::*;
+    match reason {
+        ServerFull => "the server is full",
+        BadVersion => "your game and the server are different versions; update whichever is older",
+        BadName => "that name will not do",
+        AccountRequired => "this server only lets in people signed in to an account",
+        BadTicket => "the server could not check your account; try again in a moment",
     }
 }
 

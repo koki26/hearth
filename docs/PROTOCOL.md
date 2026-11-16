@@ -1,4 +1,4 @@
-# Hearth wire protocol — version 6
+# Hearth wire protocol — version 7
 
 Throughout this document **the server** means a **Flame**: one game server,
 hosted by anybody. The Fireplace -- the one server that knows who people are --
@@ -60,9 +60,9 @@ larger prefix is a protocol error.
 
 | Type | Name | Direction | Body after the type byte |
 |---|---|---|---|
-| `0x01` | Hello | C→S | `version u16`, `name` |
+| `0x01` | Hello | C→S | `version u16`, `name`, `ticket` (`u16` length + ASCII, ≤ 1024; empty = guest) |
 | `0x02` | Welcome | S→C | `your_id u16`, `tick_hz u8`, `instance u16`, `flags u8` |
-| `0x03` | Reject | S→C | `reason u8`: 1 = server full, 2 = bad version, 3 = bad name |
+| `0x03` | Reject | S→C | `reason u8`: 1 = server full, 2 = bad version, 3 = bad name, 4 = account required, 5 = bad ticket |
 | `0x04` | PeerJoined | S→C | `id u16`, `name` |
 | `0x05` | PeerLeft | S→C | `id u16` |
 | `0x06` | WorldAdded | S→C | `slug`, `size u32`, `sha256 32 bytes` |
@@ -85,7 +85,15 @@ An instance's `name` is what its maker called it, encoded like any other
 `3` invite. A higher value is a protocol error. Nothing enforces anything but
 `public`: there are no accounts yet, so a server cannot tell whose friend
 anybody is (docs/TRUST.md). It is carried and repeated so clients can show it.
-`Welcome.flags` bit 0 means the server lets players start their own instances.
+`Welcome.flags` bit 0 means the server lets players start their own instances;
+bit 1 means you joined with an account and the server keeps what worlds `Store`
+for you. A guest has bit 1 clear, and every `Store` is answered with an empty
+`Value`.
+
+The `ticket` comes from the Fireplace (`POST /join`, `docs/FIREPLACE.md`) and
+names the SHA-256 of the server's certificate, so it is good on that server
+only. A `Hello` that ends after `name` (version 6 and older) still decodes, so
+an old client is told `bad version` rather than dropped.
 
 A rejected join is told twice: the `Reject` message, and the QUIC close frame,
 which carries `rejected:` followed by the same reason byte. The server closes
@@ -133,8 +141,8 @@ only ties the bytes to what that connection advertised. Clients cache by hash,
 so the same world from two servers is downloaded once. Limits: a world is
 1 byte to 256 MB, and a client may have one download stream open at a time.
 
-Example: `Hello { version: 2, name: "Ada" }` is
-`07 00 | 01 | 02 00 | 03 41 64 61`.
+Example: `Hello { version: 2, name: "Ada", ticket: "" }` is
+`09 00 | 01 | 02 00 | 03 41 64 61 | 00 00`.
 
 ## Datagrams
 
