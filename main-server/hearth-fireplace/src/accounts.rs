@@ -124,6 +124,10 @@ pub struct Account {
     pub admin: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ban: Option<Ban>,
+    /// Two-step sign-in: a code by email on every sign-in, not only from a
+    /// new IP address.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub two_factor: bool,
 }
 
 /// One place an account signed in from.
@@ -282,6 +286,7 @@ impl Accounts {
                 avatar: 0,
                 admin: false,
                 ban: None,
+                two_factor: false,
             },
         );
         self.save();
@@ -524,6 +529,12 @@ impl Accounts {
 
     pub fn set_admin(&mut self, me: u64, on: bool) -> Result<(), Refused> {
         self.by_id.get_mut(&me).ok_or(Refused::NoSuchAccount)?.admin = on;
+        self.save();
+        Ok(())
+    }
+
+    pub fn set_two_factor(&mut self, me: u64, on: bool) -> Result<(), Refused> {
+        self.by_id.get_mut(&me).ok_or(Refused::NoSuchAccount)?.two_factor = on;
         self.save();
         Ok(())
     }

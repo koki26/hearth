@@ -15,7 +15,7 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
-use lettre::message::{Mailbox, header::ContentType};
+use lettre::message::{Attachment, Mailbox, MultiPart, SinglePart, header::ContentType};
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor};
 
@@ -112,7 +112,9 @@ pub struct Letter {
     /// For the log line, in place of who it was to.
     pub kind: &'static str,
     pub subject: String,
+    /// Plain text: what the log shows, and the fallback part of the email.
     pub body: String,
+    pub html: String,
 }
 
 /// What the memory backend kept, for the tests.
@@ -278,12 +280,15 @@ impl Mailer {
         let mut builder = Message::builder()
             .from(self.from.clone().context("no from address")?)
             .to(to.parse().context("not an address")?)
-            .subject(letter.subject)
-            .header(ContentType::TEXT_PLAIN);
+            .subject(letter.subject);
         if let Some(reply_to) = &self.reply_to {
             builder = builder.reply_to(reply_to.clone());
         }
-        Ok(builder.body(letter.body)?)
+        // Plain text first, then the designed one with its logo inside.
+        let designed = MultiPart::related().singlepart(SinglePart::html(letter.html)).singlepart(
+            Attachment::new_inline(String::from("logo")).body(LOGO.to_vec(), ContentType::parse("image/png")?),
+        );
+        Ok(builder.multipart(MultiPart::alternative().singlepart(SinglePart::plain(letter.body)).multipart(designed))?)
     }
 }
 
@@ -345,135 +350,244 @@ fn password(config: &SmtpConfig) -> Result<String> {
 
 // --- the letters --------------------------------------------------------------
 //
-// Plain text, short, in English. Every one is about an account and
-// nothing else: there is no marketing, and no list to be on.
+// Every one is about an account and nothing else: there is no marketing, and
+// no list to be on. Each is written once, as parts, and rendered twice: as
+// HTML with the Hearth banner, and as plain text for mail apps that want it.
 
-fn footer(url: &str) -> String {
-    format!(
-        "\n-- \nHearth · {url}/privacy\n\
-         You get this because of the account named above; Hearth sends nothing else.\n\
-         Tento e-mail dostáváš kvůli účtu uvedenému výše; Hearth nic jiného neposílá.\n"
-    )
+/// The logo in the banner, sent inside the email (`cid:logo`) so it shows
+/// without "load images".
+const LOGO: &[u8] = include_bytes!("../assets/email-logo.png");
+
+enum Part {
+    Text(String),
+    /// A code to type, shown large.
+    Code(String),
+    /// The one thing to click.
+    Button(&'static str, String),
+    /// Small print under the rest.
+    Small(String),
+}
+
+struct Draft {
+    kind: &'static str,
+    subject: String,
+    /// The line a mail app shows next to the subject.
+    preview: String,
+    heading: String,
+    parts: Vec<Part>,
+    /// Why this came, under the card.
+    because: String,
+}
+
+const FONT: &str = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+const SERIF: &str = "Georgia,'Palatino Linotype',Palatino,serif";
+
+impl Draft {
+    fn letter(self, url: &str) -> Letter {
+        let esc = crate::pages::esc;
+        let mut text = format!("{}\n\n", self.heading);
+        let mut html = String::new();
+        for part in &self.parts {
+            match part {
+                Part::Text(t) => {
+                    text += &format!("{t}\n\n");
+                    html += &format!(
+                        "<p style=\"margin:0 0 16px;font:15px/1.6 {FONT};color:#3a4060\">{}</p>",
+                        esc(t)
+                    );
+                }
+                Part::Code(c) => {
+                    text += &format!("    {c}\n\n");
+                    html += &format!(
+                        "<div style=\"margin:4px 0 20px;padding:18px 0;text-align:center;background:#f3f4f9;\
+                         border:1px solid #dfe3ee;border-radius:12px;font:600 34px/1 'SFMono-Regular',Consolas,\
+                         'Liberation Mono',Menlo,monospace;letter-spacing:10px;color:#1a1f3a\">{}</div>",
+                        esc(c)
+                    );
+                }
+                Part::Button(label, link) => {
+                    text += &format!("{label}: {link}\n\n");
+                    html += &format!(
+                        "<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin:6px 0 22px\">\
+                         <tr><td style=\"border-radius:10px;background:#ad500f\"><a href=\"{l}\" style=\"display:inline-block;\
+                         padding:13px 24px;font:600 15px/1 {FONT};color:#ffffff;text-decoration:none;border-radius:10px\">{}</a>\
+                         </td></tr></table><p style=\"margin:0 0 16px;font:12px/1.5 {FONT};color:#8a8fa8;word-break:break-all\">\
+                         Or paste this into your browser: {l}</p>",
+                        esc(label),
+                        l = esc(link)
+                    );
+                }
+                Part::Small(s) => {
+                    text += &format!("{s}\n\n");
+                    html += &format!(
+                        "<p style=\"margin:0 0 12px;font:13px/1.55 {FONT};color:#6b7190\">{}</p>",
+                        esc(s)
+                    );
+                }
+            }
+        }
+        text += &format!("--\n{}\nHearth · {url}/privacy\n", self.because);
+        let html = format!(
+            "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">\
+             <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\
+             <meta name=\"color-scheme\" content=\"light\"><title>{subject}</title></head>\
+             <body style=\"margin:0;padding:0;background:#eceef5\">\
+             <div style=\"display:none;max-height:0;overflow:hidden;opacity:0\">{preview}</div>\
+             <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#eceef5\">\
+             <tr><td align=\"center\" style=\"padding:32px 12px\">\
+             <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:560px\">\
+             <tr><td style=\"background:#171c3a;border-radius:16px 16px 0 0;padding:22px 28px;border-bottom:3px solid #ad500f\">\
+             <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\"><tr>\
+             <td style=\"vertical-align:middle\"><img src=\"cid:logo\" width=\"44\" height=\"44\" alt=\"\" \
+             style=\"display:block;border:0;border-radius:11px\"></td>\
+             <td style=\"vertical-align:middle;padding-left:12px;font:600 22px/1 {SERIF};color:#ffffff\">Hearth</td>\
+             </tr></table></td></tr>\
+             <tr><td style=\"background:#ffffff;border-radius:0 0 16px 16px;padding:32px 28px 18px\">\
+             <h1 style=\"margin:0 0 18px;font:600 24px/1.25 {SERIF};color:#1a1f3a\">{heading}</h1>{html}</td></tr>\
+             <tr><td style=\"padding:20px 8px 0;text-align:center;font:12px/1.6 {FONT};color:#8a8fa8\">{because}<br>\
+             <a href=\"{url}/privacy\" style=\"color:#8a8fa8\">Privacy</a> · \
+             <a href=\"{url}/terms\" style=\"color:#8a8fa8\">Terms</a></td></tr>\
+             </table></td></tr></table></body></html>",
+            subject = esc(&self.subject),
+            preview = esc(&self.preview),
+            heading = esc(&self.heading),
+            because = esc(&self.because),
+            url = esc(url),
+        );
+        Letter { kind: self.kind, subject: self.subject, body: text, html }
+    }
+}
+
+fn because(handle: &str) -> String {
+    format!("You got this because of the Hearth account @{handle}. Hearth sends nothing else.")
 }
 
 impl Mailer {
-    pub fn verify_letter(&self, handle: &str, link: &str) -> Letter {
-        Letter {
+    /// The code is typed where the account was made; the link is for when
+    /// that page is gone.
+    pub fn verify_letter(&self, handle: &str, code: &str, link: &str) -> Letter {
+        Draft {
             kind: "verify",
-            subject: "Hearth: confirm your email / potvrzení e-mailu".into(),
-            body: format!(
-                "This address was added to the Hearth account \"{handle}\". To confirm it, open:\n\n{link}\n\n\
-                 The link works for 7 days. If you know nothing about this, ignore this email and the address is deleted.\n\n\
-                 ---\n\n\
-                 Tato adresa byla přidána k účtu Hearth „{handle}“. Potvrdíš ji otevřením odkazu:\n\n{link}\n\n\
-                 Odkaz platí 7 dní. Pokud o tom nevíš, e-mail ignoruj a adresa bude smazána.\n{}",
-                footer(&self.public_url)
-            ),
+            subject: format!("{code} is your Hearth code"),
+            preview: "Confirm your email address".into(),
+            heading: "Confirm your email".into(),
+            parts: vec![
+                Part::Text(format!("This address was added to the Hearth account @{handle}. Enter this code to confirm it:")),
+                Part::Code(code.into()),
+                Part::Text("It works for 15 minutes. If you have closed that page, use the button instead (it works for 7 days).".into()),
+                Part::Button("Confirm my email", link.into()),
+                Part::Small("If you did not make a Hearth account, ignore this email: the address is deleted in a week.".into()),
+            ],
+            because: because(handle),
         }
+        .letter(&self.public_url)
+    }
+
+    /// A code to finish signing in: always for a new IP address, and every
+    /// time for an account that turned on two-step sign-in.
+    pub fn sign_in_letter(&self, handle: &str, ip: &str, code: &str, new_place: bool) -> Letter {
+        let url = &self.public_url;
+        let why = if new_place {
+            format!("Somebody is signing in to @{handle} with the right password, from an IP address this account has not used before ({ip}).")
+        } else {
+            format!("Somebody is signing in to @{handle} with the right password, from {ip}. Two-step sign-in is on, so a code is needed.")
+        };
+        Draft {
+            kind: "sign-in",
+            subject: format!("{code} is your Hearth sign-in code"),
+            preview: "Your code to finish signing in".into(),
+            heading: if new_place { "New sign-in. Was this you?".into() } else { "Your sign-in code".into() },
+            parts: vec![
+                Part::Text(why),
+                Part::Text("If it was you, enter this code to finish signing in:".into()),
+                Part::Code(code.into()),
+                Part::Small("It works for 15 minutes, once.".into()),
+                Part::Text("If it was NOT you, do not share this code with anyone. Whoever it was knows your password but cannot get in without it. Change your password now:".into()),
+                Part::Button("Change my password", format!("{url}/reset")),
+            ],
+            because: because(handle),
+        }
+        .letter(url)
     }
 
     pub fn reset_letter(&self, handle: &str, link: &str) -> Letter {
-        Letter {
+        Draft {
             kind: "reset",
-            subject: "Hearth: reset your password / obnovení hesla".into(),
-            body: format!(
-                "Somebody asked to reset the password of the Hearth account \"{handle}\". To choose a new one, open:\n\n{link}\n\n\
-                 The link works once, for 30 minutes, and signs the account out everywhere. \
-                 If you did not ask, ignore this email: your password has not changed.\n\n\
-                 ---\n\n\
-                 Někdo požádal o obnovení hesla k účtu Hearth „{handle}“. Nové heslo nastavíš zde:\n\n{link}\n\n\
-                 Odkaz funguje jednou, 30 minut, a odhlásí účet všude. \
-                 Pokud o tom nevíš, e-mail ignoruj: heslo se nezměnilo.\n{}",
-                footer(&self.public_url)
-            ),
+            subject: "Reset your Hearth password".into(),
+            preview: "Choose a new password".into(),
+            heading: "Reset your password".into(),
+            parts: vec![
+                Part::Text(format!("Somebody asked to reset the password of the Hearth account @{handle}.")),
+                Part::Button("Choose a new password", link.into()),
+                Part::Small("The link works once, for 30 minutes, and signs the account out everywhere. If you did not ask, ignore this email: your password has not changed.".into()),
+            ],
+            because: because(handle),
         }
+        .letter(&self.public_url)
     }
 
     pub fn password_changed_letter(&self, handle: &str) -> Letter {
         let (url, contact) = (&self.public_url, &self.contact);
-        Letter {
+        Draft {
             kind: "password-changed",
-            subject: "Hearth: your password was changed / heslo bylo změněno".into(),
-            body: format!(
-                "The password of the Hearth account \"{handle}\" was just changed, and every sign-in was ended. \
-                 If that was you, there is nothing to do. If not, reset it at {url}/reset and write to {contact}.\n\n\
-                 ---\n\n\
-                 Heslo k účtu Hearth „{handle}“ bylo právě změněno a všechna přihlášení byla ukončena. \
-                 Pokud o změně víš, nic nedělej. Pokud ne, obnov heslo na {url}/reset a napiš na {contact}.\n{}",
-                footer(url)
-            ),
+            subject: "Your Hearth password was changed".into(),
+            preview: "Every sign-in was ended".into(),
+            heading: "Your password was changed".into(),
+            parts: vec![
+                Part::Text(format!("The password of the Hearth account @{handle} was just changed, and every sign-in was ended.")),
+                Part::Text("If that was you, there is nothing to do.".into()),
+                Part::Text(format!("If it was not, reset it right away and write to {contact}.")),
+                Part::Button("Reset my password", format!("{url}/reset")),
+            ],
+            because: because(handle),
         }
+        .letter(url)
     }
 
     pub fn email_changed_letter(&self, handle: &str) -> Letter {
         let contact = &self.contact;
-        Letter {
+        Draft {
             kind: "email-changed",
-            subject: "Hearth: your email was changed / e-mail byl změněn".into(),
-            body: format!(
-                "The email address of the Hearth account \"{handle}\" was changed or removed, so nothing about \
-                 that account will come to this address any more. If that was you, there is nothing to do. \
-                 If not, write to {contact}.\n\n\
-                 ---\n\n\
-                 E-mailová adresa u účtu Hearth „{handle}“ byla změněna nebo odebrána, takže na tuto adresu \
-                 už o něm nic nepřijde. Pokud o změně víš, nic nedělej. Pokud ne, napiš na {contact}.\n{}",
-                footer(&self.public_url)
-            ),
+            subject: "Your Hearth email was changed".into(),
+            preview: "Nothing more will come to this address".into(),
+            heading: "Your email was changed".into(),
+            parts: vec![
+                Part::Text(format!("The email address of the Hearth account @{handle} was changed, so nothing about that account will come to this address any more.")),
+                Part::Text(format!("If that was you, there is nothing to do. If it was not, write to {contact} straight away.")),
+            ],
+            because: because(handle),
         }
-    }
-
-    /// Somebody with the password is signing in from an address this account
-    /// has not used. Nothing happens until the owner says it was them.
-    pub fn new_place_letter(&self, handle: &str, ip: &str, link: &str) -> Letter {
-        let url = &self.public_url;
-        Letter {
-            kind: "place",
-            subject: "Hearth: was this you? / byl/a jsi to ty?".into(),
-            body: format!(
-                "Somebody just signed in to the Hearth account \"{handle}\" with the right password, from an \
-                 address it has not used before: {ip}\n\n\
-                 If it was you, confirm it here, then sign in again:\n\n{link}\n\n\
-                 The link works for 30 minutes. If it was NOT you, do not open it: change your password \
-                 at {url}/reset -- whoever it was has your password, but cannot get in without this email.\n\n\
-                 ---\n\n\
-                 Někdo se právě přihlásil k účtu Hearth „{handle}“ se správným heslem, z adresy, kterou účet \
-                 ještě nepoužil: {ip}\n\n\
-                 Pokud jsi to byl/a ty, potvrď to zde a přihlas se znovu:\n\n{link}\n\n\
-                 Odkaz platí 30 minut. Pokud jsi to NEBYL/A ty, neotvírej ho a změň si heslo na \
-                 {url}/reset -- ten někdo zná tvé heslo, ale bez tohoto e-mailu se dovnitř nedostane.\n{}",
-                footer(url)
-            ),
-        }
+        .letter(&self.public_url)
     }
 
     /// A change to the terms or privacy notice, in the operator's words, to
     /// somebody who asked to hear about it. Says how to stop them.
     pub fn policy_letter(&self, handle: &str, subject: &str, text: &str) -> Letter {
         let url = &self.public_url;
-        Letter {
+        let mut parts: Vec<Part> = text.trim().split("\n\n").map(|p| Part::Text(p.trim().to_owned())).collect();
+        parts.push(Part::Button("Read the privacy notice", format!("{url}/privacy")));
+        parts.push(Part::Small(format!("The terms are at {url}/terms. To stop these emails, turn them off on your account page: {url}/")));
+        Draft {
             kind: "policy",
-            subject: format!("Hearth: {}", subject.trim()),
-            body: format!(
-                "Hello {handle},\n\n{}\n\nThe terms: {url}/terms\nThe privacy notice: {url}/privacy\n\n\
-                 -- \nYou get this because the Hearth account \"{handle}\" asked for an email when the terms or \
-                 the privacy notice change. To stop them, turn that off on your account page: {url}/\n\
-                 Tento e-mail dostáváš, protože si účet „{handle}“ vyžádal upozornění na změny podmínek nebo \
-                 zásad ochrany soukromí. Vypnout to můžeš na stránce účtu: {url}/\n",
-                text.trim()
-            ),
+            subject: subject.trim().to_owned(),
+            preview: "A change to how Hearth works".into(),
+            heading: subject.trim().to_owned(),
+            parts,
+            because: format!("You got this because @{handle} asked to hear when the terms or the privacy notice change."),
         }
+        .letter(url)
     }
 
     pub fn test_letter(&self) -> Letter {
-        Letter {
+        Draft {
             kind: "test",
-            subject: "Hearth: test email / zkušební e-mail".into(),
-            body: format!(
-                "This is a test from your Hearth Fireplace. If you can read it, sending works.\n\n\
-                 Toto je zkušební e-mail z tvého Hearth Fireplace. Pokud ho čteš, odesílání funguje.\n{}",
-                footer(&self.public_url)
-            ),
+            subject: "Hearth test email".into(),
+            preview: "Sending works".into(),
+            heading: "Sending works".into(),
+            parts: vec![Part::Text("This is a test from your Hearth Fireplace. If you can read it, email is set up.".into())],
+            because: "You got this because somebody ran `fireplace admin test-mail` on the server.".into(),
         }
+        .letter(&self.public_url)
     }
 }
 

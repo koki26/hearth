@@ -79,10 +79,16 @@ terms or privacy notice change, sent only to a confirmed address by
 the body). `POST /settings` turns it off again.
 
 Where the Fireplace sends email, a new account also needs an `email`; it is
-sent a link, and until it is confirmed the account can sign in but cannot
-`/join` a Flame or make friends. A sign-in with the right password from an IP
-address the account has not used answers `403` and emails a link to confirm
-the place; after that it signs in as usual. A suspended account's sign-in
+sent a 6-digit code (`POST /me/email/confirm {"code"}`, or the link in the same
+email), and until it is confirmed the account can sign in but cannot `/join` a
+Flame or make friends. `POST /me/email/resend` sends a new code.
+
+A sign-in that needs a code -- always from an IP address the account has not
+used, and every time once `POST /me/two-factor {"password", "on": true}` has
+turned on two-step sign-in -- answers `403 {"code_needed": true, "ticket",
+"new_place"}` and emails a code. `POST /sessions/code {"ticket", "code"}` from
+the same address then answers with the tokens, as `/sessions` would have.
+Codes last 15 minutes, work once, and die after 5 wrong tries. A suspended account's sign-in
 answers `403` with `"banned": {"until", "until_text", "reason"}`, and a
 blocked IP gets the same shape (or a page, to a browser) for every request.
 A display name changes at most twice in 30 days (`429` after that).

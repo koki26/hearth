@@ -34,7 +34,6 @@ pub fn routes() -> Router<Arc<Fireplace>> {
         .route("/reset/{token}", get(new_password_page).post(set_new_password))
         .route("/recover", axum::routing::post(recover))
         .route("/verify/{token}", get(verify))
-        .route("/confirm-sign-in/{token}", get(confirm_sign_in))
         .route("/privacy", get(privacy))
         .route("/terms", get(terms))
 }
@@ -368,30 +367,6 @@ async fn verify(State(state): State<Arc<Fireplace>>, Path(raw): Path<String>) ->
     }
 }
 
-// --- a new place, confirmed ---------------------------------------------------
-
-/// The owner says the new address was them: it becomes a known place.
-async fn confirm_sign_in(State(state): State<Arc<Fireplace>>, Path(raw): Path<String>) -> Response {
-    let now = token::now();
-    let confirmed = state.keys.verify_link(&raw, "place", now).is_ok_and(|claims| {
-        let mut accounts = state.accounts.lock().unwrap();
-        let current = accounts.get(claims.sub).is_some_and(|a| a.token_epoch == claims.epoch);
-        if current {
-            accounts.remember_place(claims.sub, &claims.email, now, true);
-        }
-        current
-    });
-    if confirmed {
-        said(StatusCode::OK, "sign-in confirmed", "Thank you. That place is yours now: go back and sign in again.")
-    } else {
-        said(
-            StatusCode::GONE,
-            "sign-in",
-            "This link has run out, or the password was changed since. Sign in again to get a new one.",
-        )
-    }
-}
-
 // --- banned -------------------------------------------------------------------
 
 /// What a banned address, or a suspended account, is shown: for how long and why.
@@ -456,6 +431,7 @@ pub fn privacy_html(config: &crate::Config) -> String {
         row("Handle, display name, when the account was made", "Your account, and what other players see", contract, until_deleted),
         row("Password and recovery codes, only as one-way hashes", "Signing in, and getting back in", contract, until_deleted),
         row("Friends, friend requests, whether friends may see which server you are on", "Friends", contract, until_deleted),
+        row("Whether two-step sign-in is on", "Asking for a code from your email on every sign-in", contract, until_deleted),
         row("When you last changed your display name (the last 30 days)", "Display names change at most twice a month, so nobody can hide behind a new one every day", security, "30 days"),
         row("Your picture, if you upload one", "Shown to other players next to your name; anyone with its link can see it", contract, "Until you remove it or delete your account"),
         row("When you accepted the terms and this notice", "A record that you did", "Legal obligation to be able to show it (Art. 6(1)(c), 7(1))", until_deleted),
@@ -499,6 +475,8 @@ pub fn privacy_html(config: &crate::Config) -> String {
          at least {age} (Art. 8). Used for that check and thrown away: never stored, never logged.</li>\
          <li>Which server you are on: kept in memory only, if you share it, for 2 minutes after your game last \
          said so, and gone on restart.</li>\
+         <li>The 6-digit codes we email you: kept in memory only, as a one-way hash, for 15 minutes or until \
+         used, and gone on restart.</li>\
          <li>Counters of attempts per IP address, which stop people guessing passwords: memory only, at most \
          an hour.</li>\
          <li>IP addresses are never written to the server's logs.</li>\

@@ -255,6 +255,16 @@ label.button:active { transform: scale(.97); }
 .banner span { flex: 1; }
 .banner button { padding: 7px 12px; font-size: .86rem; }
 .count.warn { background: var(--red); }
+.banner { flex-wrap: wrap; }
+.banner > span { flex: 1 1 260px; }
+.banner form { gap: 8px; flex-wrap: nowrap; }
+.banner .msg { flex-basis: 100%; margin: 0; }
+.code-input { font: 600 1.6rem/1 ui-monospace, "Cascadia Mono", Consolas, monospace; letter-spacing: .45em;
+              text-align: center; padding: 14px 10px 14px calc(10px + .45em); }
+.code-input.small { width: 9.5em; font-size: 1.05rem; padding: 8px 8px 8px calc(8px + .45em); }
+.code-input::placeholder { color: color-mix(in srgb, var(--dim) 45%, transparent); }
+.banned-mark.mail { color: var(--fire); border-color: color-mix(in srgb, var(--fire) 50%, transparent); }
+#code-step h1 { margin-bottom: 8px; }
 .pill.ok { color: var(--green); border-color: color-mix(in srgb, var(--green) 40%, var(--line)); }
 .pill.warn { color: var(--red); border-color: color-mix(in srgb, var(--red) 40%, var(--line)); }
 .who .pill, .acct .pill { margin-left: 8px; vertical-align: 1px; }

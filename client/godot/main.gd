@@ -151,6 +151,8 @@ var _handle_typed := ""
 var _password_typed := ""
 ## Only for making an account: sent once, and the Fireplace does not keep it.
 var _birthday_typed := ""
+## The code from the email, when signing in needs one.
+var _code_typed := ""
 var _accept_terms := false
 var _policy_emails := false
 ## What is typed into "Add a friend" on the People page.
@@ -522,12 +524,20 @@ func _account_rows() -> Array:
 			"icon": "res://icons/lock.svg"},
 		{"label": ""},
 		{"id": "signin", "label": "Sign in", "button": true},
+	]
+	if _fireplace.code_ticket != "":
+		rows.append_array([
+			{"label": "We emailed you a 6-digit code:"},
+			{"id": "signin_code", "label": "Code from email", "text": _code_typed, "icon": "res://icons/send.svg"},
+			{"id": "send_code", "label": "Finish signing in", "button": true},
+		])
+	rows.append_array([
 		{"label": "New here? Also fill in:"},
 		{"id": "email", "label": "Email", "text": _email_typed, "icon": "res://icons/send.svg"},
 		{"id": "birthday", "label": "Birthday YYYY-MM-DD", "text": _birthday_typed, "icon": "res://icons/user.svg"},
 		{"id": "accept_terms", "label": "I accept terms & privacy", "toggle": _accept_terms,
 			"icon": "res://icons/check.svg"},
-	]
+	])
 	if bool(_fireplace.features.get("email", false)):
 		rows.append({"id": "policy_emails", "label": "Email me policy changes", "toggle": _policy_emails,
 			"icon": "res://icons/globe.svg"})
@@ -687,6 +697,11 @@ func _on_panel_chosen(id: String) -> void:
 		"accept_terms":
 			_accept_terms = not _accept_terms
 			_refresh_panel()
+		"send_code":
+			_message = "Checking the code..."
+			_fireplace.sign_in_with_code(_code_typed)
+			_code_typed = ""
+			_refresh_panel()
 		"policy_emails":
 			_policy_emails = not _policy_emails
 			_refresh_panel()
@@ -769,6 +784,8 @@ func _on_typed(text: String) -> void:
 		_handle_typed = text
 	elif _editing == "birthday":
 		_birthday_typed = text
+	elif _editing == "signin_code":
+		_code_typed = text
 	elif _editing == "password":
 		# Never saved and never written to the settings file: it goes to the
 		# Fireplace and nowhere else.

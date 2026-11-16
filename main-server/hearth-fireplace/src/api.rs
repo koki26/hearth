@@ -54,6 +54,10 @@ pub fn router(state: Arc<Fireplace>) -> Router {
         .route("/friends/accept", post(accept_friend))
         .route("/friends/remove", post(remove_friend))
         .route("/presence", post(report_presence))
+        .route("/sessions/code", post(sign_in_with_code))
+        .route("/me/email/confirm", post(confirm_email))
+        .route("/me/email/resend", post(resend_confirmation))
+        .route("/me/two-factor", post(set_two_factor))
         .route("/me/avatar", post(upload_avatar).layer(DefaultBodyLimit::max(avatar::MAX_UPLOAD)))
         .route("/me/avatar/delete", post(delete_avatar))
         .route("/avatars/{file}", get(avatar_file))
@@ -101,15 +105,39 @@ async fn built_in_web(uri: axum::http::Uri) -> Response {
     ([(axum::http::header::CONTENT_TYPE, kind)], body).into_response()
 }
 
-/// The confirmed address to ask, when `ip` is a place this account has not
-/// signed in from. Otherwise the place is noted and `None`: so also for an
-/// account with no confirmed address to ask, or a Fireplace with no email.
-fn new_place(state: &Fireplace, id: u64, ip: &str, now: u64) -> Option<String> {
+/// Sign-in codes an account can be sent in an hour.
+const CODES_PER_HOUR: u32 = 6;
+
+/// The confirmed address to send a code to, and whether it is because `ip`
+/// is new, when this sign-in needs one: always from an IP address the account
+/// has not used, and every time with two-step sign-in on. Otherwise the place
+/// is noted and `None` -- so also for an account with no confirmed address to
+/// send to, or a Fireplace with no email.
+fn needs_code(state: &Fireplace, id: u64, ip: &str, now: u64) -> Option<(String, bool)> {
     let mut accounts = state.accounts.lock().unwrap();
-    let address = accounts.get(id)?.email.as_ref().filter(|e| e.verified).map(|e| e.address.clone());
-    let ask = state.mail.enabled() && address.is_some() && !accounts.place_is_known(id, ip);
+    let account = accounts.get(id)?;
+    let address = account.email.as_ref().filter(|e| e.verified).map(|e| e.address.clone());
+    let two_step = account.two_factor;
+    let new_place = !accounts.place_is_known(id, ip);
+    let ask = state.mail.enabled() && address.is_some() && (new_place || two_step);
     accounts.remember_place(id, ip, now, !ask);
-    if ask { address } else { None }
+    if ask { address.map(|a| (a, new_place)) } else { None }
+}
+
+/// A code to type, and a link for when the page is gone.
+fn send_confirmation(state: &Fireplace, id: u64, handle: &str, epoch: u64, address: &str, now: u64) {
+    let link = format!("{}/verify/{}", state.mail.public_url, state.keys.mint_link("verify", id, epoch, address, now));
+    let (_, code) = state.codes.lock().unwrap().issue("verify", id, address, now);
+    state.mail.send(address, state.mail.verify_letter(handle, &code, &link));
+}
+
+fn wrong_code(wrong: crate::codes::Wrong) -> ApiError {
+    use crate::codes::Wrong;
+    match wrong {
+        Wrong::NotIt => ApiError::new(StatusCode::UNAUTHORIZED, "that is not the code"),
+        Wrong::UsedUp => ApiError::new(StatusCode::GONE, "that was the last try: ask for a new code"),
+        Wrong::Gone => ApiError::new(StatusCode::GONE, "that code has run out: ask for a new one"),
+    }
 }
 
 // --- what comes back when something will not be done ------------------------
@@ -234,7 +262,7 @@ fn must_be_confirmed(state: &Fireplace, id: u64) -> Result<(), ApiError> {
     if state.mail.enabled() && !confirmed {
         return Err(ApiError::new(
             StatusCode::FORBIDDEN,
-            "confirm your email first: open the link we sent you, or add an address on your account page",
+            "confirm your email first: enter the code we emailed you on your account page, or add an address there",
         ));
     }
     Ok(())
@@ -373,9 +401,7 @@ async fn create_account(
         (id, accounts.get(id).expect("just made").token_epoch)
     };
     if state.mail.enabled() {
-        let link =
-            format!("{}/verify/{}", state.mail.public_url, state.keys.mint_link("verify", id, epoch, &address, now));
-        state.mail.send(&address, state.mail.verify_letter(&handle, &link));
+        send_confirmation(&state, id, &handle, epoch, &address, now);
     }
     tracing::info!(id, %handle, "a new account");
     // The codes are shown this once and never again: only their hashes stay.
@@ -443,20 +469,23 @@ async fn sign_in(
         }
         return Ok(suspended(&ban));
     }
-    if let Some(address) = new_place(&state, id, &from, now) {
-        if state.limits.lock().unwrap().allow(&format!("place@{id}"), 3, limit::HOUR, now) {
-            let link = format!(
-                "{}/confirm-sign-in/{}",
-                state.mail.public_url,
-                state.keys.mint_link("place", id, epoch, &from, now)
-            );
-            state.mail.send(&address, state.mail.new_place_letter(&handle, &from, &link));
+    if let Some((address, new_place)) = needs_code(&state, id, &from, now) {
+        if !state.limits.lock().unwrap().allow(&format!("code@{id}"), CODES_PER_HOUR, limit::HOUR, now) {
+            return Err(too_many("that is a lot of codes: wait a while, then sign in again"));
         }
-        tracing::info!(id, "asked to confirm a new place");
-        return Err(ApiError::new(
+        let (ticket, code) = state.codes.lock().unwrap().issue("sign-in", id, &from, now);
+        state.mail.send(&address, state.mail.sign_in_letter(&handle, &from, &code, new_place));
+        tracing::info!(id, new_place, "sent a sign-in code");
+        let error = if new_place {
+            "you are signing in from somewhere new: enter the code we just emailed you"
+        } else {
+            "enter the code we just emailed you"
+        };
+        return Ok((
             StatusCode::FORBIDDEN,
-            "you are signing in from somewhere new: we emailed you a link to confirm it is you, then sign in again",
-        ));
+            Json(json!({ "error": error, "code_needed": true, "ticket": ticket, "new_place": new_place })),
+        )
+            .into_response());
     }
     state.presence.lock().unwrap().sweep(now);
     tracing::info!(id, %handle, "signed in");
@@ -521,6 +550,7 @@ async fn me(State(state): State<Arc<Fireplace>>, headers: HeaderMap) -> Result<J
         "policy_emails": account.policy_emails,
         "avatar": account.avatar,
         "admin": account.admin,
+        "two_factor": account.two_factor,
         "renames_left": renames.0,
         "next_rename": renames.1,
         "places": account.seen,
@@ -559,6 +589,7 @@ async fn export(State(state): State<Arc<Fireplace>>, headers: HeaderMap) -> Resu
         "display_name_changes": account.renamed,
         "picture": (account.avatar > 0).then(|| format!("/avatars/{}.jpg", account.id)),
         "admin": account.admin,
+        "two_factor": account.two_factor,
         "ban": account.ban,
         "password": "stored only as an argon2id hash, which is not included",
         "presence_in_memory": seen.map(|w| json!({
@@ -609,12 +640,7 @@ async fn set_email(
         state.mail.send(&old, state.mail.email_changed_letter(&handle));
     }
     if !address.is_empty() {
-        let link = format!(
-            "{}/verify/{}",
-            state.mail.public_url,
-            state.keys.mint_link("verify", id, epoch, address, now)
-        );
-        state.mail.send(address, state.mail.verify_letter(&handle, &link));
+        send_confirmation(&state, id, &handle, epoch, address, now);
     }
     tracing::info!(id, "changed their email");
     Ok(Json(json!({ "email": (!address.is_empty()).then_some(address), "email_verified": false })))
@@ -1257,4 +1283,105 @@ async fn admin_sign_out(
     state.accounts.lock().unwrap().sign_out_everywhere(id)?;
     tracing::info!(admin = me, target = id, "signed an account out everywhere");
     Ok(StatusCode::NO_CONTENT)
+}
+
+// --- codes from email -----------------------------------------------------------
+
+#[derive(serde::Deserialize)]
+struct WithCode {
+    #[serde(default)]
+    ticket: String,
+    code: String,
+}
+
+/// The second half of a sign-in that needed a code: from the same IP address
+/// the code was sent for, and then that address is a known place.
+async fn sign_in_with_code(
+    State(state): State<Arc<Fireplace>>,
+    Caller(from): Caller,
+    Json(body): Json<WithCode>,
+) -> Result<Json<Value>, ApiError> {
+    let now = token::now();
+    if !state.limits.lock().unwrap().allow(&format!("code:{from}"), limit::SIGN_INS, limit::SIGN_IN_WINDOW, now) {
+        return Err(too_many("too many tries, wait a few minutes"));
+    }
+    let pending = state.codes.lock().unwrap().check(body.ticket.trim(), &body.code, now).map_err(wrong_code)?;
+    if pending.kind != "sign-in" || pending.about != from {
+        return Err(wrong_code(crate::codes::Wrong::Gone));
+    }
+    let (handle, epoch, banned) = {
+        let mut accounts = state.accounts.lock().unwrap();
+        accounts.remember_place(pending.account, &from, now, true);
+        let account = accounts.get(pending.account).ok_or(Refused::NoSuchAccount)?;
+        (account.handle.clone(), account.token_epoch, account.ban.as_ref().is_some_and(|b| b.active(now)))
+    };
+    if banned {
+        return Err(ApiError::new(StatusCode::FORBIDDEN, "this account is suspended"));
+    }
+    tracing::info!(id = pending.account, "signed in with a code");
+    Ok(Json(tokens_for(&state, pending.account, &handle, epoch, now)))
+}
+
+/// The code from the confirmation email, typed on the account page.
+async fn confirm_email(
+    State(state): State<Arc<Fireplace>>,
+    headers: HeaderMap,
+    Json(body): Json<WithCode>,
+) -> Result<Json<Value>, ApiError> {
+    let id = signed_in(&state, &headers)?;
+    let pending =
+        state.codes.lock().unwrap().check_account("verify", id, &body.code, token::now()).map_err(wrong_code)?;
+    if !state.accounts.lock().unwrap().verify_email(id, &pending.about) {
+        return Err(wrong_code(crate::codes::Wrong::Gone));
+    }
+    tracing::info!(id, "confirmed their email with a code");
+    Ok(Json(json!({ "email_verified": true })))
+}
+
+async fn resend_confirmation(State(state): State<Arc<Fireplace>>, headers: HeaderMap) -> Result<StatusCode, ApiError> {
+    let id = signed_in(&state, &headers)?;
+    let now = token::now();
+    let (handle, epoch, email) = {
+        let accounts = state.accounts.lock().unwrap();
+        let account = accounts.get(id).ok_or_else(unauthorised)?;
+        (account.handle.clone(), account.token_epoch, account.email.clone())
+    };
+    let Some(email) = email.filter(|e| !e.verified) else {
+        return Err(bad("there is no address waiting to be confirmed"));
+    };
+    if !state.limits.lock().unwrap().allow(&format!("verify@{id}"), 3, limit::HOUR, now) {
+        return Err(too_many("three a hour is plenty: check your spam folder"));
+    }
+    send_confirmation(&state, id, &handle, epoch, &email.address, now);
+    Ok(StatusCode::NO_CONTENT)
+}
+
+#[derive(serde::Deserialize)]
+struct TwoFactor {
+    password: String,
+    on: bool,
+}
+
+/// Two-step sign-in: a code by email every time, not just from new places.
+async fn set_two_factor(
+    State(state): State<Arc<Fireplace>>,
+    headers: HeaderMap,
+    Json(body): Json<TwoFactor>,
+) -> Result<Json<Value>, ApiError> {
+    let id = signed_in(&state, &headers)?;
+    if !state.mail.enabled() {
+        return Err(ApiError::new(StatusCode::NOT_FOUND, "this Fireplace does not send email"));
+    }
+    let (hashed, _) = password_of(&state, id)?;
+    if !check_password(hashed, body.password).await {
+        return Err(ApiError::new(StatusCode::UNAUTHORIZED, "that is not your password"));
+    }
+    let mut accounts = state.accounts.lock().unwrap();
+    let confirmed = accounts.get(id).is_some_and(|a| a.email.as_ref().is_some_and(|e| e.verified));
+    if body.on && !confirmed {
+        return Err(bad("confirm your email first: the codes go there"));
+    }
+    accounts.set_two_factor(id, body.on)?;
+    tracing::info!(id, on = body.on, "changed two-step sign-in");
+    Ok(Json(json!({ "two_factor": body.on })))
 }

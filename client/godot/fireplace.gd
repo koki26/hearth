@@ -141,6 +141,15 @@ func create_account(new_handle: String, password: String, address: String, birth
 		"birthdate": birthdate, "accept_terms": accept_terms, "policy_emails": policy_emails}, "signin")
 
 
+## The second step, when signing in needed a code from the email (a new IP
+## address, or two-step sign-in): the ticket the Fireplace handed back.
+var code_ticket := ""
+
+
+func sign_in_with_code(code: String) -> void:
+	_send("POST", "/sessions/code", {"ticket": code_ticket, "code": code.strip_edges()}, "signin")
+
+
 func sign_in(as_handle: String, password: String) -> void:
 	_send("POST", "/sessions", {"handle": as_handle, "password": password}, "signin")
 
@@ -325,6 +334,8 @@ func _on_answer(result: int, code: int, _headers: PackedStringArray, body: Packe
 		_next()
 		return
 	if code >= 400:
+		if tag == "signin" and bool(answer.get("code_needed", false)):
+			code_ticket = str(answer.get("ticket", ""))
 		failed.emit(tag, str(answer.get("error", "that did not work (%d)" % code)))
 		_next()
 		return
@@ -335,6 +346,7 @@ func _on_answer(result: int, code: int, _headers: PackedStringArray, body: Packe
 func _took(tag: String, answer: Dictionary) -> void:
 	match tag:
 		"signin", "refresh":
+			code_ticket = ""
 			token = str(answer.get("access", ""))
 			handle = str(answer.get("handle", ""))
 			account_id = int(answer.get("id", 0))

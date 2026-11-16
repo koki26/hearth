@@ -910,7 +910,7 @@ fn sign_in_as(handle: &str) -> Value {
 }
 
 #[tokio::test]
-async fn a_new_place_has_to_be_confirmed_by_email_before_it_gets_in() {
+async fn a_new_place_needs_the_code_from_the_email_to_get_in() {
     let (app, state) = fireplace_with_mail("places");
     join_with_email(&app, &state, "ada", "ada@example.org").await;
     // Made from "unknown" (no proxy header in `call`), so that place is known.
@@ -918,23 +918,88 @@ async fn a_new_place_has_to_be_confirmed_by_email_before_it_gets_in() {
 
     let (status, said) = call_from(&app, "203.0.113.7", "POST", "/sessions", None, sign_in_as("ada")).await;
     assert_eq!(status, StatusCode::FORBIDDEN, "{said}");
-    assert_eq!(letters(&state, "place"), 1);
-    let letter = state.mail.sent().into_iter().rev().find(|s| s.letter.kind == "place").unwrap();
+    assert_eq!((said["code_needed"].as_bool(), said["new_place"].as_bool()), (Some(true), Some(true)));
+    assert!(said.get("access").is_none(), "no tokens yet");
+    let ticket = said["ticket"].as_str().unwrap();
+    let letter = state.mail.sent().into_iter().rev().find(|s| s.letter.kind == "sign-in").unwrap();
     assert_eq!(letter.to, "ada@example.org");
-    assert!(letter.letter.body.contains("203.0.113.7"), "the letter says where from");
+    assert!(letter.letter.body.contains("203.0.113.7") && letter.letter.html.contains("cid:logo"));
+    let code = code_in(&state, "sign-in");
 
-    // A wrong password from there sends nothing: only the password-holder is asked about.
+    // A wrong password from there sends nothing: only the password-holder is asked.
     let wrong = json!({"handle": "ada", "password": "not it at all"});
     call_from(&app, "203.0.113.8", "POST", "/sessions", None, wrong).await;
-    assert_eq!(letters(&state, "place"), 1);
+    assert_eq!(letters(&state, "sign-in"), 1);
 
-    let (status, _) = get_page(&app, &link_in(&state, "place")).await;
-    assert_eq!(status, StatusCode::OK);
-    let (status, tokens) = call_from(&app, "203.0.113.7", "POST", "/sessions", None, sign_in_as("ada")).await;
-    assert_eq!(status, StatusCode::OK, "confirmed, so in");
+    // The code, from somewhere else, is no good; a wrong code is no good.
+    let elsewhere = json!({"ticket": ticket, "code": code});
+    assert_eq!(call_from(&app, "198.51.100.1", "POST", "/sessions/code", None, elsewhere).await.0, StatusCode::GONE);
+    let (_, said) = call_from(&app, "203.0.113.7", "POST", "/sessions", None, sign_in_as("ada")).await;
+    let ticket = said["ticket"].as_str().unwrap().to_owned();
+    let code = code_in(&state, "sign-in");
+    let wrong = json!({"ticket": ticket, "code": "000000x"});
+    assert_eq!(call_from(&app, "203.0.113.7", "POST", "/sessions/code", None, wrong).await.0, StatusCode::UNAUTHORIZED);
+    let right = json!({"ticket": ticket, "code": code});
+    let (status, tokens) = call_from(&app, "203.0.113.7", "POST", "/sessions/code", None, right).await;
+    assert_eq!(status, StatusCode::OK, "{tokens}");
+
+    // From then on that place is known: no code.
+    assert_eq!(call_from(&app, "203.0.113.7", "POST", "/sessions", None, sign_in_as("ada")).await.0, StatusCode::OK);
     let (_, me) = call(&app, "GET", "/me", tokens["access"].as_str(), Value::Null).await;
     let places: Vec<&str> = me["places"].as_array().unwrap().iter().map(|p| p["ip"].as_str().unwrap()).collect();
     assert!(places.contains(&"203.0.113.7"), "you can see where you signed in from: {places:?}");
+}
+
+/// The code in the last letter of this kind.
+fn code_in(state: &Fireplace, kind: &str) -> String {
+    let sent = state.mail.sent();
+    let letter = &sent.iter().rev().find(|s| s.letter.kind == kind).expect("a letter of that kind").letter;
+    letter
+        .body
+        .lines()
+        .map(str::trim)
+        .find(|l| l.len() == 6 && l.bytes().all(|b| b.is_ascii_digit()))
+        .expect("a code")
+        .to_owned()
+}
+
+#[tokio::test]
+async fn two_step_sign_in_asks_for_a_code_every_time() {
+    let (app, state) = fireplace_with_mail("two-step");
+    let made = join_with_email(&app, &state, "ada", "ada@example.org").await;
+    let access = made["access"].as_str().unwrap();
+    let wrong = json!({"password": "nope nope", "on": true});
+    assert_eq!(call(&app, "POST", "/me/two-factor", Some(access), wrong).await.0, StatusCode::UNAUTHORIZED);
+    let on = json!({"password": "a long one", "on": true});
+    assert_eq!(call(&app, "POST", "/me/two-factor", Some(access), on).await.0, StatusCode::OK);
+
+    // A known place, and still a code.
+    let (status, said) = call(&app, "POST", "/sessions", None, sign_in_as("ada")).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert_eq!((said["code_needed"].as_bool(), said["new_place"].as_bool()), (Some(true), Some(false)));
+    let right = json!({"ticket": said["ticket"], "code": code_in(&state, "sign-in")});
+    let (status, tokens) = call(&app, "POST", "/sessions/code", None, right.clone()).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(call(&app, "POST", "/sessions/code", None, right).await.0, StatusCode::GONE, "once");
+
+    let off = json!({"password": "a long one", "on": false});
+    assert_eq!(call(&app, "POST", "/me/two-factor", tokens["access"].as_str(), off).await.0, StatusCode::OK);
+    assert_eq!(call(&app, "POST", "/sessions", None, sign_in_as("ada")).await.0, StatusCode::OK);
+}
+
+#[tokio::test]
+async fn an_email_is_confirmed_with_the_code_it_was_sent() {
+    let (app, state) = fireplace_with_mail("verify-code");
+    let access = join(&app, "ada").await;
+    let letter = state.mail.sent().into_iter().rev().find(|s| s.letter.kind == "verify").unwrap();
+    assert!(letter.letter.html.contains("Confirm your email") && !letter.letter.body.contains("Tato"), "English only");
+    let code = code_in(&state, "verify");
+    let wrong = json!({"code": "123456x"});
+    assert_eq!(call(&app, "POST", "/me/email/confirm", Some(&access), wrong).await.0, StatusCode::UNAUTHORIZED);
+    assert_eq!(call(&app, "POST", "/me/email/confirm", Some(&access), json!({"code": code})).await.0, StatusCode::OK);
+    let (_, me) = call(&app, "GET", "/me", Some(&access), Value::Null).await;
+    assert_eq!(me["email_verified"], true);
+    assert_eq!(call(&app, "POST", "/me/email/resend", Some(&access), Value::Null).await.0, StatusCode::BAD_REQUEST);
 }
 
 #[tokio::test]

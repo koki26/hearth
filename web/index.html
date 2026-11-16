@@ -127,6 +127,21 @@
       </form>
     </div>
 
+    <!-- The second step: a code from the email. -->
+    <div class="auth-card" id="code-step" hidden>
+      <span class="banned-mark mail"><svg class="ic"><use href="#i-send"/></svg></span>
+      <h1>Check your email</h1>
+      <p class="note" id="code-why"></p>
+      <form id="code-form">
+        <label for="code">Code</label>
+        <input id="code" class="code-input" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}"
+          maxlength="6" required placeholder="000000">
+        <button class="main wide">Sign in</button>
+        <p class="msg" id="code-msg" role="status"></p>
+      </form>
+      <button class="wide quiet" id="code-back">Back</button>
+    </div>
+
     <!-- A suspended account, after the right password: how long, and why. -->
     <div class="auth-card banned" id="banned" hidden>
       <span class="banned-mark"><svg class="ic"><use href="#i-lock"/></svg></span>
@@ -175,9 +190,14 @@
   <main class="content">
     <div class="banner" id="confirm-banner" hidden>
       <svg class="ic"><use href="#i-send"/></svg>
-      <span>Confirm your email to play with this account and make friends. Open the link we sent to
-        <b id="confirm-to"></b>.</span>
-      <button data-view="email" class="go-email">Email settings</button>
+      <span>Enter the code we sent to <b id="confirm-to"></b> to play with this account and make friends.</span>
+      <form class="row" id="confirm-form">
+        <input id="confirm-code" class="code-input small" inputmode="numeric" autocomplete="one-time-code"
+          pattern="[0-9]{6}" maxlength="6" required placeholder="000000" aria-label="Code from the email">
+        <button class="main">Confirm</button>
+        <button type="button" id="confirm-resend">Send again</button>
+      </form>
+      <p class="msg" id="confirm-msg" role="status"></p>
     </div>
 
     <section class="view" id="view-profile">
@@ -238,9 +258,20 @@
       <header><h1>Security</h1><p>Your password, your recovery codes, and everywhere you signed in from.</p></header>
       <div class="card">
         <h2>Where you signed in from</h2>
-        <p class="note">Kept for 90 days after each was last used, only for security: a new address has to
-          be confirmed by email. Not you? Change your password below.</p>
+        <p class="note">Kept for 90 days after each was last used, only for security: a new address needs a
+          code from your email. Not you? Change your password below.</p>
         <ul class="places" id="places"></ul>
+      </div>
+      <div class="card" id="two-step-card" hidden>
+        <h2>Two-step sign-in <span class="pill" id="two-step-state"></span></h2>
+        <p class="note">With it on, every sign-in needs a code we email you, not just the password. A sign-in
+          from a new IP address always needs one, on or off.</p>
+        <form id="two-step-form" class="stack">
+          <label for="two-step-pw">Password</label>
+          <input id="two-step-pw" type="password" autocomplete="current-password" required>
+          <div class="actions"><button class="main" id="two-step-go">Turn on</button></div>
+          <p class="msg" id="two-step-msg" role="status"></p>
+        </form>
       </div>
       <div class="card">
         <h2>Change password</h2>

@@ -15,6 +15,7 @@ const el = (tag, cls, text) => {
 let creating = false;
 let features = { email: false, email_required: false, min_age: 16, renames: 2 };
 let me = null;
+let ticket = "";
 
 /** JSON in and out; `raw` sends a Blob as it is (a picture). */
 async function api(method, path, body, raw) {
@@ -89,7 +90,7 @@ function signOut() {
   store.set("access", ""); store.set("refresh", "");
   me = null;
   $("signed-in").hidden = true; $("auth").hidden = false;
-  $("banned").hidden = true; $("auth-card").hidden = false;
+  $("banned").hidden = true; $("code-step").hidden = true; $("auth-card").hidden = false;
   setTab(false);
   show("profile");
 }
@@ -131,9 +132,32 @@ $("auth-form").onsubmit = async (e) => {
     if (made.recovery_codes) showCodes(made.recovery_codes);
   } catch (err) {
     if (err.data && err.data.banned) return showBanned(err.data.banned);
+    if (err.data && err.data.code_needed) return askForCode(err.data);
     say("auth-msg", err.message, false);
   } finally { go.disabled = false; }
 };
+
+function askForCode(data) {
+  ticket = data.ticket;
+  $("auth-card").hidden = true; $("code-step").hidden = false;
+  $("code-why").textContent = data.new_place
+    ? "You are signing in from somewhere new. We emailed you a 6-digit code to make sure it is you."
+    : "Two-step sign-in is on. We emailed you a 6-digit code.";
+  $("code").value = "";
+  say("code-msg", "", true);
+  $("code").focus();
+}
+
+$("code-form").onsubmit = async (e) => {
+  e.preventDefault();
+  try {
+    keep(await api("POST", "/sessions/code", { ticket, code: $("code").value.trim() }));
+    ticket = ""; $("password").value = "";
+    $("code-step").hidden = true; $("auth-card").hidden = false;
+    await load();
+  } catch (err) { say("code-msg", err.message); }
+};
+$("code-back").onclick = () => { $("code-step").hidden = true; $("auth-card").hidden = false; };
 
 function showBanned(ban) {
   $("auth-card").hidden = true; $("banned").hidden = false;
@@ -160,12 +184,17 @@ async function load() {
   $("policy-emails").checked = me.policy_emails;
   $("email").value = me.email || "";
   $("email-state").textContent = !me.email ? "No email on this account yet: add one to play with it."
-    : me.email_verified ? "Confirmed." : "Waiting for you to open the link we sent to " + me.email + ". Saving it again sends a new link.";
+    : me.email_verified ? "Confirmed." : "Waiting for the code we sent to " + me.email + " (see the box at the top).";
   const unconfirmed = features.email_required && !me.email_verified;
   $("confirm-banner").hidden = !unconfirmed;
   $("email-flag").hidden = !unconfirmed;
   $("confirm-to").textContent = me.email || "your address";
   $("codes-left").textContent = me.recovery_codes_left + " of 8 left";
+  $("two-step-card").hidden = !features.email;
+  $("two-step-state").textContent = me.two_factor ? "on" : "off";
+  $("two-step-state").className = "pill " + (me.two_factor ? "ok" : "");
+  $("two-step-go").textContent = me.two_factor ? "Turn off" : "Turn on";
+  $("two-step-go").className = me.two_factor ? "" : "main";
   $("admin-nav").hidden = !me.admin;
   fillPlaces();
   await loadFriends();
@@ -353,12 +382,37 @@ $("codes-form").onsubmit = async (e) => {
   } catch (err) { say("codes-msg", err.message); }
 };
 
+$("confirm-form").onsubmit = async (e) => {
+  e.preventDefault();
+  try {
+    await api("POST", "/me/email/confirm", { code: $("confirm-code").value.trim() });
+    $("confirm-code").value = "";
+    await load();
+    say("email-msg", "Confirmed.", true);
+  } catch (err) { say("confirm-msg", err.message); }
+};
+$("confirm-resend").onclick = async () => {
+  try { await api("POST", "/me/email/resend"); say("confirm-msg", "A new code is on its way.", true); }
+  catch (err) { say("confirm-msg", err.message); }
+};
+
+$("two-step-form").onsubmit = async (e) => {
+  e.preventDefault();
+  const on = !me.two_factor;
+  try {
+    await api("POST", "/me/two-factor", { password: $("two-step-pw").value, on });
+    $("two-step-pw").value = "";
+    await load();
+    say("two-step-msg", on ? "On. Every sign-in now needs a code from your email." : "Off. New places still need a code.", true);
+  } catch (err) { say("two-step-msg", err.message); }
+};
+
 $("email-form").onsubmit = async (e) => {
   e.preventDefault();
   try {
     await api("POST", "/me/email", { password: $("email-pw").value, email: $("email").value.trim() });
     $("email-pw").value = "";
-    say("email-msg", "Saved. Open the link we sent to confirm it.", true);
+    say("email-msg", "Saved. Enter the code we sent to confirm it.", true);
     await load();
   } catch (err) { say("email-msg", err.message); }
 };
