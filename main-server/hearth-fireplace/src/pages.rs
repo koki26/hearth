@@ -49,29 +49,40 @@ pub fn esc(text: &str) -> String {
         .replace('\'', "&#39;")
 }
 
+// The account page's palette (web/style.css): night stone and firelight.
 const STYLE: &str = "
-:root{--bg:#17130f;--fg:#f1e7da;--muted:#a8998a;--card:#221c16;--line:#3a3027;--accent:#e6b45a}
-@media (prefers-color-scheme:light){:root{--bg:#f6f1ea;--fg:#2b241d;--muted:#7a6b5c;--card:#fffaf3;--line:#e2d6c6;--accent:#b07a1c}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 system-ui,sans-serif}
-main{max-width:40rem;margin:0 auto;padding:2rem 16px}h1{font-size:1.6rem;margin:0 0 1rem}h1 span{color:var(--accent)}
-h2{font-size:1.1rem;margin:0 0 .4rem}section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:1rem 1.2rem;margin:1rem 0}
-label{display:block;margin:.7rem 0 .2rem;font-size:.9rem;color:var(--muted)}
-input{width:100%;padding:.6rem;font:inherit;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)}
-input:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-button{margin-top:1rem;padding:.6rem 1.2rem;font:inherit;font-weight:600;border:0;border-radius:8px;background:var(--accent);color:#1b140c;cursor:pointer}
-p.muted,footer{color:var(--muted)}footer{margin-top:2.5rem;font-size:.9rem;text-align:center}a{color:var(--accent)}code{word-break:break-all}
+:root{--bg:#0d1022;--fg:#e9ecf8;--muted:#8f97bd;--card:#171c3a;--line:#2a3160;--accent:#ffb366;--stone:#aec2ff;--on:#2a1404}
+@media (prefers-color-scheme:light){:root{--bg:#f4f1ea;--fg:#1a1f3a;--muted:#626987;--card:#fffdf8;--line:#ddd5c6;--accent:#c4601a;--stone:#3d4f9c;--on:#fff}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.6 system-ui,-apple-system,'Segoe UI',sans-serif}
+main{max-width:40rem;margin:0 auto;padding:3rem 16px;animation:rise .5s cubic-bezier(.2,.7,.2,1) both}
+h1,h2{font-family:'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;font-weight:600}
+h1{font-size:1.9rem;margin:0 0 1.5rem;display:flex;align-items:center;gap:12px}h1 svg{width:34px;height:34px;flex:none;color:var(--stone)}
+h2{font-size:1.15rem;margin:0 0 .5rem}section{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:1.2rem 1.4rem;margin:1rem 0}
+label{display:block;margin:.9rem 0 .3rem;font-size:.82rem;font-weight:500;color:var(--muted)}
+input{width:100%;padding:.7rem .8rem;font:inherit;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--fg)}
+input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button{margin-top:1.1rem;padding:.65rem 1.2rem;font:inherit;font-weight:600;border:0;border-radius:10px;background:var(--accent);color:var(--on);cursor:pointer;transition:transform .12s}
+button:active{transform:scale(.97)}p.muted{color:var(--muted)}a{color:var(--accent)}code{word-break:break-all}
+footer{margin-top:2.5rem;font-size:.85rem;display:flex;gap:18px;justify-content:center;flex-wrap:wrap}
+footer a{color:var(--muted);text-decoration:none}footer a:hover{color:var(--fg)}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}}@media (prefers-reduced-motion:reduce){main{animation:none}}
 ";
+
+/// The logo's arch and flame, as on the account page.
+const MARK: &str = r##"<svg viewBox="0 0 512 512" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="40" stroke-linecap="round"><path d="M136 376V240a120 120 0 0 1 240 0v136"/><path d="M104 396h304"/></g><path fill="#ffb366" d="M258 172C266 218 300 238 312 272C326 312 300 358 254 358C210 358 188 324 194 292C199 264 222 250 231 224C240 246 250 251 256 243C263 232 256 202 258 172Z"/></svg>"##;
 
 fn page(status: StatusCode, title: &str, body: &str) -> Response {
     let html = format!(
         "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">\
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\
          <meta name=\"referrer\" content=\"no-referrer\">\
-         <meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; form-action 'self'\">\
+         <meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; form-action 'self'\">\
+         <link rel=\"icon\" href=\"/favicon.svg\" type=\"image/svg+xml\"><link rel=\"icon\" href=\"/favicon.ico\" sizes=\"any\">\
          <title>{title} · Hearth</title><style>{STYLE}</style></head><body><main>\
-         <h1><span>Hearth</span> {title}</h1>{body}\
-         <footer><a href=\"/\">Account</a> · <a href=\"/reset\">Forgot password</a> · \
-         <a href=\"/privacy\">Privacy</a> · <a href=\"/terms\">Terms</a></footer></main></body></html>",
+         <h1>{MARK}<span>Hearth {title}</span></h1>{body}\
+         <footer><a href=\"/\">Account</a><a href=\"/reset\">Forgot password</a>\
+         <a href=\"/privacy\">Privacy</a><a href=\"/terms\">Terms</a></footer></main></body></html>",
         title = esc(title)
     );
     (status, Html(html)).into_response()

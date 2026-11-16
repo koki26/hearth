@@ -3,142 +3,221 @@
   The Fireplace account page. Everything in web/ is served as-is by the
   Fireplace (web_dir in fireplace.toml): edit a file and reload, no rebuild.
   The page talks to the JSON routes in docs/FIREPLACE.md; app.js shows how.
+  Icons are the game's own (client/godot/icons), drawn in currentColor.
 -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#0f1226">
 <title>Hearth Account</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.ico" sizes="any">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<main>
-  <div class="top">
-    <div>
-      <h1><span>Hearth</span> account</h1>
-      <p class="sub" id="whoami">Sign in to manage your account.</p>
-    </div>
-    <button id="signout" hidden>Sign out</button>
-  </div>
+<svg class="sprite" aria-hidden="true">
+  <symbol id="i-logo" viewBox="0 0 512 512">
+    <g fill="none" stroke="currentColor" stroke-width="40" stroke-linecap="round">
+      <path d="M136 376 V240 A120 120 0 0 1 376 240 V376"/><path d="M104 396 H408"/>
+    </g>
+    <path fill="#ffb366" d="M258 172 C266 218 300 238 312 272 C326 312 300 358 254 358 C210 358 188 324 194 292 C199 264 222 250 231 224 C240 246 250 251 256 243 C263 232 256 202 258 172 Z"/>
+    <path fill="#fff3d6" d="M254 256 C276 280 287 293 287 310 C287 328 272 341 254 341 C236 341 222 328 222 310 C222 293 233 280 254 256 Z"/>
+  </symbol>
+  <symbol id="i-user" viewBox="0 0 64 64"><circle cx="32" cy="22" r="10"/><path d="M13 54a19 19 0 0 1 38 0"/></symbol>
+    <symbol id="i-people" viewBox="0 0 64 64"><circle cx="25" cy="22" r="9"/><path d="M10 52a15 15 0 0 1 30 0M43 15a9 9 0 0 1 0 18M44 38a15 15 0 0 1 11 14"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 64 64"><rect x="14" y="29" width="36" height="26" rx="5"/><path d="M23 29v-8a9 9 0 0 1 18 0v8"/></symbol>
+    <symbol id="i-send" viewBox="0 0 64 64"><path d="M10 30L54 10 40 54 30 36zM30 36l24-26"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 64 64"><path d="M8 18a5 5 0 0 1 5-5h12l6 7h20a5 5 0 0 1 5 5v22a5 5 0 0 1-5 5H13a5 5 0 0 1-5-5z"/></symbol>
+    <symbol id="i-exit" viewBox="0 0 64 64"><path d="M36 12H15v40h21M30 32h22M43 23l9 9l-9 9"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 64 64"><path d="M32 14v36M14 32h36"/></symbol>
+    <symbol id="i-check" viewBox="0 0 64 64"><path d="M14 33l12 12 24-26"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 64 64"><circle cx="32" cy="32" r="23"/><path d="M9 32h46M32 9c7 7 7 39 0 46c-7-7-7-39 0-46"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 64 64"><path d="M26 14l18 18-18 18"/></symbol>
+</svg>
 
-  <!-- Signed out -->
-  <section id="auth">
-    <div class="tabs" role="tablist">
-      <button role="tab" aria-selected="true" id="tab-in">Sign in</button>
-      <button role="tab" aria-selected="false" id="tab-new">Create account</button>
+<!-- Signed out -->
+<div class="auth" id="auth">
+  <aside class="hero" aria-hidden="true">
+    <div class="embers"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <svg class="hero-mark" viewBox="0 0 512 512">
+      <defs>
+        <linearGradient id="fire" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#ffe3b0"/><stop offset=".55" stop-color="#ffb366"/><stop offset="1" stop-color="#ff7a2f"/>
+        </linearGradient>
+      </defs>
+      <g fill="none" stroke="currentColor" stroke-width="28" stroke-linecap="round">
+        <path d="M136 376 V240 A120 120 0 0 1 376 240 V376"/><path d="M104 396 H408"/>
+      </g>
+      <g class="fire">
+        <path fill="url(#fire)" d="M258 172 C266 218 300 238 312 272 C326 312 300 358 254 358 C210 358 188 324 194 292 C199 264 222 250 231 224 C240 246 250 251 256 243 C263 232 256 202 258 172 Z"/>
+        <path class="core" fill="#fff3d6" d="M254 256 C276 280 287 293 287 310 C287 328 272 341 254 341 C236 341 222 328 222 310 C222 293 233 280 254 256 Z"/>
+      </g>
+    </svg>
+    <p class="hero-line">Your name, your friends,<br>and a seat by every fire.</p>
+    <p class="hero-small">One account for every Hearth server.</p>
+  </aside>
+  <main class="auth-side">
+    <div class="auth-card">
+      <div class="brand"><svg class="brand-mark"><use href="#i-logo"/></svg><span>Hearth</span></div>
+      <h1 id="whoami">Welcome back</h1>
+      <div class="tabs" role="tablist">
+        <button role="tab" aria-selected="true" id="tab-in">Sign in</button>
+        <button role="tab" aria-selected="false" id="tab-new">Create account</button>
+      </div>
+      <form id="auth-form">
+        <label for="handle">Handle</label>
+        <div class="field"><svg class="ic"><use href="#i-user"/></svg>
+          <input id="handle" autocomplete="username" required maxlength="20" spellcheck="false"></div>
+        <label for="password">Password</label>
+        <div class="field"><svg class="ic"><use href="#i-lock"/></svg>
+          <input id="password" type="password" autocomplete="current-password" required minlength="8" maxlength="128"></div>
+        <button class="main wide" id="auth-go">Sign in</button>
+        <p class="msg" id="auth-msg" role="status"></p>
+        <p class="note" id="new-terms" hidden>Making an account means you accept the <a href="/terms">terms</a>
+          and are at least <span id="min-age">16</span>. What is stored and why: <a href="/privacy">privacy</a>.</p>
+        <p class="note"><a href="/reset">Forgot your password?</a></p>
+      </form>
     </div>
-    <form id="auth-form">
-      <label for="handle">Handle</label>
-      <input id="handle" autocomplete="username" required maxlength="20">
-      <label for="password">Password</label>
-      <input id="password" type="password" autocomplete="current-password" required minlength="8" maxlength="128">
-      <div class="actions"><button class="main" id="auth-go">Sign in</button></div>
-      <p class="msg" id="auth-msg" role="status"></p>
-      <p class="empty"><a href="/reset">Forgot your password?</a></p>
-      <p class="empty" id="new-terms" hidden>Making an account means you accept the <a href="/terms">terms</a>
-        and are at least <span id="min-age">16</span>. What is stored and why: <a href="/privacy">privacy</a>.</p>
-    </form>
-  </section>
+    <footer><a href="/privacy">Privacy</a><a href="/terms">Terms</a></footer>
+  </main>
+</div>
 
-  <!-- Shown once, right after an account is made, and never again. -->
-  <section id="codes-box" hidden>
-    <h2>Your recovery codes</h2>
-    <p class="empty">Write these down or print them. Each one resets your password once, and they are the
+<!-- Shown once, right after an account is made, and never again. -->
+<div class="overlay" id="codes-box" hidden>
+  <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="codes-title">
+    <span class="badge-ic"><svg><use href="#i-lock"/></svg></span>
+    <h2 id="codes-title">Your recovery codes</h2>
+    <p class="note">Write these down or print them. Each one resets your password once, and they are the
       only way back in if you forget it. They are not shown again.</p>
-    <ul id="codes" class="codes"></ul>
-    <div class="actions"><button class="main" id="codes-done">I have saved them</button></div>
+    <ol id="codes" class="codes"></ol>
+    <button class="main wide" id="codes-done"><svg class="ic"><use href="#i-check"/></svg>I have saved them</button>
   </section>
+</div>
 
-  <!-- Signed in -->
-  <div id="signed-in" hidden>
-    <section>
-      <h2>Display name</h2>
-      <form class="row" id="name-form">
-        <input id="display" maxlength="32" aria-label="Display name" required>
-        <button class="main">Save</button>
-      </form>
-      <p class="msg" id="name-msg" role="status"></p>
-      <label class="check"><input type="checkbox" id="share"> Let friends see which server I am on</label>
-    </section>
+<!-- Signed in -->
+<div class="app" id="signed-in" hidden>
+  <nav class="side" aria-label="Account">
+    <div class="brand"><svg class="brand-mark"><use href="#i-logo"/></svg><span>Hearth</span></div>
+    <ul class="nav">
+      <li><button data-view="profile" aria-current="page"><svg class="ic"><use href="#i-user"/></svg>Profile</button></li>
+      <li><button data-view="friends"><svg class="ic"><use href="#i-people"/></svg>Friends<b class="count" id="incoming-count" hidden></b></button></li>
+      <li><button data-view="security"><svg class="ic"><use href="#i-lock"/></svg>Security</button></li>
+      <li id="email-nav" hidden><button data-view="email"><svg class="ic"><use href="#i-send"/></svg>Email</button></li>
+      <li><button data-view="data"><svg class="ic"><use href="#i-folder"/></svg>Your data</button></li>
+    </ul>
+    <div class="me">
+      <span class="avatar" id="avatar">?</span>
+      <div class="me-text"><b id="me-name"></b><small id="me-handle"></small></div>
+      <button class="icon-btn" id="signout" title="Sign out" aria-label="Sign out"><svg class="ic"><use href="#i-exit"/></svg></button>
+    </div>
+  </nav>
 
-    <section>
-      <h2>Friends</h2>
-      <form class="row" id="add-form">
-        <input id="add-handle" placeholder="Add by handle" aria-label="Friend's handle" maxlength="20" required>
-        <button>Add</button>
-      </form>
-      <p class="msg" id="friend-msg" role="status"></p>
-      <div id="incoming-box" hidden>
-        <label>Asking to be your friend</label>
-        <ul id="incoming"></ul>
+  <main class="content">
+    <section class="view" id="view-profile">
+      <header><h1>Profile</h1><p>How you show up to other players.</p></header>
+      <div class="card">
+        <h2>Display name</h2>
+        <form class="row" id="name-form">
+          <input id="display" maxlength="32" aria-label="Display name" required>
+          <button class="main">Save</button>
+        </form>
+        <p class="msg" id="name-msg" role="status"></p>
       </div>
-      <label>Friends</label>
-      <ul id="friends"></ul>
-      <div id="outgoing-box" hidden>
-        <label>Waiting for them</label>
-        <ul id="outgoing"></ul>
+      <div class="card">
+        <label class="switch"><input type="checkbox" id="share" role="switch"><span class="track"></span>
+          <span><b>Show friends where I am</b><small>They see which server you are on while you play.</small></span></label>
       </div>
     </section>
 
-    <section id="email-box" hidden>
-      <h2>Email <small class="empty">optional</small></h2>
-      <p class="empty">Only for resetting your password and for a short notice when your password or email
-        changes. Never anything else.</p>
-      <p class="msg" id="email-state"></p>
-      <form id="email-form">
-        <label for="email">Email address</label>
-        <input id="email" type="email" autocomplete="email" maxlength="254">
-        <label for="email-pw">Password</label>
-        <input id="email-pw" type="password" autocomplete="current-password" required>
-        <div class="actions row"><button class="main">Save email</button><button type="button" id="email-remove">Remove email</button></div>
-        <p class="msg" id="email-msg" role="status"></p>
-      </form>
+    <section class="view" id="view-friends" hidden>
+      <header><h1>Friends</h1><p>People you play with, and who is online right now.</p></header>
+      <div class="card">
+        <form class="row" id="add-form">
+          <div class="field grow"><svg class="ic"><use href="#i-plus"/></svg>
+            <input id="add-handle" placeholder="Add by handle" aria-label="Friend's handle" maxlength="20" required spellcheck="false"></div>
+          <button class="main">Send request</button>
+        </form>
+        <p class="msg" id="friend-msg" role="status"></p>
+      </div>
+      <div class="card" id="incoming-box" hidden>
+        <h2>Asking to be your friend</h2>
+        <ul class="people" id="incoming"></ul>
+      </div>
+      <div class="card">
+        <h2>Friends</h2>
+        <ul class="people" id="friends"></ul>
+      </div>
+      <div class="card" id="outgoing-box" hidden>
+        <h2>Waiting for them</h2>
+        <ul class="people" id="outgoing"></ul>
+      </div>
     </section>
 
-    <section>
-      <h2>Recovery codes</h2>
-      <p class="empty" id="codes-left"></p>
-      <form id="codes-form">
-        <label for="codes-pw">Password</label>
-        <input id="codes-pw" type="password" autocomplete="current-password" required>
-        <div class="actions"><button>Make a new set</button></div>
-        <p class="msg" id="codes-msg" role="status"></p>
-      </form>
+    <section class="view" id="view-security" hidden>
+      <header><h1>Security</h1><p>Your password, and the codes that get you back in without it.</p></header>
+      <div class="card">
+        <h2>Change password</h2>
+        <form id="pw-form" class="stack">
+          <label for="pw-old">Current password</label>
+          <input id="pw-old" type="password" autocomplete="current-password" required>
+          <label for="pw-new">New password</label>
+          <input id="pw-new" type="password" autocomplete="new-password" required minlength="8" maxlength="128">
+          <div class="actions"><button class="main">Change password</button></div>
+          <p class="msg" id="pw-msg" role="status"></p>
+        </form>
+      </div>
+      <div class="card">
+        <h2>Recovery codes <span class="pill" id="codes-left"></span></h2>
+        <p class="note">Making a new set turns every old code off.</p>
+        <form id="codes-form" class="stack">
+          <label for="codes-pw">Password</label>
+          <input id="codes-pw" type="password" autocomplete="current-password" required>
+          <div class="actions"><button>Make a new set</button></div>
+          <p class="msg" id="codes-msg" role="status"></p>
+        </form>
+      </div>
     </section>
 
-    <section>
-      <h2>Your data</h2>
-      <p class="empty">Everything this server stores about your account, as a JSON file.</p>
-      <div class="actions"><button id="export">Download my data</button></div>
+    <section class="view" id="view-email" hidden>
+      <header><h1>Email <span class="pill">optional</span></h1>
+        <p>Only for resetting your password and a short notice when your password or email changes. Never anything else.</p></header>
+      <div class="card" id="email-box">
+        <p class="state" id="email-state"></p>
+        <form id="email-form" class="stack">
+          <label for="email">Email address</label>
+          <input id="email" type="email" autocomplete="email" maxlength="254">
+          <label for="email-pw">Password</label>
+          <input id="email-pw" type="password" autocomplete="current-password" required>
+          <div class="actions row"><button class="main">Save email</button><button type="button" id="email-remove">Remove email</button></div>
+          <p class="msg" id="email-msg" role="status"></p>
+        </form>
+      </div>
     </section>
 
-    <section>
-      <h2>Password</h2>
-      <form id="pw-form">
-        <label for="pw-old">Current password</label>
-        <input id="pw-old" type="password" autocomplete="current-password" required>
-        <label for="pw-new">New password</label>
-        <input id="pw-new" type="password" autocomplete="new-password" required minlength="8" maxlength="128">
-        <div class="actions"><button class="main">Change password</button></div>
-        <p class="msg" id="pw-msg" role="status"></p>
-      </form>
+    <section class="view" id="view-data" hidden>
+      <header><h1>Your data</h1><p>Take it with you, or take it away.</p></header>
+      <div class="card split">
+        <div><h2>Download my data</h2><p class="note">Everything this server stores about your account, as a JSON file.</p></div>
+        <button id="export"><svg class="ic"><use href="#i-folder"/></svg>Download</button>
+      </div>
+      <div class="card danger-zone">
+        <h2>Delete account</h2>
+        <p class="note">This removes your account and your friends list for good. Servers keep nothing
+          that points back to you.</p>
+        <form id="del-form" class="stack">
+          <label for="del-pw">Password</label>
+          <input id="del-pw" type="password" autocomplete="current-password" required>
+          <div class="actions"><button class="danger">Delete my account</button></div>
+          <p class="msg" id="del-msg" role="status"></p>
+        </form>
+      </div>
+      <footer><a href="/privacy">Privacy</a><a href="/terms">Terms</a></footer>
     </section>
-
-    <section>
-      <h2>Delete account</h2>
-      <p class="empty">This removes your account and your friends list for good. Servers keep nothing
-        that points back to you.</p>
-      <form id="del-form">
-        <label for="del-pw">Password</label>
-        <input id="del-pw" type="password" autocomplete="current-password" required>
-        <div class="actions"><button class="danger">Delete my account</button></div>
-        <p class="msg" id="del-msg" role="status"></p>
-      </form>
-    </section>
-  </div>
-  <footer class="empty"><a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></footer>
-</main>
+  </main>
+</div>
 
 <script src="app.js"></script>
 </body>

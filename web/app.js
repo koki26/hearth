@@ -37,8 +37,9 @@ function say(id, text, good) { const el = $(id); el.textContent = text; el.class
 
 function signOut() {
   store.set("access", ""); store.set("refresh", "");
-  $("signed-in").hidden = true; $("auth").hidden = false; $("signout").hidden = true;
-  $("whoami").textContent = "Sign in to manage your account.";
+  $("signed-in").hidden = true; $("auth").hidden = false;
+  setTab(false);
+  show("profile");
 }
 
 function setTab(newAccount) {
@@ -46,6 +47,7 @@ function setTab(newAccount) {
   $("tab-in").setAttribute("aria-selected", String(!newAccount));
   $("tab-new").setAttribute("aria-selected", String(newAccount));
   $("auth-go").textContent = newAccount ? "Create account" : "Sign in";
+  $("whoami").textContent = newAccount ? "Pull up a chair" : "Welcome back";
   $("password").autocomplete = newAccount ? "new-password" : "current-password";
   $("new-terms").hidden = !newAccount;
   say("auth-msg", "", true);
@@ -69,29 +71,35 @@ $("signout").onclick = signOut;
 
 async function load() {
   const me = await api("GET", "/me");
-  $("auth").hidden = true; $("signed-in").hidden = false; $("signout").hidden = false;
-  $("whoami").textContent = "Signed in as @" + me.handle;
+  $("auth").hidden = true; $("signed-in").hidden = false;
+  $("me-name").textContent = me.display_name || me.handle;
+  $("me-handle").textContent = "@" + me.handle;
+  $("avatar").textContent = initial(me.display_name || me.handle);
   $("display").value = me.display_name;
   $("share").checked = me.share_location;
   $("email").value = me.email || "";
   $("email-state").textContent = !me.email ? "No email on this account."
     : me.email_verified ? "Confirmed." : "Waiting for you to open the link we sent.";
-  $("codes-left").textContent = me.recovery_codes_left + " of 8 recovery codes left.";
+  $("codes-left").textContent = me.recovery_codes_left + " of 8 left";
   await loadFriends();
 }
 
 function person(p, extra) {
   const li = document.createElement("li");
   const who = document.createElement("div"); who.className = "who";
-  const name = document.createElement("b");
+  const face = document.createElement("span"); face.className = "avatar"; face.textContent = initial(p.display_name || p.handle);
   if (extra && "online" in extra) {
     const dot = document.createElement("span"); dot.className = "dot" + (extra.online ? " on" : "");
-    name.append(dot);
+    dot.title = extra.online ? "Online" : "Offline";
+    face.append(dot);
   }
+  const text = document.createElement("div");
+  const name = document.createElement("b");
   name.append(p.display_name || p.handle);
   const sub = document.createElement("small");
   sub.textContent = "@" + p.handle + (extra && extra.where ? " · " + extra.where : "");
-  who.append(name, sub);
+  text.append(name, sub);
+  who.append(face, text);
   const buttons = document.createElement("div"); buttons.className = "row";
   for (const [label, route, cls] of (extra && extra.buttons) || []) {
     const b = document.createElement("button"); b.textContent = label; if (cls) b.className = cls;
@@ -118,6 +126,8 @@ async function loadFriends() {
     buttons: [["Remove", "/friends/remove"]],
   }));
   $("incoming-box").hidden = !f.incoming.length;
+  $("incoming-count").hidden = !f.incoming.length;
+  $("incoming-count").textContent = f.incoming.length;
   fill("incoming", f.incoming, (p) => person(p, { buttons: [["Accept", "/friends/accept", "main"], ["Decline", "/friends/remove"]] }));
   $("outgoing-box").hidden = !f.outgoing.length;
   fill("outgoing", f.outgoing, (p) => person(p, { buttons: [["Cancel", "/friends/remove"]] }));
@@ -171,14 +181,14 @@ if (store.get("access") || store.get("refresh")) load().catch(signOut);
 // --- what this server offers, recovery codes, email, export (D63) ------------
 
 fetch("/features").then((r) => r.json()).then((f) => {
-  $("email-box").hidden = !f.email;
+  $("email-nav").hidden = !f.email;
   $("min-age").textContent = f.min_age;
 }).catch(() => {});
 
 function showCodes(codes) {
   $("codes").replaceChildren(...codes.map((c) => { const li = document.createElement("li"); li.textContent = c; return li; }));
   $("codes-box").hidden = false;
-  $("codes-box").scrollIntoView();
+  $("codes-done").focus();
 }
 $("codes-done").onclick = () => { $("codes-box").hidden = true; $("codes").replaceChildren(); };
 
@@ -212,3 +222,16 @@ $("export").onclick = async () => {
   a.click();
   URL.revokeObjectURL(a.href);
 };
+
+// --- the sidebar: one view at a time -----------------------------------------
+
+function initial(name) { return [...name.trim()][0]?.toUpperCase() || "?"; }
+
+function show(view) {
+  for (const b of document.querySelectorAll(".nav button")) {
+    if (b.dataset.view === view) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
+  }
+  for (const v of document.querySelectorAll(".view")) v.hidden = v.id !== "view-" + view;
+  window.scrollTo(0, 0);
+}
+for (const b of document.querySelectorAll(".nav button")) b.onclick = () => show(b.dataset.view);
