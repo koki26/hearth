@@ -162,7 +162,7 @@ impl Fireplace {
             web_dir: {
                 // Not fatal: the API is the part the game needs.
                 if !config.web_dir.join("index.html").exists() {
-                    tracing::warn!(dir = %config.web_dir.display(), "no index.html, so no account page");
+                    tracing::info!(dir = %config.web_dir.display(), "no index.html there, so serving the built-in account page");
                 }
                 config.web_dir.clone()
             },

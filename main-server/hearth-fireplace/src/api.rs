@@ -56,14 +56,32 @@ pub fn router(state: Arc<Fireplace>) -> Router {
         .merge(crate::pages::routes())
         // Anything that is not a route is a file from the web folder: the
         // account page, its stylesheet and script, and whatever else a host
-        // puts there. ServeDir refuses anything that climbs out of it.
-        .fallback_service(tower_http::services::ServeDir::new(&state.web_dir))
+        // puts there. ServeDir refuses anything that climbs out of it. A file
+        // the folder does not have comes from the copy built into the binary,
+        // so the page works on a server nobody copied web/ to.
+        .fallback_service(
+            tower_http::services::ServeDir::new(&state.web_dir)
+                .fallback(axum::handler::HandlerWithoutStateExt::into_service(built_in_web)),
+        )
         .layer(tower_http::timeout::TimeoutLayer::with_status_code(
             StatusCode::REQUEST_TIMEOUT,
             std::time::Duration::from_secs(TIMEOUT_SECONDS),
         ))
         .layer(DefaultBodyLimit::max(MAX_BODY))
         .with_state(state)
+}
+
+/// The repository's `web/`, as it was when this binary was built.
+async fn built_in_web(uri: axum::http::Uri) -> Response {
+    let (body, kind): (&[u8], &str) = match uri.path() {
+        "/" | "/index.html" => (include_bytes!("../../../web/index.html"), "text/html; charset=utf-8"),
+        "/style.css" => (include_bytes!("../../../web/style.css"), "text/css; charset=utf-8"),
+        "/app.js" => (include_bytes!("../../../web/app.js"), "text/javascript; charset=utf-8"),
+        "/favicon.svg" => (include_bytes!("../../../web/favicon.svg"), "image/svg+xml"),
+        "/favicon.ico" => (include_bytes!("../../../web/favicon.ico"), "image/x-icon"),
+        _ => return StatusCode::NOT_FOUND.into_response(),
+    };
+    ([(axum::http::header::CONTENT_TYPE, kind)], body).into_response()
 }
 
 // --- what comes back when something will not be done ------------------------

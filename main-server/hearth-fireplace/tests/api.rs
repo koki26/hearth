@@ -810,3 +810,20 @@ async fn no_address_password_or_token_ever_reaches_the_log() {
         assert!(!log.contains(secret), "{secret:?} is in the log:\n{log}");
     }
 }
+
+#[tokio::test]
+async fn the_account_page_is_there_even_with_no_web_folder() {
+    let dir = std::env::temp_dir().join(format!("hearth-fireplace-api-{}-noweb", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let config = Config { data_dir: dir.clone(), web_dir: dir.join("nowhere"), ..Config::default() };
+    let app = api::router(Arc::new(Fireplace::open(&config).unwrap()));
+    for (path, kind) in [("/", "text/html"), ("/style.css", "text/css"), ("/favicon.ico", "image/x-icon")] {
+        let response =
+            app.clone().oneshot(Request::builder().uri(path).body(Body::empty()).unwrap()).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK, "{path}");
+        assert!(response.headers()["content-type"].to_str().unwrap().starts_with(kind), "{path}");
+    }
+    let missing =
+        app.clone().oneshot(Request::builder().uri("/nope.txt").body(Body::empty()).unwrap()).await.unwrap();
+    assert_eq!(missing.status(), StatusCode::NOT_FOUND);
+}

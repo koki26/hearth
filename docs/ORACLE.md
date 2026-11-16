@@ -265,7 +265,9 @@ sudo cp -r web /opt/fireplace/ && sudo chown -R hearth:hearth /opt/fireplace/web
 sudo systemctl restart fireplace
 ```
 
-A change to the account page alone (`web/`) needs only the `cp` line -- no
+The binary carries its own copy of `web/`, so the page shows up even without
+the `cp` line. Copying the folder is how to change the page without a
+rebuild: a change to the account page alone needs only the `cp` line -- no
 build and no restart:
 
 ```sh

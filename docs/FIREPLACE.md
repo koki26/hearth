@@ -60,7 +60,9 @@ storage. It lives in `web/` at the top of the repository -- `index.html`,
 `style.css`, `app.js` -- and the Fireplace serves that folder as it is
 (`web_dir` in `fireplace.toml`), so changing the page is editing a file and
 reloading. Anything that is not an API route is looked up there; nothing
-outside the folder can be.
+outside the folder can be. A file the folder does not have comes from a copy of
+`web/` built into the binary, so a server with no `web_dir` at all still
+shows the page as it was when the binary was built.
 
 The first three answer with the same thing:
 
