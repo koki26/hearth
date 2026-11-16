@@ -31,7 +31,7 @@ whoever is playing on it.
 
 Double-click **`start.bat`**: it packs the worlds the client ships with,
 builds, and opens the window. `start.bat --noGUI` gives you the console one
-instead. The window and its commands are in the [README](../README.md).
+instead. The window and its commands are in the [README](https://github.com/koki26/hearth/blob/main/README.md).
 
 ### Linux and macOS
 
@@ -67,7 +67,7 @@ mkdir -p data/worlds
 - Nothing else. No database, no account server.
 
 Every key it takes, with its default and what it means, is in
-[`deploy/flame.toml`](../deploy/flame.toml). Pass the config as the only
+[`deploy/flame.toml`](https://github.com/koki26/hearth/blob/main/deploy/flame.toml). Pass the config as the only
 argument; with no argument it looks for `flame.toml` in the directory it was
 started from, and with no file at all it runs on the defaults and says so.
 
@@ -92,7 +92,7 @@ cargo run --release -p hearth-fireplace -- deploy/fireplace.toml
 ```
 
 ```powershell
-cargo run --release -p hearth-fireplace -- deployireplace.toml
+cargo run --release -p hearth-fireplace -- deploy\fireplace.toml
 ```
 
 ```sh
@@ -112,7 +112,7 @@ curl -s -XPOST localhost:7800/accounts -H 'content-type: application/json'   -d 
 - Rate limits and presence live in memory, so a restart forgives everybody and
   forgets where they were. It signs nobody out: tokens are signed, not stored.
 
-Every key it takes is in [`deploy/fireplace.toml`](../deploy/fireplace.toml).
+Every key it takes is in [`deploy/fireplace.toml`](https://github.com/koki26/hearth/blob/main/deploy/fireplace.toml).
 
 Pointing a client at one is a single constant,
 `ConnectDetails.DEFAULT_FIREPLACE` in `client/godot/connect.gd`; a player can
@@ -123,7 +123,7 @@ what that means.
 
 ## As a service (systemd)
 
-Two unit files are in [`deploy/`](../deploy). They expect a binary, a config
+Two unit files are in [`deploy/`](https://github.com/koki26/hearth/tree/main/deploy). They expect a binary, a config
 and a `data/` directory under `/opt/flame` and `/opt/fireplace`, owned by a
 user that cannot log in:
 
