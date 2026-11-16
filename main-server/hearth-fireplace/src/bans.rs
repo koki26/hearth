@@ -43,6 +43,17 @@ impl IpBans {
         gone
     }
 
+    /// Lifts every ban set by `by`; how many.
+    pub fn remove_by(&mut self, by: &str) -> usize {
+        let before = self.bans.len();
+        self.bans.retain(|_, b| b.by != by);
+        let gone = before - self.bans.len();
+        if gone > 0 {
+            self.save();
+        }
+        gone
+    }
+
     /// Bans in force; ones that ran out are dropped, address and all.
     pub fn list(&mut self, now: u64) -> &BTreeMap<String, Ban> {
         let before = self.bans.len();

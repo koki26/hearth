@@ -422,6 +422,25 @@ async fn sign_in(
     // Only told to whoever has the password: a ban is nobody else's business.
     let ban = state.accounts.lock().unwrap().get(id).and_then(|a| a.ban.clone()).filter(|b| b.active(now));
     if let Some(ban) = ban {
+        // Whoever holds a suspended account's password is the person it was
+        // suspended for: their address goes with it, until the same end, so
+        // they cannot carry on under another account.
+        let address = from.parse::<IpAddr>().ok().filter(|ip| !ip.is_loopback() && !ip.is_unspecified());
+        if let Some(ip) = address {
+            let mut bans = state.ip_bans.lock().unwrap();
+            if bans.of(&ip.to_string(), now).is_none() {
+                bans.set(
+                    &ip.to_string(),
+                    Ban {
+                        until: ban.until,
+                        reason: format!("signed in to the suspended account @{handle}: {}", ban.reason),
+                        by: format!("automatic, for @{handle}"),
+                        at: now,
+                    },
+                );
+                tracing::info!(id, "blocked the address a suspended account signed in from");
+            }
+        }
         return Ok(suspended(&ban));
     }
     if let Some(address) = new_place(&state, id, &from, now) {
@@ -1138,9 +1157,15 @@ async fn admin_unban(
 ) -> Result<Json<Value>, ApiError> {
     let (me, _) = admin_of(&state, &headers)?;
     let id = target(&state, me, &body.handle)?;
-    state.accounts.lock().unwrap().set_ban(id, None)?;
-    tracing::info!(admin = me, target = id, "unbanned an account");
-    Ok(Json(json!({ "ban": null })))
+    let handle = {
+        let mut accounts = state.accounts.lock().unwrap();
+        accounts.set_ban(id, None)?;
+        accounts.get(id).map(|a| a.handle.clone()).unwrap_or_default()
+    };
+    // The addresses blocked because this account was signed in to go too.
+    let lifted = state.ip_bans.lock().unwrap().remove_by(&format!("automatic, for @{handle}"));
+    tracing::info!(admin = me, target = id, lifted, "unbanned an account");
+    Ok(Json(json!({ "ban": null, "addresses_unblocked": lifted })))
 }
 
 async fn admin_ban_ip(

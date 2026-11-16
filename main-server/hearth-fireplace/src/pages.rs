@@ -515,9 +515,13 @@ pub fn privacy_html(config: &crate::Config) -> String {
          <li><strong>Other players</strong>: your handle, display name and picture; your friends also see \
          whether you are online and, if you allow it, on which server.</li>\
          <li>Nobody else. Nothing is sold or shared.</li></ul></section>\
-         <section><h2>Decisions made automatically</h2><p>Only two, both simple rules: an account is refused \
-         below the minimum age, and a sign-in from a new IP address waits until you confirm it by email. \
-         Neither is profiling.</p></section>\
+         <section><h2>Decisions made automatically</h2><p>Only three, all simple rules, none of them \
+         profiling: an account is refused below the minimum age; a sign-in from a new IP address waits until \
+         you confirm it by email; and signing in to a <strong>suspended</strong> account with its correct \
+         password blocks the IP address it came from until the suspension ends, with the same reason, so it \
+         cannot be used to sign in to another account. That block is kept with the other blocked addresses, \
+         admins can see and lift it, and it is lifted when the account is unbanned. If you share an address \
+         with somebody suspended and are blocked by mistake, write to the contact above.</p></section>\
          <section><h2>How long, in general</h2><p>Deleting your account deletes all of it at once, picture \
          included. Backups roll it out within {days} days. Links in emails last 30 minutes (confirming an \
          address: 7 days).</p></section>\
@@ -555,7 +559,8 @@ async fn terms(State(state): State<Arc<Fireplace>>) -> Response {
              <li>Do not attack this server, make accounts in bulk, cheat, upload pictures that are illegal or \
              hurtful, or use it to harass anybody. Admins may suspend an account or block an IP address for \
              that, for a set time or for good; you are always shown how long and why, and can write to the \
-             operator if you think it is a mistake.</li>\
+             operator if you think it is a mistake. Signing in to a suspended account blocks the address it \
+             was signed in from for as long as the suspension lasts.</li>\
              <li>You can delete your account whenever you like, from the account page.</li>\
              <li>When these terms or the privacy notice change in a way that matters, they are updated here, and \
              if you asked for it and have a confirmed email, you are told by email too.</li>\

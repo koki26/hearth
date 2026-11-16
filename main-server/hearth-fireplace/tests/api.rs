@@ -1079,7 +1079,26 @@ async fn a_banned_account_is_told_for_how_long_and_why_and_comes_back_when_unban
     let (status, _) = call(&app, "POST", "/admin/ban", Some(&root), json!({"handle": "root", "reason": "x"})).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 
-    assert_eq!(call(&app, "POST", "/admin/unban", Some(&root), json!({"handle": "bob"})).await.0, StatusCode::OK);
+    // With the right password from an address, that address is blocked too,
+    // until the same end: no carrying on under another account.
+    join(&app, "bobs-alt").await;
+    let (status, _) = call_from(&app, "203.0.113.50", "POST", "/sessions", None, sign_in_as("bob")).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    let (status, said) = call_from(&app, "203.0.113.50", "POST", "/sessions", None, sign_in_as("bobs-alt")).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert!(said["error"].as_str().unwrap().contains("address is blocked"), "{said}");
+    assert_eq!(said["banned"]["until"], call(&app, "GET", "/admin/accounts", Some(&root), Value::Null).await.1
+        .as_array().unwrap().iter().find(|a| a["handle"] == "bob").unwrap()["ban"]["until"]);
+    let (_, bans) = call(&app, "GET", "/admin/bans", Some(&root), Value::Null).await;
+    assert_eq!(bans[0]["ip"], "203.0.113.50");
+    // A wrong password from elsewhere blocks nothing.
+    let wrong = json!({"handle": "bob", "password": "not the one"});
+    call_from(&app, "203.0.113.51", "POST", "/sessions", None, wrong).await;
+    assert_eq!(call_from(&app, "203.0.113.51", "GET", "/health", None, Value::Null).await.0, StatusCode::OK);
+
+    let (status, lifted) = call(&app, "POST", "/admin/unban", Some(&root), json!({"handle": "bob"})).await;
+    assert_eq!((status, lifted["addresses_unblocked"].as_u64()), (StatusCode::OK, Some(1)), "its address goes free too");
+    assert_eq!(call_from(&app, "203.0.113.50", "GET", "/health", None, Value::Null).await.0, StatusCode::OK);
     assert_eq!(call(&app, "POST", "/sessions", None, sign_in_as("bob")).await.0, StatusCode::OK);
 }
 

@@ -171,7 +171,9 @@ Admins then use the **Admin** page on the account site. They can see every
 account, its email and its sign-in IP addresses; suspend an account for a
 time or for good, with a reason the person is shown; lift it; sign an
 account out everywhere; make or remove admins; delete accounts; and block or
-unblock IP addresses. A blocked address is turned away before anything else
+unblock IP addresses. Signing in to a suspended account with its right
+password blocks that address automatically, until the suspension ends;
+unbanning the account lifts it again. A blocked address is turned away before anything else
 runs and is shown how long and why. For a flood that is really an attack,
 block it in the firewall or in Caddy as well: the Fireplace answers a
 blocked address cheaply, but it still answers.
