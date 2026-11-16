@@ -29,6 +29,12 @@ pub const REFRESH_SECONDS: u64 = 30 * 24 * 60 * 60;
 /// copied one, even though it only works on the one Flame it names.
 pub const JOIN_SECONDS: u64 = 120;
 
+/// A password reset link lasts half an hour.
+pub const RESET_SECONDS: u64 = 30 * 60;
+/// A link that confirms an email address lasts as long as the unverified
+/// address is kept (`accounts::UNVERIFIED_SECONDS`).
+pub const VERIFY_SECONDS: u64 = 7 * 24 * 60 * 60;
+
 const PREFIX: &str = "v1.";
 const BASE64: base64::engine::general_purpose::GeneralPurpose =
     base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -81,6 +87,24 @@ pub struct JoinClaims {
     pub exp: u64,
 }
 
+/// What a link in an email carries: a reset (`typ` = `reset`) or the address
+/// to confirm (`typ` = `verify`). Nothing is stored for one: it is signed,
+/// it names the account's epoch, and a reset moves the epoch -- so a link
+/// works once, and a leaked people file holds no link at all. `nonce` is 128
+/// random bits, so no two links are alike even within one second.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct LinkClaims {
+    pub typ: String,
+    pub sub: u64,
+    pub epoch: u64,
+    /// The address being confirmed; empty on a reset.
+    #[serde(default)]
+    pub email: String,
+    pub nonce: String,
+    pub iat: u64,
+    pub exp: u64,
+}
+
 /// The signing key, read from `data/key.pk8` or made on first run, and the
 /// secret the per-Flame player ids are derived with, from `data/pid.key`.
 pub struct Keys {
@@ -101,7 +125,9 @@ impl Keys {
                 tracing::info!(path = %path.display(), "made a signing key");
                 made.as_ref().to_vec()
             }
-            Err(err) => return Err(err).with_context(|| format!("could not read {}", path.display())),
+            Err(err) => {
+                return Err(err).with_context(|| format!("could not read {}", path.display()));
+            }
         };
         let pair = Ed25519KeyPair::from_pkcs8(&pkcs8)
             .map_err(|_| anyhow::anyhow!("{} is not a usable signing key", path.display()))?;
@@ -118,7 +144,9 @@ impl Keys {
                     .with_context(|| format!("could not write {}", pid_path.display()))?;
                 made.to_vec()
             }
-            Err(err) => return Err(err).with_context(|| format!("could not read {}", pid_path.display())),
+            Err(err) => {
+                return Err(err).with_context(|| format!("could not read {}", pid_path.display()));
+            }
         };
         Ok(Self { pair, pid: ring::hmac::Key::new(ring::hmac::HMAC_SHA256, &secret) })
     }
@@ -161,9 +189,38 @@ impl Keys {
         self.sign(&serde_json::to_vec(&claims).expect("claims are plain data"))
     }
 
-    /// Signature, shape and expiry. The caller still has to check the epoch
-    /// against the account, because only the account knows what it is now.
-    pub fn verify(&self, token: &str, now: u64) -> Result<Claims> {
+    /// A link for an email: `reset` or `verify`.
+    pub fn mint_link(&self, typ: &str, account: u64, epoch: u64, email: &str, now: u64) -> String {
+        let mut nonce = [0u8; 16];
+        ring::rand::SecureRandom::fill(&ring::rand::SystemRandom::new(), &mut nonce)
+            .expect("the system has randomness");
+        let claims = LinkClaims {
+            typ: typ.to_owned(),
+            sub: account,
+            epoch,
+            email: email.to_owned(),
+            nonce: BASE64.encode(nonce),
+            iat: now,
+            exp: now + if typ == "reset" { RESET_SECONDS } else { VERIFY_SECONDS },
+        };
+        self.sign(&serde_json::to_vec(&claims).expect("claims are plain data"))
+    }
+
+    /// A link of this kind, signed by us and not expired. The caller checks
+    /// the epoch, as with a token.
+    pub fn verify_link(&self, token: &str, typ: &str, now: u64) -> Result<LinkClaims> {
+        let claims: LinkClaims = serde_json::from_slice(&self.open_signed(token)?).context("not a link")?;
+        if claims.typ != typ {
+            bail!("not that kind of link");
+        }
+        if claims.exp <= now {
+            bail!("this link has expired");
+        }
+        Ok(claims)
+    }
+
+    /// The signed payload, if the signature is ours.
+    fn open_signed(&self, token: &str) -> Result<Vec<u8>> {
         let Some(rest) = token.strip_prefix(PREFIX) else {
             bail!("not a Hearth token");
         };
@@ -175,9 +232,14 @@ impl Keys {
         UnparsedPublicKey::new(&ring::signature::ED25519, self.pair.public_key().as_ref())
             .verify(signed.as_bytes(), &signature)
             .map_err(|_| anyhow::anyhow!("this token was not signed by us"))?;
+        BASE64.decode(payload).context("the payload is not base64url")
+    }
+
+    /// Signature, shape and expiry. The caller still has to check the epoch
+    /// against the account, because only the account knows what it is now.
+    pub fn verify(&self, token: &str, now: u64) -> Result<Claims> {
         let claims: Claims =
-            serde_json::from_slice(&BASE64.decode(payload).context("the payload is not base64url")?)
-                .context("the payload is not a token")?;
+            serde_json::from_slice(&self.open_signed(token)?).context("the payload is not a token")?;
         if claims.exp <= now {
             bail!("this token has expired");
         }

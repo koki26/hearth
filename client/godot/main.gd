@@ -151,6 +151,8 @@ var _handle_typed := ""
 var _password_typed := ""
 ## What is typed into "Add a friend" on the People page.
 var _friend_typed := ""
+## The address typed on the account page, before it is saved.
+var _email_typed := ""
 ## An ember to walk into the moment we land on a friend's Flame, or -1.
 var _join_ember := -1
 ## Which page of the lift panel is showing: "main", "warning" or "advanced".
@@ -251,7 +253,12 @@ func _ready() -> void:
 	_fireplace.signed_in.connect(_on_signed_in)
 	_fireplace.signed_out.connect(_on_signed_out)
 	_fireplace.friends_changed.connect(_refresh_menu)
+	_fireplace.account_changed.connect(_refresh_panel)
 	_fireplace.failed.connect(_on_fireplace_failed)
+	_fireplace.said.connect(func(message: String) -> void:
+		_message = message
+		_email_typed = ""
+		_refresh_panel())
 	add_child(_fireplace)
 	_elevator = Elevator.new()
 	_elevator.name = "Elevator"
@@ -474,17 +481,38 @@ func _panel_rows() -> Array:
 ## Your account is what friends add; the name above is what a Flame shows
 ## over your head, and the two are deliberately separate (docs/TRUST.md).
 func _account_rows() -> Array:
+	if _fireplace.is_signed_in() and not _fireplace.recovery_codes.is_empty():
+		# Straight after making an account: shown this once, never saved.
+		var codes: Array = [{"heading": "Your recovery codes"},
+			{"label": "Each resets your password once. Write"},
+			{"label": "them down: they are not shown again."}]
+		for code in _fireplace.recovery_codes:
+			codes.append({"label": str(code)})
+		codes.append({"id": "codes_done", "label": "I wrote them down", "button": true})
+		return codes
 	if _fireplace.is_signed_in():
-		return [
+		var mine: Array = [
 			{"label": _fireplace.handle, "avatar": _fireplace.handle, "status": "online", "sub": "signed in"},
 			{"label": ""},
-			{"id": "signout", "label": "Sign out", "icon": "res://icons/exit.svg"},
-			{"id": "back", "label": "Back", "icon": "res://icons/back.svg"},
-			{"label": ""},
-			{"label": "Friends are on the menu, in world."},
-			{"label": _message, "warn": true} if _message != "" else {"label": ""},
 		]
-	return [
+		# Only where the Fireplace sends email at all (GET /features).
+		if bool(_fireplace.features.get("email", false)):
+			var state := "none yet, optional" if _fireplace.email == "" else (
+				"confirmed" if _fireplace.email_verified else "open the link we sent")
+			mine.append({"id": "email", "label": "Email", "text": _email_typed if _email_typed != ""
+				else _fireplace.email, "icon": "res://icons/globe.svg", "sub": state})
+			mine.append({"id": "password", "label": "Password", "text": _password_typed, "secret": true,
+				"icon": "res://icons/lock.svg"})
+			mine.append({"id": "save_email", "label": "Save email", "icon": "res://icons/plus.svg"})
+			mine.append({"label": "Only for resets and security notices."})
+			mine.append({"label": ""})
+		mine.append({"id": "signout", "label": "Sign out", "icon": "res://icons/exit.svg"})
+		mine.append({"id": "back", "label": "Back", "icon": "res://icons/back.svg"})
+		mine.append({"label": ""})
+		mine.append({"label": "Friends are on the menu, in world."})
+		mine.append({"label": _message, "warn": true} if _message != "" else {"label": ""})
+		return mine
+	var rows: Array = [
 		{"id": "handle", "label": "Handle", "text": _handle_typed, "icon": "res://icons/user.svg"},
 		{"id": "password", "label": "Password", "text": _password_typed, "secret": true,
 			"icon": "res://icons/lock.svg"},
@@ -492,12 +520,21 @@ func _account_rows() -> Array:
 		{"id": "signin", "label": "Sign in", "button": true},
 		{"id": "signup", "label": "Create an account", "icon": "res://icons/plus.svg"},
 		{"id": "back", "label": "Play without one", "icon": "res://icons/back.svg"},
+	]
+	# Opened in the system browser: the reset form and the policies are web
+	# pages the Fireplace serves, and they are read once, not played in.
+	if _fireplace.can_reset():
+		rows.append({"id": "forgot", "label": "Forgot password?", "icon": "res://icons/lock.svg", "more": true})
+	rows.append_array([
 		{"label": ""},
 		{"label": "An account is for friends and for finding"},
 		{"label": "them. A Flame never sees your password."},
-		{"label": "There is no way to reset one: write it down."},
+		{"label": "Making one means you accept the terms."},
+		{"id": "privacy", "label": "Privacy", "more": true},
+		{"id": "terms", "label": "Terms", "more": true},
 		{"label": _message, "warn": true} if _message != "" else {"label": ""},
-	]
+	])
+	return rows
 
 
 ## Shown every time the advanced page is opened, and not remembered. It is
@@ -629,6 +666,21 @@ func _on_panel_chosen(id: String) -> void:
 			_message = "Making an account..."
 			_fireplace.create_account(_handle_typed, _password_typed)
 			_refresh_panel()
+		"forgot":
+			OS.shell_open(_fireplace.page_url("reset"))
+			_message = "The reset page is open in your browser."
+			_refresh_panel()
+		"privacy", "terms":
+			OS.shell_open(_fireplace.page_url(id))
+		"codes_done":
+			_fireplace.recovery_codes = []
+			_panel_page = "main"
+			_refresh_panel()
+		"save_email":
+			_message = "Saving..."
+			_fireplace.set_email(_password_typed, _email_typed.strip_edges())
+			_password_typed = ""
+			_refresh_panel()
 		"signout":
 			_fireplace.sign_out()
 			_password_typed = ""
@@ -695,6 +747,8 @@ func _on_typed(text: String) -> void:
 		# Never saved and never written to the settings file: it goes to the
 		# Fireplace and nowhere else.
 		_password_typed = text
+	elif _editing == "email":
+		_email_typed = text
 	elif _editing == "addfriend":
 		_friend_typed = ""
 		_fireplace.add_friend(text)
@@ -706,6 +760,7 @@ func _on_typed(text: String) -> void:
 	elif _editing == "accounts":
 		_details.account_server = text
 		_details.save()
+		_fireplace.fetch_features()
 	_editing = ""
 	_keyboard.close()
 	_audio.play("click")
@@ -1723,7 +1778,8 @@ func _report_presence() -> void:
 
 func _on_signed_in(as_handle: String) -> void:
 	_message = ""
-	if _panel_page == "account":
+	# A new account stays on the page that shows its recovery codes.
+	if _panel_page == "account" and _fireplace.recovery_codes.is_empty():
 		_panel_page = "main"
 	_password_typed = ""
 	_status("Signed in as %s." % as_handle)
@@ -1740,7 +1796,7 @@ func _on_signed_out(_why: String) -> void:
 ## Something the Fireplace would not do. Sign-in trouble belongs on the panel
 ## where it was typed; anything else is a line in the log.
 func _on_fireplace_failed(what: String, message: String) -> void:
-	if what == "signin" or what == "refresh":
+	if what == "signin" or what == "refresh" or what == "email":
 		_message = message
 		_refresh_panel()
 		return

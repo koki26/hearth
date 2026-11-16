@@ -25,3 +25,52 @@ max_accounts = 10000
 # be: raise it while you are testing, lower it if somebody starts making
 # accounts in bulk.
 accounts_per_hour = 10
+
+# The account web page: everything in this folder is served as it is, so the
+# HTML, CSS and JavaScript can be edited in place and picked up on reload.
+web_dir = "web"
+
+# --- Email (docs/SELFHOST-MAIL.md) -------------------------------------------
+# Optional, and only ever for password resets and security notices -- never
+# marketing (docs/decisions.md D63). Without it, players reset with recovery
+# codes, or you run `fireplace admin reset-password <handle>` over SSH.
+[mail]
+# "none" = no email features: reset only via recovery codes / admin command
+# "smtp" = send through an SMTP server
+# "log"  = print emails to the log (development only; refused in a release
+#          build unless FIREPLACE_DEV_MAIL=1)
+backend = "smtp"
+public_url = "https://fireplace.example.org"   # base for links in emails
+from = "Hearth <hearth@example.org>"
+reply_to = "info@example.org"                  # optional
+# Who runs the SMTP server, if not the operator below: that company is a
+# processor under GDPR and is named on /privacy. Empty = you run it yourself.
+provider = ""
+
+[mail.smtp]
+host = "mail.example.org"
+port = 587
+security = "starttls"   # "starttls" (587) | "tls" (465, implicit) | "none"
+                        # "none" is only allowed when host is localhost
+username = "hearth@example.org"
+# One line, the password and nothing else, readable only by the service user:
+#   sudo install -d -m 700 -o hearth -g hearth /opt/fireplace/secrets
+#   sudo install -m 600 -o hearth -g hearth /dev/null /opt/fireplace/secrets/smtp-password
+#   sudo -u hearth nano /opt/fireplace/secrets/smtp-password
+# The environment variable FIREPLACE_SMTP_PASSWORD overrides this file.
+password_file = "/opt/fireplace/secrets/smtp-password"
+timeout_secs = 10
+
+# --- Who runs this server: shown on /privacy and /terms ---------------------
+# The Fireplace REFUSES TO START while email is on and name or contact_email
+# is empty, because /privacy must say who the data controller is.
+[operator]
+name = ""            # FILL IN: your full name, or your organisation's
+contact_email = ""   # FILL IN: where people send privacy requests
+hosting = ""         # FILL IN: provider and region, e.g. "Hetzner, Falkenstein, Germany (EU)"
+authority = ""       # FILL IN: your country's data protection authority, with a link
+# The youngest anybody may be to make an account. The built-in default is 16,
+# the GDPR default; some countries allow as low as 13.
+min_age = 15
+# How long a deleted account lives on in backups (docs/ORACLE.md, step 7).
+backup_days = 14

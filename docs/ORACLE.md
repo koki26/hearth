@@ -129,6 +129,14 @@ sudo useradd --system --home /opt/fireplace --shell /usr/sbin/nologin hearth
 sudo install -d -o hearth -g hearth /opt/fireplace /opt/fireplace/data
 sudo install -o hearth -g hearth target/release/fireplace /opt/fireplace/
 sudo install -o hearth -g hearth deploy/fireplace.toml /opt/fireplace/
+# Email: the SMTP password, one line, readable by the service alone
+# (docs/SELFHOST-MAIL.md). Fill in [operator] in fireplace.toml as well:
+# with email on, the Fireplace will not start until it says who runs it.
+sudo install -d -m 700 -o hearth -g hearth /opt/fireplace/secrets
+sudo install -m 600 -o hearth -g hearth /dev/null /opt/fireplace/secrets/smtp-password
+sudo -u hearth nano /opt/fireplace/secrets/smtp-password
+sudo -u hearth /opt/fireplace/fireplace admin test-mail you@example.org /opt/fireplace/fireplace.toml
+sudo cp -r web /opt/fireplace/ && sudo chown -R hearth:hearth /opt/fireplace/web
 sudo cp deploy/fireplace.service /etc/systemd/system/
 sudo systemctl enable --now fireplace
 
@@ -175,8 +183,8 @@ curl -s -XPOST https://fireplace.example.org/accounts \
   -d '{"handle":"you","password":"something you wrote down"}'
 ```
 
-**There is no password reset** ([FIREPLACE.md](FIREPLACE.md)). Write it down
-somewhere real.
+It answers with eight `recovery_codes`. Keep them with the password: they
+are how you get back in without email ([FIREPLACE.md](FIREPLACE.md)).
 
 ## 7. Back it up before anybody else signs up
 
@@ -189,6 +197,8 @@ sudo tee /etc/systemd/system/fireplace-backup.service >/dev/null <<'EOF'
 Description=Pack up the Fireplace's data
 [Service]
 Type=oneshot
+# Root-only: the archive holds email addresses.
+UMask=0077
 ExecStart=/usr/bin/tar czf /opt/fireplace/backup.tar.gz -C /opt/fireplace data
 EOF
 sudo tee /etc/systemd/system/fireplace-backup.timer >/dev/null <<'EOF'
@@ -205,17 +215,38 @@ sudo systemctl enable --now fireplace-backup.timer
 ```
 
 A tarball on the same box is half a backup. Pull it down from your own
-machine, and put that in whatever you already back up:
+machine. **It holds email addresses, so it is personal data: encrypt it the
+moment it lands, and keep only the last 14 days** -- that is the
+`backup_days` `/privacy` promises, and a deleted account must really be gone
+from backups by then. With [age](https://age-encryption.org):
 
 ```sh
-scp ubuntu@<ip>:/opt/fireplace/backup.tar.gz fireplace-$(date +%F).tar.gz
+ssh ubuntu@<ip> sudo cat /opt/fireplace/backup.tar.gz \
+  | age -r <your age public key> > fireplace-$(date +%F).tar.gz.age
+find . -name 'fireplace-*.tar.gz.age' -mtime +14 -delete
 ```
+
+Or with 7-Zip, AES-256 with the file names hidden too (`-mhe=on`), then
+delete the plain copy:
+
+```sh
+ssh ubuntu@<ip> sudo cat /opt/fireplace/backup.tar.gz > backup.tar.gz
+7z a -p -mhe=on fireplace-$(date +%F).7z backup.tar.gz && rm backup.tar.gz
+```
+
+Keep the age key or the 7-Zip password somewhere other than next to the
+backups.
 
 **The restore drill**, worth doing once now rather than reading for the first
 time in an emergency: stop the service, unpack the archive over
 `/opt/fireplace`, `chown -R hearth:hearth /opt/fireplace/data`, start it, and
 check that a token issued *before* the restore still works (`GET /me` with
-it). If it does, the key came back with the accounts.
+it). If it does, the key came back with the accounts. Decrypt first:
+`age -d -i key.txt fireplace-<date>.tar.gz.age > backup.tar.gz`.
+
+**A restore brings deleted accounts back.** After restoring, go through the
+erasure requests answered since that backup was taken and delete those
+accounts again ([PRIVACY-OPS.md](PRIVACY-OPS.md)).
 
 ## 8. Afterwards
 
@@ -230,7 +261,15 @@ journalctl -u fireplace --since "1 hour ago"
 cd ~/hearth && git pull
 cargo build --release -p hearth-fireplace
 sudo install -o hearth -g hearth target/release/fireplace /opt/fireplace/
+sudo cp -r web /opt/fireplace/ && sudo chown -R hearth:hearth /opt/fireplace/web
 sudo systemctl restart fireplace
+```
+
+A change to the account page alone (`web/`) needs only the `cp` line -- no
+build and no restart:
+
+```sh
+sudo cp -r web /opt/fireplace/ && sudo chown -R hearth:hearth /opt/fireplace/web
 ```
 
 A restart signs nobody out: tokens are signed, not stored, and the key stays

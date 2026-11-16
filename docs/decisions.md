@@ -975,7 +975,7 @@ The smaller choices, each a sentence:
 * **Loopback by default.** The Fireplace speaks plain HTTP (D59) and belongs
   behind a terminator on the same box. A port that is never open is a better
   last line than a firewall rule that might be wrong.
-* **No email, so no password reset.** A reset flow is most of the work and
+* **No email, so no password reset.** *(Superseded by D63.)* A reset flow is most of the work and
   all of the abuse surface; a forgotten password is a new account until there
   is somewhere to send one. The create-account page says so, in those words,
   because the alternative is a support request with no answer.
@@ -1060,3 +1060,64 @@ can be (docs/TRUST.md, docs/FIREPLACE.md).
 * **Not yet:** `friends` embers are still unenforced, because a ticket says
   nothing about friends; and a world scripting language (FireSharp) is its
   own piece of work.
+
+## D63 — Email is optional, and only ever for getting back in
+
+D60 said "no email, so no password reset", and the account page said so in
+those words. That was honest, and it turned a forgotten password into a lost
+friends list and lost saves -- since D62 an account is the key to saves, so
+the cost of forgetting went up and the old answer stopped being good enough.
+This supersedes that bullet.
+
+* **Email is optional, and so is sending it.** Making an account still takes
+  a handle and a password and nothing else. A signed-in player can add, change
+  or remove an address; it must be confirmed by a link before it can reset
+  anything, and one nobody confirms is deleted after 7 days. Each Fireplace
+  chooses in `[mail]` whether it sends email at all, and the default is
+  `backend = "none"`: a fresh self-host needs no SMTP and offers no email
+  fields (`GET /features` tells the client which).
+* **It is used for two things and nothing else.** A reset link the player
+  asked for, and a short notice when the password or the address changes --
+  to the *old* address when it is the address that changed, because that is
+  the one somebody taking over an account wants kept quiet. Never marketing,
+  never a newsletter, never shared. The lawful basis is performance of the
+  service (GDPR Art. 6(1)(b)), so there is no consent box, because there is
+  nothing to consent to.
+* **Everybody gets a way back in, with or without email.** Eight recovery
+  codes are shown once when an account is made, kept only as SHA-256 hashes
+  (80 random bits each: a fast hash is enough, argon2 is for things people
+  choose), and can be remade while signed in. An operator can also run
+  `fireplace admin reset-password <handle>` over SSH and hand the link over
+  some channel they trust.
+* **A reset link is signed, not stored.** It is the same `v1.` shape as a
+  token, signed by the same key, with its own `typ`, 128 random bits of
+  nonce, the account's `token_epoch` and a 30-minute expiry. Using it moves the
+  epoch, which ends every sign-in and refresh token *and* makes the link
+  itself worthless, so it works once without a table of used links. Nothing
+  about it is in `people.json`, so a leaked data file holds no live link --
+  stronger than storing a hash. It is also what lets the admin command work
+  from a second process without touching the running server.
+* **Asking for a reset never says whether the address is known.** The same
+  page, the same status, the same time: the lookup is in memory and sending
+  happens on a task of its own, so a request never waits on SMTP and never
+  learns whether a letter went out. Limited per address and per account; over
+  the account's limit the answer is still the same and nothing is sent.
+* **Every operator brings their own SMTP.** `lettre` with rustls and ring
+  only, so the build stays pure Rust. The whole of `[mail]` and `[operator]`
+  is checked at startup and a bad setting stops the server with a sentence
+  saying which one -- including email switched on with nobody named as the
+  data controller, because `/privacy` has to say who that is. The password
+  comes from a file or `FIREPLACE_SMTP_PASSWORD`, and is never printed.
+* **The privacy page describes the server it is on.** `/privacy` and
+  `/terms` are filled from that Fireplace's own config, so somebody hosting
+  their own describes their own server, mail provider and authority. No
+  analytics, no third-party anything, no cookies, so no banner.
+* **Right of access and erasure are routes, not promises.** `GET /me/export`
+  is everything stored about the account; `DELETE /me` removes it and its
+  address at once. Removing an address deletes it rather than hiding it.
+
+What stays the same for a player who never adds an address: every route
+answers as it did (`POST /accounts` gains `recovery_codes`, `GET /me` gains
+three fields), the people file holds exactly what it held -- the new fields
+are skipped when empty, so old backups load and a rolled-back binary still
+reads a new file -- and nothing is ever sent to anybody.

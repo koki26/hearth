@@ -23,6 +23,10 @@ signal signed_out(reason: String)
 signal friends_changed
 ## Something did not work, with a line a player can read.
 signal failed(what: String, message: String)
+## Something worked that the player should hear about.
+signal said(message: String)
+## What the account page shows changed: features, or the email on file.
+signal account_changed
 
 ## How often we say where we are, and ask where everybody else is. The server
 ## forgets a player it has not heard from in two minutes.
@@ -44,6 +48,16 @@ var friends: Array = []
 var incoming: Array = []
 var outgoing: Array = []
 var share_location := true
+## What this Fireplace offers (`GET /features`): whether it sends email, and
+## where its reset, privacy and terms pages are. Empty until it answers, and
+## then nothing email-shaped is shown, which is the safe way round.
+var features := {}
+## Shown once, straight after an account is made, and then forgotten. They
+## are never written to the settings file.
+var recovery_codes: Array = []
+## The address on the account, if any, and whether its link was opened.
+var email := ""
+var email_verified := false
 
 var _details: ConnectDetails
 var _http: HTTPRequest
@@ -70,6 +84,7 @@ func _ready() -> void:
 	_http.timeout = TIMEOUT
 	_http.request_completed.connect(_on_answer)
 	add_child(_http)
+	fetch_features()
 	# A token saved from last time is worth a try: if it is still good, the
 	# player never sees a sign-in page at all.
 	if _details.account_refresh != "":
@@ -125,6 +140,29 @@ func sign_in(as_handle: String, password: String) -> void:
 	_send("POST", "/sessions", {"handle": as_handle, "password": password}, "signin")
 
 
+## Asks what this Fireplace offers. Again whenever the address changes.
+func fetch_features() -> void:
+	features = {}
+	_send("GET", "/features", {}, "features")
+
+
+## Whether "Forgot password?" means anything here.
+func can_reset() -> bool:
+	return bool(features.get("email", false)) or bool(features.get("recovery_codes", false))
+
+
+## A page the Fireplace serves, for the system browser: the reset form, the
+## privacy policy, the terms.
+func page_url(which: String) -> String:
+	return base_url() + str(features.get(which, "/" + which))
+
+
+## Add or change the address (empty removes it). The password as well, as the
+## server asks: the address is how a password gets reset.
+func set_email(password: String, address: String) -> void:
+	_send("POST", "/me/email", {"password": password, "email": address}, "email")
+
+
 ## Forgets the tokens on this machine. The one on the server runs out on its
 ## own; there is nothing to call back.
 func sign_out() -> void:
@@ -139,6 +177,9 @@ func sign_out() -> void:
 	_details.account_token = ""
 	_details.account_refresh = ""
 	_details.save()
+	recovery_codes = []
+	email = ""
+	email_verified = false
 	signed_out.emit("signed out")
 
 
@@ -270,7 +311,8 @@ func _on_answer(result: int, code: int, _headers: PackedStringArray, body: Packe
 	# Anything at all may come back from anywhere: never assume it parses.
 	var parsed = JSON.parse_string(body.get_string_from_utf8())
 	var answer: Dictionary = parsed if parsed is Dictionary else {}
-	if code == 401 and tag != "signin":
+	# A wrong password is a 401 as well, and must not sign anybody out.
+	if code == 401 and tag != "signin" and tag != "email":
 		# The token is no longer believed. Sign out rather than keep asking.
 		var was := handle
 		sign_out()
@@ -297,8 +339,10 @@ func _took(tag: String, answer: Dictionary) -> void:
 			_details.save()
 			_beat = 0.0
 			_renew = RENEW
+			recovery_codes = answer.get("recovery_codes", [])
 			signed_in.emit(handle)
 			refresh_friends()
+			_send("GET", "/me", {}, "me")
 		"renew":
 			# Quietly: the player is still signed in, nothing to announce.
 			token = str(answer.get("access", token))
@@ -315,3 +359,14 @@ func _took(tag: String, answer: Dictionary) -> void:
 		"settings":
 			share_location = bool(answer.get("share_location", share_location))
 			friends_changed.emit()
+		"features":
+			features = answer
+			account_changed.emit()
+		"me":
+			email = str(answer.get("email", "")) if answer.get("email") != null else ""
+			email_verified = bool(answer.get("email_verified", false))
+			account_changed.emit()
+		"email":
+			_send("GET", "/me", {}, "me")
+			said.emit("Saved. Open the link we emailed to confirm it." if answer.get("email") != null
+				else "Email removed.")

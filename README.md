@@ -74,7 +74,9 @@ bash start.sh
 
 Putting one on the internet, as a service, on either OS:
 [docs/RUNNING.md](docs/RUNNING.md). The box the official servers run on:
-[docs/ORACLE.md](docs/ORACLE.md).
+[docs/ORACLE.md](docs/ORACLE.md). Running your own Fireplace with email:
+[docs/SELFHOST-MAIL.md](docs/SELFHOST-MAIL.md), and what GDPR asks of whoever
+runs one: [docs/PRIVACY-OPS.md](docs/PRIVACY-OPS.md).
 
 It is operated by typing at it, with the commands the window also takes
 (`flame --help` prints them):

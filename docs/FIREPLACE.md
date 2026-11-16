@@ -11,9 +11,11 @@ the client is a game engine, not a REST purist.
 
 ## What it is not
 
-- **There is no password reset.** No email is collected, so there is nobody to
-  send one to. A forgotten password is a new account.
-- **There is no account deletion** yet, and ids are never reused — the id in a
+- **Email is optional, and so is sending it.** A Fireplace may send reset
+  links and security notices (`[mail]`, [SELFHOST-MAIL.md](SELFHOST-MAIL.md));
+  one that does not still has recovery codes and the admin command. Nothing
+  else is ever sent (`docs/decisions.md` D63).
+- **Deleting an account is immediate**, and ids are never reused — the id in a
   signed token has to keep meaning one person.
 - **There is no revocation.** A token is good until it expires. Bumping an
   account's `token_epoch` in `people.json` invalidates every token it holds,
@@ -39,6 +41,11 @@ business.
 | `POST /me/name` | `{"display_name": "Ada L"}` → `200` |
 | `POST /me/password` | `{"password", "new_password"}` → `200`, a fresh token pair; every other sign-in ends |
 | `POST /me/delete` | `{"password"}` → `204`; the account and every friendship it was in are gone |
+| `DELETE /me` | the same, under the name GDPR requests expect |
+| `GET /me/export` | everything stored about the account, as JSON (hashes left out) |
+| `POST /me/email` | `{"password", "email"}` → `200`; `""` removes it. `404` where the server sends no email |
+| `POST /me/recovery` | `{"password"}` → `{"recovery_codes": [8]}`; the old set stops working |
+| `GET /features` | `{"email", "recovery_codes", "reset", "privacy", "terms", "min_age"}`, no token |
 
 A **display name** is what Flames and friends see: 1–32 bytes, no control
 characters, need not be unique, and the handle until one is chosen. Changing
@@ -48,14 +55,44 @@ a token, so a token left on somebody else's machine cannot lock the owner out.
 **The account page.** `GET /` serves one HTML page that does all of this in a
 browser: sign in or make an account, see friends and requests, change the
 display name, the password and location sharing, and delete the account. It
-calls the same routes the game does, keeps its tokens in the tab's session
-storage, and needs no build step (`src/page.html`).
+calls the same routes the game does and keeps its tokens in the tab's session
+storage. It lives in `web/` at the top of the repository -- `index.html`,
+`style.css`, `app.js` -- and the Fireplace serves that folder as it is
+(`web_dir` in `fireplace.toml`), so changing the page is editing a file and
+reloading. Anything that is not an API route is looked up there; nothing
+outside the folder can be.
 
 The first three answer with the same thing:
 
 ```json
 { "id": 7, "handle": "Ada", "access": "v1.…", "refresh": "v1.…", "expires_in": 3600 }
 ```
+
+`POST /accounts` also carries `"recovery_codes"`: eight codes, shown this
+once and kept only as hashes. `GET /me` also says `email`, `email_verified`
+and `recovery_codes_left`.
+
+## Getting back in
+
+Three ways, from most to least self-service. Each one moves the account's
+`token_epoch`, so every sign-in and refresh token ends, and each tells the
+confirmed address, if there is one.
+
+* **A recovery code**, at `/reset` in a browser: handle, code, new password.
+  Works on every Fireplace, with or without email. Each code works once.
+* **An email link**, where the server sends email and the address was
+  confirmed. `/reset` asks for the address and always answers the same,
+  known or not. The link is signed rather than stored, lasts 30 minutes, and
+  works once (D63).
+* **The operator**, over SSH: `fireplace admin reset-password <handle>`
+  prints a link, for them to pass on by a channel they trust.
+
+A new address is confirmed by a link to `/verify/<token>` (7 days); one that
+is not confirmed is deleted after that, and resets nothing meanwhile.
+
+`/reset`, `/reset/<token>`, `/verify/<token>`, `/privacy` and `/terms` are
+pages built into the binary, filled from `fireplace.toml`. No script, no
+cookies, nothing loaded from anywhere else.
 
 A wrong password and an unknown handle give the same `401` and the same
 sentence. Whether somebody has an account here is not ours to hand out.
@@ -191,6 +228,8 @@ Always `{"error": "a short sentence"}`, never a stack trace.
 | Sign-in | 10 tries per 5 minutes, per address **and** per handle |
 | New accounts | 10 an hour per address (`accounts_per_hour`), counted only for real attempts — everybody in one house shares an address |
 | Friend requests | 60 an hour per account |
+| Reset emails | 5 asks an hour per address; at most 3 letters an hour per account, silently |
+| Reset links, recovery codes | 10 tries per 5 minutes, per address **and** per account |
 | Request body | 8 KB |
 | Request time | 10 seconds |
 
@@ -210,8 +249,12 @@ which is a way to be attacked rather than a defence.
 data/
   key.pk8        the Ed25519 signing key, 0600, made on first run
   pid.key        the secret per-Flame player ids are derived with, 0600
-  people.json    every account and every friendship
+  people.json    every account and every friendship, and any email address
 ```
+
+Because it can hold email addresses, a backup of `data/` is personal data:
+keep it encrypted off the box ([ORACLE.md](ORACLE.md), step 7, and
+[PRIVACY-OPS.md](PRIVACY-OPS.md)).
 
 All three matter. Losing `people.json` loses everybody; losing `key.pk8` signs
 everybody out at once and cannot be undone; losing `pid.key` gives every

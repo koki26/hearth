@@ -92,7 +92,29 @@ pub struct Account {
     pub incoming: Vec<u64>,
     #[serde(default)]
     pub outgoing: Vec<u64>,
+    /// Optional, and only ever for resets and security notices
+    /// (`docs/decisions.md` D63). Skipped when absent, so an account without
+    /// one is written exactly as it always was.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub email: Option<Email>,
+    /// SHA-256 of each unused recovery code. The codes are 80 random bits, so
+    /// a fast hash is enough; argon2 is for things people choose.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub recovery: Vec<String>,
 }
+
+/// An address and whether its owner has clicked the link sent to it. Nothing
+/// else about it is kept.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Email {
+    pub address: String,
+    pub verified: bool,
+    /// When it was added, so an unverified one can be forgotten.
+    pub since: u64,
+}
+
+/// An address nobody confirms is deleted after this long.
+pub const UNVERIFIED_SECONDS: u64 = 7 * 24 * 60 * 60;
 
 fn one() -> u64 {
     1
@@ -188,6 +210,8 @@ impl Accounts {
                 friends: Vec::new(),
                 incoming: Vec::new(),
                 outgoing: Vec::new(),
+                email: None,
+                recovery: Vec::new(),
             },
         );
         self.save();
@@ -298,6 +322,82 @@ impl Accounts {
         Ok(epoch)
     }
 
+    /// A new address, unverified, replacing whatever was there -- which is
+    /// deleted at once, not kept aside. `None` removes it. Returns the old
+    /// one, if it was verified, so it can be told.
+    pub fn set_email(&mut self, me: u64, address: Option<&str>, now: u64) -> Result<Option<String>, Refused> {
+        let account = self.by_id.get_mut(&me).ok_or(Refused::NoSuchAccount)?;
+        let new = address.map(|a| Email { address: a.to_owned(), verified: false, since: now });
+        let old = std::mem::replace(&mut account.email, new);
+        self.save();
+        Ok(old.filter(|e| e.verified).map(|e| e.address))
+    }
+
+    /// True when `address` is the one waiting on this account, now verified.
+    pub fn verify_email(&mut self, me: u64, address: &str) -> bool {
+        let Some(email) = self.by_id.get_mut(&me).and_then(|a| a.email.as_mut()) else {
+            return false;
+        };
+        if !email.address.eq_ignore_ascii_case(address) {
+            return false;
+        }
+        if !email.verified {
+            email.verified = true;
+            self.save();
+        }
+        true
+    }
+
+    /// Accounts whose **verified** address is this one. Several may share an
+    /// address; refusing that would tell a stranger it is in use.
+    pub fn by_verified_email(&self, address: &str) -> Vec<&Account> {
+        self.by_id
+            .values()
+            .filter(|a| {
+                a.email.as_ref().is_some_and(|e| e.verified && e.address.eq_ignore_ascii_case(address))
+            })
+            .collect()
+    }
+
+    /// Deletes every address that was not verified in time.
+    pub fn forget_unverified(&mut self, now: u64) {
+        let mut changed = false;
+        for account in self.by_id.values_mut() {
+            if account
+                .email
+                .as_ref()
+                .is_some_and(|e| !e.verified && now.saturating_sub(e.since) > UNVERIFIED_SECONDS)
+            {
+                account.email = None;
+                changed = true;
+            }
+        }
+        if changed {
+            self.save();
+        }
+    }
+
+    /// Replaces every recovery code with these hashes.
+    pub fn set_recovery(&mut self, me: u64, hashes: Vec<String>) -> Result<(), Refused> {
+        self.by_id.get_mut(&me).ok_or(Refused::NoSuchAccount)?.recovery = hashes;
+        self.save();
+        Ok(())
+    }
+
+    /// Spends one recovery code. True if it was one of this account's.
+    pub fn spend_recovery(&mut self, me: u64, hash: &str) -> bool {
+        let Some(account) = self.by_id.get_mut(&me) else {
+            return false;
+        };
+        let before = account.recovery.len();
+        account.recovery.retain(|h| h != hash);
+        let spent = account.recovery.len() < before;
+        if spent {
+            self.save();
+        }
+        spent
+    }
+
     /// Gone for good, and out of everybody else's lists in the same save, so
     /// nobody is left friends with an id that means nothing. The handle is
     /// free again afterwards.
@@ -363,6 +463,36 @@ pub fn handle_is_usable(handle: &str) -> bool {
 
 pub fn password_is_usable(password: &str) -> bool {
     (MIN_PASSWORD..=MAX_PASSWORD).contains(&password.len())
+}
+
+/// How many recovery codes an account holds when they are (re)made.
+pub const RECOVERY_CODES: usize = 8;
+
+/// Eight codes as they are shown, once, and their hashes as they are kept.
+/// 80 random bits each, in hex, grouped so they can be read out and typed.
+pub fn new_recovery_codes() -> (Vec<String>, Vec<String>) {
+    let random = ring::rand::SystemRandom::new();
+    let codes: Vec<String> = (0..RECOVERY_CODES)
+        .map(|_| {
+            let mut bytes = [0u8; 10];
+            ring::rand::SecureRandom::fill(&random, &mut bytes).expect("the system has randomness");
+            let hex: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
+            format!("{}-{}-{}-{}", &hex[..5], &hex[5..10], &hex[10..15], &hex[15..])
+        })
+        .collect();
+    let hashes = codes.iter().map(|c| hash_recovery(c)).collect();
+    (codes, hashes)
+}
+
+/// Dashes, spaces and capitals do not matter: a code is typed by hand.
+pub fn hash_recovery(code: &str) -> String {
+    let clean: String =
+        code.chars().filter(char::is_ascii_alphanumeric).map(|c| c.to_ascii_lowercase()).collect();
+    ring::digest::digest(&ring::digest::SHA256, clean.as_bytes())
+        .as_ref()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
 }
 
 #[cfg(test)]
@@ -520,5 +650,33 @@ mod tests {
         assert!(store.get(ada).is_none() && store.by_handle("ada").is_none());
         assert!(store.get(bob).unwrap().friends.is_empty(), "not friends with nobody");
         make(&mut store, "ada"); // The handle is free again.
+    }
+
+    #[test]
+    fn an_old_people_file_still_reads_and_an_account_without_email_is_written_as_before() {
+        let dir = temp("old-file");
+        let old =
+            r#"{"version":1,"next_id":2,"accounts":[{"id":1,"handle":"ada","password":"x","created":1}]}"#;
+        std::fs::write(dir.join("people.json"), old).unwrap();
+        let mut store = Accounts::open(&dir).unwrap();
+        assert!(store.get(1).unwrap().email.is_none() && store.get(1).unwrap().recovery.is_empty());
+        store.set_sharing(1, false).unwrap();
+        let written = std::fs::read_to_string(dir.join("people.json")).unwrap();
+        assert!(!written.contains("email") && !written.contains("recovery"), "{written}");
+    }
+
+    #[test]
+    fn an_unverified_address_is_forgotten_after_a_week_and_a_verified_one_is_not() {
+        let mut store = Accounts::open(&temp("unverified")).unwrap();
+        let (ada, bob) = (make(&mut store, "ada"), make(&mut store, "bob"));
+        store.set_email(ada, Some("ada@example.org"), 0).unwrap();
+        store.set_email(bob, Some("bob@example.org"), 0).unwrap();
+        assert!(store.by_verified_email("ada@example.org").is_empty(), "not until it is verified");
+        assert!(store.verify_email(bob, "BOB@example.org"));
+        store.forget_unverified(UNVERIFIED_SECONDS);
+        assert!(store.get(ada).unwrap().email.is_some(), "a week is a week");
+        store.forget_unverified(UNVERIFIED_SECONDS + 1);
+        assert!(store.get(ada).unwrap().email.is_none(), "deleted, not hidden");
+        assert_eq!(store.by_verified_email("bob@example.org").len(), 1);
     }
 }

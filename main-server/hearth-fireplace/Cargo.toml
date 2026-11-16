@@ -19,6 +19,9 @@ argon2 = "0.6.0"
 hearth-protocol.workspace = true
 axum = "0.8.9"
 base64 = "0.23.1"
+# rustls with ring and webpki roots only: no OpenSSL, no aws-lc, no CMake, so
+# the build stays pure Rust (docs/ORACLE.md).
+lettre = { version = "0.11.23", default-features = false, features = ["builder", "smtp-transport", "hostname", "tokio1-rustls-tls"] }
 ring = "0.17.14"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
@@ -26,7 +29,7 @@ tokio = { workspace = true, features = ["rt-multi-thread", "signal", "io-util", 
 toml = "1.1.8"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
-tower-http = { version = "0.7.1", features = ["timeout"] }
+tower-http = { version = "0.7.1", features = ["fs", "timeout"] }
 tower = { version = "0.5.3", features = ["util"] }
 
 [dev-dependencies]

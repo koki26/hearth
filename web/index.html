@@ -1,0 +1,145 @@
+<!doctype html>
+<!--
+  The Fireplace account page. Everything in web/ is served as-is by the
+  Fireplace (web_dir in fireplace.toml): edit a file and reload, no rebuild.
+  The page talks to the JSON routes in docs/FIREPLACE.md; app.js shows how.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'">
+<title>Hearth Account</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <div class="top">
+    <div>
+      <h1><span>Hearth</span> account</h1>
+      <p class="sub" id="whoami">Sign in to manage your account.</p>
+    </div>
+    <button id="signout" hidden>Sign out</button>
+  </div>
+
+  <!-- Signed out -->
+  <section id="auth">
+    <div class="tabs" role="tablist">
+      <button role="tab" aria-selected="true" id="tab-in">Sign in</button>
+      <button role="tab" aria-selected="false" id="tab-new">Create account</button>
+    </div>
+    <form id="auth-form">
+      <label for="handle">Handle</label>
+      <input id="handle" autocomplete="username" required maxlength="20">
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" required minlength="8" maxlength="128">
+      <div class="actions"><button class="main" id="auth-go">Sign in</button></div>
+      <p class="msg" id="auth-msg" role="status"></p>
+      <p class="empty"><a href="/reset">Forgot your password?</a></p>
+      <p class="empty" id="new-terms" hidden>Making an account means you accept the <a href="/terms">terms</a>
+        and are at least <span id="min-age">16</span>. What is stored and why: <a href="/privacy">privacy</a>.</p>
+    </form>
+  </section>
+
+  <!-- Shown once, right after an account is made, and never again. -->
+  <section id="codes-box" hidden>
+    <h2>Your recovery codes</h2>
+    <p class="empty">Write these down or print them. Each one resets your password once, and they are the
+      only way back in if you forget it. They are not shown again.</p>
+    <ul id="codes" class="codes"></ul>
+    <div class="actions"><button class="main" id="codes-done">I have saved them</button></div>
+  </section>
+
+  <!-- Signed in -->
+  <div id="signed-in" hidden>
+    <section>
+      <h2>Display name</h2>
+      <form class="row" id="name-form">
+        <input id="display" maxlength="32" aria-label="Display name" required>
+        <button class="main">Save</button>
+      </form>
+      <p class="msg" id="name-msg" role="status"></p>
+      <label class="check"><input type="checkbox" id="share"> Let friends see which server I am on</label>
+    </section>
+
+    <section>
+      <h2>Friends</h2>
+      <form class="row" id="add-form">
+        <input id="add-handle" placeholder="Add by handle" aria-label="Friend's handle" maxlength="20" required>
+        <button>Add</button>
+      </form>
+      <p class="msg" id="friend-msg" role="status"></p>
+      <div id="incoming-box" hidden>
+        <label>Asking to be your friend</label>
+        <ul id="incoming"></ul>
+      </div>
+      <label>Friends</label>
+      <ul id="friends"></ul>
+      <div id="outgoing-box" hidden>
+        <label>Waiting for them</label>
+        <ul id="outgoing"></ul>
+      </div>
+    </section>
+
+    <section id="email-box" hidden>
+      <h2>Email <small class="empty">optional</small></h2>
+      <p class="empty">Only for resetting your password and for a short notice when your password or email
+        changes. Never anything else.</p>
+      <p class="msg" id="email-state"></p>
+      <form id="email-form">
+        <label for="email">Email address</label>
+        <input id="email" type="email" autocomplete="email" maxlength="254">
+        <label for="email-pw">Password</label>
+        <input id="email-pw" type="password" autocomplete="current-password" required>
+        <div class="actions row"><button class="main">Save email</button><button type="button" id="email-remove">Remove email</button></div>
+        <p class="msg" id="email-msg" role="status"></p>
+      </form>
+    </section>
+
+    <section>
+      <h2>Recovery codes</h2>
+      <p class="empty" id="codes-left"></p>
+      <form id="codes-form">
+        <label for="codes-pw">Password</label>
+        <input id="codes-pw" type="password" autocomplete="current-password" required>
+        <div class="actions"><button>Make a new set</button></div>
+        <p class="msg" id="codes-msg" role="status"></p>
+      </form>
+    </section>
+
+    <section>
+      <h2>Your data</h2>
+      <p class="empty">Everything this server stores about your account, as a JSON file.</p>
+      <div class="actions"><button id="export">Download my data</button></div>
+    </section>
+
+    <section>
+      <h2>Password</h2>
+      <form id="pw-form">
+        <label for="pw-old">Current password</label>
+        <input id="pw-old" type="password" autocomplete="current-password" required>
+        <label for="pw-new">New password</label>
+        <input id="pw-new" type="password" autocomplete="new-password" required minlength="8" maxlength="128">
+        <div class="actions"><button class="main">Change password</button></div>
+        <p class="msg" id="pw-msg" role="status"></p>
+      </form>
+    </section>
+
+    <section>
+      <h2>Delete account</h2>
+      <p class="empty">This removes your account and your friends list for good. Servers keep nothing
+        that points back to you.</p>
+      <form id="del-form">
+        <label for="del-pw">Password</label>
+        <input id="del-pw" type="password" autocomplete="current-password" required>
+        <div class="actions"><button class="danger">Delete my account</button></div>
+        <p class="msg" id="del-msg" role="status"></p>
+      </form>
+    </section>
+  </div>
+  <footer class="empty"><a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></footer>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>

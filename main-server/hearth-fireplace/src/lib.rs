@@ -24,6 +24,8 @@
 pub mod accounts;
 pub mod api;
 pub mod limit;
+pub mod mail;
+pub mod pages;
 pub mod presence;
 pub mod token;
 
@@ -58,6 +60,46 @@ pub struct Config {
     /// it should be; raise it while you are testing, lower it if somebody
     /// starts making accounts in bulk.
     pub accounts_per_hour: u32,
+    /// The account web page: `index.html` and whatever it loads, served as
+    /// they are from disk, so editing one is a reload rather than a rebuild.
+    pub web_dir: PathBuf,
+    /// Email: off unless set up (`docs/SELFHOST-MAIL.md`).
+    pub mail: mail::MailConfig,
+    /// Who runs this Fireplace, for `/privacy` and `/terms`.
+    pub operator: Operator,
+}
+
+/// `[operator]`: whoever runs this Fireplace, so its privacy page describes
+/// this server and not the official one.
+#[derive(Debug, Clone, serde::Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields, default)]
+pub struct Operator {
+    /// The data controller: a person or an organisation.
+    pub name: String,
+    /// Where privacy requests go.
+    pub contact_email: String,
+    /// Where the server and its data are, e.g. "Oracle Cloud, Frankfurt (EU)".
+    pub hosting: String,
+    /// The data protection authority people may complain to.
+    pub authority: String,
+    /// The youngest anybody may be to make an account. 16 is the GDPR
+    /// default; member states may go lower (as low as 13).
+    pub min_age: u8,
+    /// How long a deleted account can live on in backups, stated on /privacy.
+    pub backup_days: u32,
+}
+
+impl Default for Operator {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            contact_email: String::new(),
+            hosting: String::new(),
+            authority: String::new(),
+            min_age: 16,
+            backup_days: 14,
+        }
+    }
 }
 
 impl Default for Config {
@@ -68,6 +110,9 @@ impl Default for Config {
             data_dir: "data".into(),
             max_accounts: 10_000,
             accounts_per_hour: limit::ACCOUNTS_PER_HOUR,
+            web_dir: "web".into(),
+            mail: mail::MailConfig::default(),
+            operator: Operator::default(),
         }
     }
 }
@@ -89,21 +134,40 @@ pub struct Fireplace {
     pub keys: token::Keys,
     pub max_accounts: usize,
     pub accounts_per_hour: u32,
+    pub web_dir: PathBuf,
+    pub mail: mail::Mailer,
+    /// What the pages are filled from.
+    pub config: Config,
 }
 
 impl Fireplace {
     /// Reads what is on disk and makes what is missing. Called once, before
     /// anything is served.
     pub fn open(config: &Config) -> Result<Self> {
+        // Checked first: a bad [mail] stops the server before it touches disk.
+        let mail = mail::Mailer::new(config)?;
         std::fs::create_dir_all(&config.data_dir)
             .with_context(|| format!("could not make {}", config.data_dir.display()))?;
         Ok(Self {
-            accounts: Mutex::new(accounts::Accounts::open(&config.data_dir)?),
+            accounts: Mutex::new({
+                let mut accounts = accounts::Accounts::open(&config.data_dir)?;
+                accounts.forget_unverified(token::now());
+                accounts
+            }),
             presence: Mutex::new(presence::Presence::default()),
             limits: Mutex::new(limit::Limiter::default()),
             keys: token::Keys::open(&config.data_dir)?,
             max_accounts: config.max_accounts,
             accounts_per_hour: config.accounts_per_hour,
+            web_dir: {
+                // Not fatal: the API is the part the game needs.
+                if !config.web_dir.join("index.html").exists() {
+                    tracing::warn!(dir = %config.web_dir.display(), "no index.html, so no account page");
+                }
+                config.web_dir.clone()
+            },
+            mail,
+            config: config.clone(),
         })
     }
 }
@@ -120,6 +184,16 @@ mod tests {
         assert_eq!(config.data_dir, PathBuf::from("accounts"));
         // A typo in a config is a stopped server, not a silently ignored key.
         assert!(Config::parse("prot = 9000").is_err());
+    }
+
+    #[test]
+    fn the_shipped_config_parses_and_says_what_the_official_server_does() {
+        let config = Config::parse(include_str!("../../../deploy/fireplace.toml")).unwrap();
+        assert_eq!(config.mail.backend, mail::Backend::Smtp);
+        assert_eq!(config.mail.smtp.port, 587);
+        assert_eq!(config.operator.min_age, 15);
+        // A fresh self-host sends nothing until somebody sets it up.
+        assert_eq!(Config::default().mail.backend, mail::Backend::None);
     }
 
     #[test]

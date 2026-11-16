@@ -4,8 +4,8 @@
 //! and nothing else: there is no session table to keep, which is what makes a
 //! restart invisible to everybody who is signed in.
 //!
-//! Only POST and GET. Godot's `HTTPRequest` is happiest that way, and REST
-//! purity is not worth a body on a DELETE.
+//! POST and GET, because Godot's `HTTPRequest` is happiest that way. The one
+//! exception is `DELETE /me`, the GDPR-shaped name for `POST /me/delete`.
 
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
@@ -33,13 +33,16 @@ const NOBODY: &str =
 
 pub fn router(state: Arc<Fireplace>) -> Router {
     Router::new()
-        .route("/", get(page))
         .route("/health", get(health))
         .route("/key", get(public_key))
         .route("/accounts", post(create_account))
         .route("/sessions", post(sign_in))
         .route("/sessions/refresh", post(refresh))
-        .route("/me", get(me))
+        .route("/features", get(features))
+        .route("/me", get(me).delete(delete_account))
+        .route("/me/email", post(set_email))
+        .route("/me/recovery", post(new_recovery_codes))
+        .route("/me/export", get(export))
         .route("/me/name", post(set_name))
         .route("/me/password", post(set_password))
         .route("/me/delete", post(delete_account))
@@ -50,6 +53,11 @@ pub fn router(state: Arc<Fireplace>) -> Router {
         .route("/friends/accept", post(accept_friend))
         .route("/friends/remove", post(remove_friend))
         .route("/presence", post(report_presence))
+        .merge(crate::pages::routes())
+        // Anything that is not a route is a file from the web folder: the
+        // account page, its stylesheet and script, and whatever else a host
+        // puts there. ServeDir refuses anything that climbs out of it.
+        .fallback_service(tower_http::services::ServeDir::new(&state.web_dir))
         .layer(tower_http::timeout::TimeoutLayer::with_status_code(
             StatusCode::REQUEST_TIMEOUT,
             std::time::Duration::from_secs(TIMEOUT_SECONDS),
@@ -155,16 +163,23 @@ fn signed_in(state: &Fireplace, headers: &HeaderMap) -> Result<u64, ApiError> {
 
 // --- open routes ------------------------------------------------------------
 
-/// The account page: sign in, friends, display name, password, delete. One
-/// file with no build step, calling the same JSON routes the game does.
-async fn page() -> axum::response::Html<&'static str> {
-    axum::response::Html(include_str!("page.html"))
-}
-
 /// Unchanged, and deliberately text: the deploy guide curls it, and so does
 /// anything watching the box.
 async fn health() -> &'static str {
     "ok"
+}
+
+/// What this Fireplace offers, so a client shows "Forgot password?" and email
+/// fields only where they mean something.
+async fn features(State(state): State<Arc<Fireplace>>) -> Json<Value> {
+    Json(json!({
+        "email": state.mail.enabled(),
+        "recovery_codes": true,
+        "reset": "/reset",
+        "privacy": "/privacy",
+        "terms": "/terms",
+        "min_age": state.config.operator.min_age,
+    }))
 }
 
 /// The public half of the signing key, so a Flame can verify a token offline
@@ -204,13 +219,18 @@ async fn create_account(
         return Err(too_many("too many new accounts from here, try again later"));
     }
     let hashed = hash_password(body.password).await?;
+    let (codes, hashes) = accounts::new_recovery_codes();
     let (id, epoch) = {
         let mut accounts = state.accounts.lock().unwrap();
         let id = accounts.create(&handle, hashed, now, state.max_accounts)?;
+        accounts.set_recovery(id, hashes)?;
         (id, accounts.get(id).expect("just made").token_epoch)
     };
     tracing::info!(id, %handle, "a new account");
-    Ok((StatusCode::CREATED, Json(tokens_for(&state, id, &handle, epoch, now))).into_response())
+    // The codes are shown this once and never again: only their hashes stay.
+    let mut answer = tokens_for(&state, id, &handle, epoch, now);
+    answer["recovery_codes"] = json!(codes);
+    Ok((StatusCode::CREATED, Json(answer)).into_response())
 }
 
 async fn sign_in(
@@ -281,7 +301,7 @@ async fn refresh(
     Ok(Json(tokens_for(&state, claims.sub, &handle, epoch, now)))
 }
 
-fn tokens_for(state: &Fireplace, id: u64, handle: &str, epoch: u64, now: u64) -> Value {
+pub(crate) fn tokens_for(state: &Fireplace, id: u64, handle: &str, epoch: u64, now: u64) -> Value {
     json!({
         "id": id,
         "handle": handle,
@@ -304,7 +324,110 @@ async fn me(State(state): State<Arc<Fireplace>>, headers: HeaderMap) -> Result<J
         "display_name": account.display(),
         "share_location": account.share_location,
         "friends": account.friends.len(),
+        "email": account.email.as_ref().map(|e| &e.address),
+        "email_verified": account.email.as_ref().is_some_and(|e| e.verified),
+        "recovery_codes_left": account.recovery.len(),
     })))
+}
+
+/// Everything stored about the account, for GDPR access and portability.
+/// The hashes are left out: they are not information about anybody.
+async fn export(State(state): State<Arc<Fireplace>>, headers: HeaderMap) -> Result<Json<Value>, ApiError> {
+    let id = signed_in(&state, &headers)?;
+    let now = token::now();
+    let accounts = state.accounts.lock().unwrap();
+    let account = accounts.get(id).ok_or_else(unauthorised)?;
+    let people = |ids: &Vec<u64>| -> Vec<Value> {
+        ids.iter()
+            .filter_map(|id| accounts.get(*id))
+            .map(|a| json!({ "id": a.id, "handle": a.handle }))
+            .collect()
+    };
+    let seen = state.presence.lock().unwrap().of(id, now).cloned();
+    Ok(Json(json!({
+        "id": account.id,
+        "handle": account.handle,
+        "display_name": account.display_name,
+        "created": account.created,
+        "token_epoch": account.token_epoch,
+        "share_location": account.share_location,
+        "friends": people(&account.friends),
+        "incoming": people(&account.incoming),
+        "outgoing": people(&account.outgoing),
+        "email": account.email,
+        "recovery_codes_left": account.recovery.len(),
+        "password": "stored only as an argon2id hash, which is not included",
+        "presence_in_memory": seen.map(|w| json!({
+            "flame": w.flame, "ember": w.ember, "ember_name": w.ember_name, "world": w.world, "at": w.at,
+        })),
+    })))
+}
+
+#[derive(serde::Deserialize)]
+struct SetEmail {
+    password: String,
+    /// Empty removes it.
+    email: String,
+}
+
+/// Add, change or remove the address. The password as well as a token, as
+/// for changing the password: the address is how a password gets reset, so
+/// a token left on somebody else's machine must not be enough to take it.
+async fn set_email(
+    State(state): State<Arc<Fireplace>>,
+    headers: HeaderMap,
+    Json(body): Json<SetEmail>,
+) -> Result<Json<Value>, ApiError> {
+    let id = signed_in(&state, &headers)?;
+    if !state.mail.enabled() {
+        return Err(ApiError::new(StatusCode::NOT_FOUND, "this Fireplace does not send email"));
+    }
+    let address = body.email.trim();
+    if !address.is_empty() && !crate::mail::address_is_usable(address) {
+        return Err(bad("that is not an email address"));
+    }
+    let (hashed, handle) = password_of(&state, id)?;
+    if !check_password(hashed, body.password).await {
+        return Err(ApiError::new(StatusCode::UNAUTHORIZED, "that is not your password"));
+    }
+    let now = token::now();
+    let (old, epoch) = {
+        let mut accounts = state.accounts.lock().unwrap();
+        let old = accounts.set_email(id, (!address.is_empty()).then_some(address), now)?;
+        (old, accounts.get(id).map_or(0, |a| a.token_epoch))
+    };
+    // The old address hears about it, not the new one: that is the one an
+    // account thief would want kept quiet.
+    if let Some(old) = old.filter(|old| !old.eq_ignore_ascii_case(address)) {
+        state.mail.send(&old, state.mail.email_changed_letter(&handle));
+    }
+    if !address.is_empty() {
+        let link = format!(
+            "{}/verify/{}",
+            state.mail.public_url,
+            state.keys.mint_link("verify", id, epoch, address, now)
+        );
+        state.mail.send(address, state.mail.verify_letter(&handle, &link));
+    }
+    tracing::info!(id, "changed their email");
+    Ok(Json(json!({ "email": (!address.is_empty()).then_some(address), "email_verified": false })))
+}
+
+/// A fresh set of eight, and the old ones stop working. The password too:
+/// these reset the password, so they are worth as much as it is.
+async fn new_recovery_codes(
+    State(state): State<Arc<Fireplace>>,
+    headers: HeaderMap,
+    Json(body): Json<Confirm>,
+) -> Result<Json<Value>, ApiError> {
+    let id = signed_in(&state, &headers)?;
+    let (hashed, _) = password_of(&state, id)?;
+    if !check_password(hashed, body.password).await {
+        return Err(ApiError::new(StatusCode::UNAUTHORIZED, "that is not your password"));
+    }
+    let (codes, hashes) = accounts::new_recovery_codes();
+    state.accounts.lock().unwrap().set_recovery(id, hashes)?;
+    Ok(Json(json!({ "recovery_codes": codes })))
 }
 
 #[derive(serde::Deserialize)]
@@ -341,7 +464,9 @@ async fn friends(State(state): State<Arc<Fireplace>>, headers: HeaderMap) -> Res
 
     let mut friends = Vec::new();
     for friend in &mine.friends {
-        let Some(account) = accounts.get(*friend) else { continue };
+        let Some(account) = accounts.get(*friend) else {
+            continue;
+        };
         let seen = account.share_location.then(|| presence.of(account.id, now)).flatten();
         friends.push(json!({
             "id": account.id,
@@ -405,7 +530,10 @@ async fn set_password(
         return Err(ApiError::new(StatusCode::UNAUTHORIZED, "that is not your current password"));
     }
     let new = hash_password(body.new_password).await?;
-    let epoch = state.accounts.lock().unwrap().set_password(id, new)?;
+    if !crate::pages::change_password(&state, id, None, new) {
+        return Err(unauthorised());
+    }
+    let epoch = state.accounts.lock().unwrap().get(id).ok_or_else(unauthorised)?.token_epoch;
     tracing::info!(id, "changed their password");
     // Every other sign-in just ended; this one carries on with fresh tokens.
     Ok(Json(tokens_for(&state, id, &handle, epoch, token::now())))
@@ -576,7 +704,7 @@ async fn report_presence(
 /// argon2id costs 19 MiB and real time **on purpose**. That is exactly why it
 /// goes to a blocking thread: a handful of people signing in at once would
 /// otherwise stall every other request, the health check included.
-async fn hash_password(password: String) -> Result<String, ApiError> {
+pub(crate) async fn hash_password(password: String) -> Result<String, ApiError> {
     tokio::task::spawn_blocking(move || {
         // The salt comes from the operating system; argon2 generates it.
         let hashed: PasswordHash = Argon2::default().hash_password(password.as_bytes()).map_err(|_| ())?;
@@ -587,7 +715,7 @@ async fn hash_password(password: String) -> Result<String, ApiError> {
     .map_err(|_| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "could not make that account"))
 }
 
-async fn check_password(hashed: String, password: String) -> bool {
+pub(crate) async fn check_password(hashed: String, password: String) -> bool {
     tokio::task::spawn_blocking(move || match PasswordHash::new(&hashed) {
         Ok(parsed) => Argon2::default().verify_password(password.as_bytes(), &parsed).is_ok(),
         Err(_) => false,

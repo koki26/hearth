@@ -12,33 +12,44 @@ use tracing::info;
 async fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env().add_directive("info".parse()?))
+        // stderr, so `fireplace admin ...` prints only its answer on stdout.
+        .with_writer(std::io::stderr)
         .init();
 
-    let path = std::env::args().nth(1).unwrap_or_else(|| "fireplace.toml".into());
-    if path == "--help" || path == "-h" {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.first().is_some_and(|a| a == "--help" || a == "-h") {
         println!("fireplace [fireplace.toml]");
+        println!("fireplace admin reset-password <handle> [fireplace.toml]");
+        println!("fireplace admin test-mail <address> [fireplace.toml]");
         return Ok(());
     }
-    let config = match std::fs::read_to_string(&path) {
-        Ok(text) => Config::parse(&text).with_context(|| format!("in {path}"))?,
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-            info!("no {path}, using defaults");
-            Config::default()
-        }
-        Err(err) => return Err(err).with_context(|| format!("could not read {path}")),
-    };
+    if args.first().is_some_and(|a| a == "admin") {
+        return admin(&args[1..]).await;
+    }
+    let config = read_config(args.first().map_or("fireplace.toml", String::as_str))?;
 
     let state = Arc::new(Fireplace::open(&config)?);
     let accounts = state.accounts.lock().unwrap().len();
     let addr = SocketAddr::from((config.bind, config.port));
     let listener =
         tokio::net::TcpListener::bind(addr).await.with_context(|| format!("could not listen on {addr}"))?;
-    info!(%addr, accounts, key = %state.keys.public_hex(), "the Fireplace is lit");
+    info!(%addr, accounts, email = state.mail.enabled(), key = %state.keys.public_hex(), "the Fireplace is lit");
     if !config.bind.is_loopback() {
         tracing::warn!(
             "listening beyond this machine: the Fireplace speaks plain HTTP and belongs behind a TLS terminator"
         );
     }
+
+    // An address nobody confirmed is deleted after a week, whether or not
+    // anything else happens to touch the file.
+    let sweeping = state.clone();
+    tokio::spawn(async move {
+        let mut hourly = tokio::time::interval(std::time::Duration::from_secs(60 * 60));
+        loop {
+            hourly.tick().await;
+            sweeping.accounts.lock().unwrap().forget_unverified(hearth_fireplace::token::now());
+        }
+    });
 
     // `ConnectInfo` so rate limiting knows who is asking -- see api::Caller,
     // which needs the peer to decide whether to believe X-Forwarded-For.
@@ -48,6 +59,72 @@ async fn main() -> Result<()> {
         .context("the Fireplace stopped badly")?;
     info!("the Fireplace is out");
     Ok(())
+}
+
+fn read_config(path: &str) -> Result<Config> {
+    Ok(match std::fs::read_to_string(path) {
+        Ok(text) => Config::parse(&text).with_context(|| format!("in {path}"))?,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+            info!("no {path}, using defaults");
+            Config::default()
+        }
+        Err(err) => return Err(err).with_context(|| format!("could not read {path}")),
+    })
+}
+
+/// For the operator, over SSH, as the user the service runs as:
+///
+/// ```sh
+/// cd /opt/fireplace && sudo -u hearth ./fireplace admin reset-password ada
+/// ```
+///
+/// Neither touches the running server: a reset link is signed with the key
+/// in `data/`, and nothing about it is stored, so there is nothing to write.
+async fn admin(args: &[String]) -> Result<()> {
+    let (Some(command), Some(what)) = (args.first(), args.get(1)) else {
+        anyhow::bail!("fireplace admin reset-password <handle> | test-mail <address> [fireplace.toml]");
+    };
+    let config = read_config(args.get(2).map_or("fireplace.toml", String::as_str))?;
+    match command.as_str() {
+        "reset-password" => {
+            // Read only, and refused rather than made: an admin command run in
+            // the wrong directory must not mint a new signing key there.
+            if !config.data_dir.join("people.json").exists()
+                || !hearth_fireplace::token::key_path(&config.data_dir).exists()
+            {
+                anyhow::bail!(
+                    "no accounts in {}: run this where fireplace.toml is",
+                    config.data_dir.display()
+                );
+            }
+            let accounts = hearth_fireplace::accounts::Accounts::open(&config.data_dir)?;
+            let account =
+                accounts.by_handle(what).with_context(|| format!("nobody here goes by {what:?}"))?;
+            let keys = hearth_fireplace::token::Keys::open(&config.data_dir)?;
+            let link =
+                keys.mint_link("reset", account.id, account.token_epoch, "", hearth_fireplace::token::now());
+            let base = config.mail.public_url.trim().trim_end_matches('/');
+            let base = if base.is_empty() { "https://<this server>" } else { base };
+            println!("{base}/reset/{link}");
+            println!("Works once, for 30 minutes. Send it to {} by a channel you trust.", account.handle);
+            Ok(())
+        }
+        "test-mail" => {
+            let mailer = hearth_fireplace::mail::Mailer::new(&config)?;
+            let letter = mailer.test_letter();
+            match mailer.send_now(what, letter).await {
+                Ok(said) => {
+                    println!("sent: {said}");
+                    Ok(())
+                }
+                Err(err) => {
+                    println!("not sent: {err:#}");
+                    std::process::exit(1);
+                }
+            }
+        }
+        other => anyhow::bail!("no admin command called {other:?}"),
+    }
 }
 
 /// Ctrl-C at a console, or SIGTERM from a service manager. Both mean stop,
