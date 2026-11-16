@@ -1,6 +1,0 @@
-# GitBook reads the book from docs/: README.md is the cover, SUMMARY.md the sidebar.
-root: ./docs/
-
-structure:
-  readme: README.md
-  summary: SUMMARY.md
