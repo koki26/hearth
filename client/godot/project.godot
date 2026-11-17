@@ -40,3 +40,8 @@ shaders/enabled=true
 [gui]
 
 theme/custom="res://ui_theme.tres"
+
+[debug]
+
+gdscript/warnings/inference_on_variant=0
+

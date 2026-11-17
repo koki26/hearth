@@ -18,6 +18,8 @@ const STAFF_COLOUR := Color("3ccf6e")
 ## Their public profile from the Fireplace (`/profiles/...`), or empty for a
 ## guest. Only the Fireplace fills it: a Flame passes on an id, nothing more.
 var profile := {}
+## Custom avatar styling (AvatarFormat dictionary).
+var avatar_data := {}
 
 var _voice: AudioStreamGeneratorPlayback
 var _head := Transform3D.IDENTITY
@@ -31,6 +33,13 @@ func _ready() -> void:
 	$Head/Voice.play()
 	_voice = $Head/Voice.get_stream_playback()
 	set_picture(null)
+
+
+## Customizes the visual mesh, materials, and accessories of this avatar.
+func set_avatar_data(data: Dictionary) -> void:
+	avatar_data = data
+	AvatarFormat.apply_to_avatar_node(self, data)
+
 
 
 func _exit_tree() -> void:

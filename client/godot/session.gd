@@ -17,5 +17,9 @@ const CACHE := "user://worlds_cache"
 const WORLDS := "user://worlds"
 ## Where "Pack" writes `.hworld` files for a server.
 const PACKS := "user://packs"
+## Where custom avatars are stored.
+const AVATARS := "user://avatars"
+## The active player avatar configuration.
+const ACTIVE_AVATAR := "user://active_avatar.json"
 ## The one settings file: the connect screen's last address, and the volumes.
 const SETTINGS := "user://settings.cfg"

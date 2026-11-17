@@ -77,6 +77,7 @@ const HOME_WORLD := "res://worlds/hub"
 const PUBLIC_FLAMES_SHOWN := 6
 const MENU_TABS := [
 	{"id": "tab:worlds", "label": "Worlds", "icon": "res://icons/globe.svg"},
+	{"id": "tab:avatar", "label": "Avatar", "icon": "res://icons/user.svg"},
 	{"id": "tab:camera", "label": "Camera", "icon": "res://icons/camera.svg"},
 	{"id": "tab:settings", "label": "Settings", "icon": "res://icons/gear.svg"},
 ]
@@ -291,6 +292,7 @@ func _ready() -> void:
 	# can draw people without drawing the world behind them.
 	_on_layer($XROrigin3D/LeftHand)
 	_on_layer($XROrigin3D/RightHand)
+	_apply_active_avatar()
 
 	_menu = WorldMenu.new()
 	_menu.name = "Menu"
@@ -1697,6 +1699,8 @@ func _menu_rows() -> Array:
 		return _reports_rows()
 	var rows: Array = [_me_row()]
 	match _menu_tab:
+		"avatar":
+			rows.append_array(_avatar_rows())
 		"camera":
 			rows.append_array(_camera_rows())
 		"settings":
@@ -2055,6 +2059,55 @@ func _ember_rows(slug: String) -> Array:
 	return rows
 
 
+## Equips the active custom avatar onto local hand meshes and profile.
+func _apply_active_avatar() -> void:
+	var active := AvatarFormat.get_active_avatar()
+	var colors: Dictionary = active.get("colors", {})
+	var skin_col := AvatarFormat.parse_color(colors.get("skin", AvatarFormat.DEFAULT_SKIN))
+	var hand_data: Dictionary = active.get("hands", {})
+	var hand_shape := str(hand_data.get("shape", "box"))
+	var hand_size := AvatarFormat.parse_vec3(hand_data.get("size", [0.08, 0.05, 0.12]))
+	var hand_col := AvatarFormat.parse_color(hand_data.get("color", skin_col))
+
+	for side: String in ["LeftHand", "RightHand"]:
+		var mesh_node: MeshInstance3D = get_node_or_null("XROrigin3D/%s/Mesh" % side)
+		if mesh_node != null:
+			mesh_node.mesh = AvatarFormat.build_primitive_mesh(hand_shape, hand_size)
+			mesh_node.set_surface_override_material(0, AvatarFormat.create_material(hand_col, 0.7))
+
+
+## Custom avatar switcher and editor links in the in-game menu.
+func _avatar_rows() -> Array:
+	var rows: Array = []
+	var active := AvatarFormat.get_active_avatar()
+	var active_name := str(active.get("name", "Classic"))
+	rows.append({"heading": "Active Avatar"})
+	rows.append({
+		"label": active_name,
+		"sub": "Scale: %.2fx  •  Head: %s  •  Hat: %s" % [
+			float(active.get("height", 1.0)),
+			str(active.get("head", {}).get("shape", "box")).capitalize(),
+			str(active.get("hair", {}).get("type", "none")).replace("_", " ").capitalize()
+		],
+		"icon": "res://icons/user.svg",
+		"bright": true,
+	})
+	rows.append({"id": "avatar:open_studio", "label": "Open Studio Avatar Creator", "icon": "res://icons/flame.svg", "button": true})
+	rows.append({"heading": "Select / Equip Avatar"})
+	var avatars := AvatarFormat.list_avatars()
+	for av_slug: String in avatars:
+		var is_active := (av_slug == AvatarFormat.avatar_slug(active_name)) or (av_slug.to_lower() == active_name.to_lower())
+		rows.append({
+			"id": "avatar:equip:" + av_slug,
+			"label": av_slug.replace("-", " ").capitalize(),
+			"icon": "res://icons/check.svg" if is_active else "res://icons/user.svg",
+			"accent": is_active,
+			"bright": is_active,
+			"action": "Equipped" if is_active else "Equip",
+		})
+	return rows
+
+
 ## The camera: take it out, turn it round, and the last picture you took.
 func _camera_rows() -> Array:
 	var rows: Array = []
@@ -2356,6 +2409,16 @@ func _on_menu_chosen(id: String) -> void:
 		_fireplace.said.emit("Cleared profile of @" + who + ".")
 	elif id == "my_picture":
 		OS.shell_open(_fireplace.base_url() + "/")
+	elif id.begins_with("avatar:equip:"):
+		var av_name := id.substr(13)
+		if AvatarFormat.set_active_avatar_name(av_name):
+			_apply_active_avatar()
+			_fireplace.said.emit("Equipped avatar '%s'." % av_name.replace("-", " ").capitalize())
+		_refresh_menu()
+	elif id == "avatar:open_studio":
+		_menu.close()
+		get_tree().change_scene_to_file("res://studio.tscn")
+
 
 
 func _on_menu_changed(id: String, value: float) -> void:

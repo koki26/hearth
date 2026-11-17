@@ -355,8 +355,8 @@ static func validate(source: String) -> Dictionary:
 ## Represents an executable instance of a FireSharp script bound to a Node3D.
 class Instance:
 	var target_node: Node3D
-	var script_name: String := ""
-	var source_code: String := ""
+	var script_name := ""
+	var source_code := ""
 	var variables: Dictionary = {}
 	var functions: Dictionary = {} # name -> function AST node
 	var parsed_ok: bool = false
@@ -1012,20 +1012,20 @@ class _Parser:
 				return {"type": "literal", "value": null}
 			elif tok.value == "new":
 				advance()
-				var class_name := str(advance().value)
+				var cls_name := str(advance().value)
 				match_punct("(")
 				var args: Array[Dictionary] = []
 				while not match_punct(")") and cur().kind != TokenKind.EOF:
 					args.append(parse_expr())
 					match_punct(",")
-				if class_name == "Vector3":
+				if cls_name == "Vector3":
 					return {
 						"type": "new_vec",
 						"x": args[0] if args.size() > 0 else 0.0,
 						"y": args[1] if args.size() > 1 else 0.0,
 						"z": args[2] if args.size() > 2 else 0.0
 					}
-				return {"type": "call", "callee": class_name, "args": args}
+				return {"type": "call", "callee": cls_name, "args": args}
 		elif tok.kind == TokenKind.IDENTIFIER:
 			advance()
 			return {"type": "ident", "name": str(tok.value)}
