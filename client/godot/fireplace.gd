@@ -34,6 +34,10 @@ signal profile_seen(key: String, profile: Dictionary)
 signal picture_ready(id: int, texture: Texture2D)
 ## The list of public Flames changed.
 signal flames_changed
+## Staff: open reports list changed.
+signal reports_changed
+## A report was accepted by the Fireplace.
+signal report_filed
 
 ## How often we say where we are, and ask where everybody else is. The server
 ## forgets a player it has not heard from in two minutes.
@@ -70,6 +74,21 @@ var email_verified := false
 var me := {}
 ## Public Flames, as `GET /flames` last listed them.
 var flames: Array = []
+## Open reports on this Fireplace, when `can("reports")` is true.
+var admin_reports: Array = []
+
+const DEFAULT_REPORT_REASONS: Array[Dictionary] = [
+	{"id": "picture", "label": "Inappropriate picture"},
+	{"id": "name", "label": "Offensive name"},
+	{"id": "bio", "label": "Offensive bio or pronouns"},
+	{"id": "harassment", "label": "Harassment or bullying"},
+	{"id": "hate", "label": "Hate speech"},
+	{"id": "cheating", "label": "Cheating"},
+	{"id": "spam", "label": "Spam or scams"},
+	{"id": "underage", "label": "May be under the minimum age"},
+	{"id": "other", "label": "Something else"},
+]
+
 ## Pictures by "id:version", null while one is on its way.
 var _pictures := {}
 
@@ -280,6 +299,48 @@ func fetch_flames() -> void:
 	_send("GET", "/flames", {}, "flames")
 
 
+## Whether this player has a permission (e.g. "reports", "ban", "moderate").
+func can(perm: String) -> bool:
+	if not is_signed_in() or me.is_empty():
+		return false
+	if bool(me.get("owner", false)):
+		return true
+	var perms = me.get("perms", [])
+	return perms is Array and perms.has(perm)
+
+
+func get_report_reasons() -> Array:
+	if features.has("report_reasons") and features["report_reasons"] is Array and not features["report_reasons"].is_empty():
+		return features["report_reasons"]
+	return DEFAULT_REPORT_REASONS
+
+
+## Reports another player. Sent to this Fireplace's moderators.
+func file_report(whose_handle: String, reason: String, details: String = "") -> void:
+	if not is_signed_in():
+		failed.emit("file_report", "Sign in to report players")
+		return
+	_send("POST", "/reports", {"handle": whose_handle, "reason": reason, "details": details}, "file_report")
+
+
+## For staff with "reports" permission: lists open reports.
+func fetch_reports() -> void:
+	if can("reports"):
+		_send("GET", "/admin/reports", {}, "admin_reports")
+
+
+## For staff with "reports" permission: resolves/dismisses a report.
+func resolve_report(report_id: int) -> void:
+	if can("reports"):
+		_send("POST", "/admin/reports/resolve", {"id": report_id}, "admin_resolve")
+
+
+## For staff with "moderate" permission: clears profile fields.
+func moderate(whose_handle: String, clear: Array) -> void:
+	if can("moderate"):
+		_send("POST", "/admin/moderate", {"handle": whose_handle, "clear": clear}, "moderate")
+
+
 ## Somebody's picture, if it is here already; otherwise null, and it is
 ## fetched and announced through `picture_ready`. `version` is the profile's
 ## `avatar`: 0 means they have none.
@@ -414,7 +475,7 @@ func _on_answer(result: int, code: int, _headers: PackedStringArray, body: Packe
 		return
 	# Anything at all may come back from anywhere: never assume it parses.
 	var parsed = JSON.parse_string(body.get_string_from_utf8())
-	var answer: Dictionary = parsed if parsed is Dictionary else {}
+	var answer: Dictionary = parsed if parsed is Dictionary else ({"_list": parsed} if parsed is Array else {})
 	# A wrong password is a 401 as well, and must not sign anybody out.
 	if code == 401 and tag != "signin" and tag != "email":
 		# The token is no longer believed. Sign out rather than keep asking.
@@ -482,6 +543,19 @@ func _took(tag: String, answer: Dictionary) -> void:
 			email = str(answer.get("email", "")) if answer.get("email") != null else ""
 			email_verified = bool(answer.get("email_verified", false))
 			account_changed.emit()
+			if can("reports"):
+				fetch_reports()
+		"file_report":
+			said.emit("Report sent. The moderators will look at it.")
+			report_filed.emit()
+		"admin_reports":
+			admin_reports = answer.get("_list", [])
+			reports_changed.emit()
+		"admin_resolve":
+			said.emit("Report resolved.")
+			fetch_reports()
+		"moderate":
+			said.emit("Profile cleared.")
 		"profile":
 			_send("GET", "/me", {}, "me")
 			said.emit("Profile saved.")

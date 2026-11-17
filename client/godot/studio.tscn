@@ -1,21 +1,109 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://studio.gd" id="1_studio"]
 
-[sub_resource type="StyleBoxFlat" id="1_panel"]
-bg_color = Color(0.09, 0.1, 0.13, 0.94)
+; ── Style boxes ───────────────────────────────────────────────────────────────
+
+[sub_resource type="StyleBoxFlat" id="sb_panel"]
+bg_color = Color(0.052, 0.046, 0.046, 0.96)
+border_color = Color(0.98, 0.86, 0.74, 0.13)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="sb_toolbar"]
+bg_color = Color(0.04, 0.036, 0.036, 0.98)
+border_color = Color(0.98, 0.86, 0.74, 0.08)
+border_width_bottom = 1
+
+[sub_resource type="StyleBoxFlat" id="sb_statusbar"]
+bg_color = Color(0.04, 0.036, 0.036, 0.98)
+border_color = Color(0.98, 0.86, 0.74, 0.08)
+border_width_top = 1
+
+[sub_resource type="StyleBoxFlat" id="sb_section"]
+bg_color = Color(0.07, 0.065, 0.065, 1.0)
+border_color = Color(0.98, 0.86, 0.74, 0.08)
+border_width_bottom = 1
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+
+[sub_resource type="StyleBoxFlat" id="sb_popup"]
+bg_color = Color(0.045, 0.040, 0.040, 0.98)
+border_color = Color(0.98, 0.86, 0.74, 0.18)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+corner_radius_top_left = 10
 corner_radius_top_right = 10
 corner_radius_bottom_right = 10
-
-[sub_resource type="StyleBoxFlat" id="2_panel_right"]
-bg_color = Color(0.09, 0.1, 0.13, 0.94)
-corner_radius_top_left = 10
 corner_radius_bottom_left = 10
 
-[sub_resource type="StyleBoxFlat" id="3_panel_bottom"]
-bg_color = Color(0.09, 0.1, 0.13, 0.94)
-corner_radius_top_left = 10
-corner_radius_top_right = 10
+[sub_resource type="StyleBoxFlat" id="sb_accent_btn"]
+bg_color = Color(0.4, 0.22, 0.06, 1.0)
+border_color = Color(1.0, 0.63, 0.3, 0.8)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+content_margin_left = 10
+content_margin_right = 10
+content_margin_top = 6
+content_margin_bottom = 6
+
+[sub_resource type="StyleBoxEmpty" id="sb_empty"]
+
+; ── Code syntax colors ────────────────────────────────────────────────────────
+
+[sub_resource type="CodeHighlighter" id="firesharp_highlighter"]
+keyword_colors = {
+"bool": Color(0.56, 0.74, 0.98, 1),
+"class": Color(0.56, 0.74, 0.98, 1),
+"else": Color(0.86, 0.6, 1.0, 1),
+"false": Color(1.0, 0.63, 0.3, 1),
+"float": Color(0.56, 0.74, 0.98, 1),
+"for": Color(0.86, 0.6, 1.0, 1),
+"func": Color(0.86, 0.6, 1.0, 1),
+"function": Color(0.86, 0.6, 1.0, 1),
+"if": Color(0.86, 0.6, 1.0, 1),
+"int": Color(0.56, 0.74, 0.98, 1),
+"let": Color(0.56, 0.74, 0.98, 1),
+"new": Color(0.86, 0.6, 1.0, 1),
+"null": Color(1.0, 0.63, 0.3, 1),
+"private": Color(0.56, 0.74, 0.98, 1),
+"protected": Color(0.56, 0.74, 0.98, 1),
+"public": Color(0.56, 0.74, 0.98, 1),
+"return": Color(0.86, 0.6, 1.0, 1),
+"string": Color(0.56, 0.74, 0.98, 1),
+"true": Color(1.0, 0.63, 0.3, 1),
+"using": Color(0.56, 0.74, 0.98, 1),
+"var": Color(0.56, 0.74, 0.98, 1),
+"void": Color(0.56, 0.74, 0.98, 1),
+"while": Color(0.86, 0.6, 1.0, 1),
+}
+color_regions = {
+"\"": ["\"", Color(0.74, 0.90, 0.56, 1)],
+"//": ["", Color(0.5, 0.55, 0.52, 1)],
+"/*": ["*/", Color(0.5, 0.55, 0.52, 1)],
+}
+number_color = Color(0.98, 0.78, 0.44, 1)
+symbol_color = Color(0.80, 0.80, 0.84, 1)
+function_color = Color(0.98, 0.84, 0.56, 1)
+member_variable_color = Color(0.90, 0.90, 0.95, 1)
+
+; ═════════════════════════════════════════════════════════════════════════════
+; Root scene
+; ═════════════════════════════════════════════════════════════════════════════
 
 [node name="Studio" type="Node3D"]
 script = ExtResource("1_studio")
@@ -30,210 +118,649 @@ far = 400.0
 visible = false
 cast_shadow = 0
 
+; ── 2D UI layer ───────────────────────────────────────────────────────────────
+
 [node name="UI" type="CanvasLayer" parent="."]
 
-[node name="Left" type="PanelContainer" parent="UI"]
-anchors_preset = 9
-anchor_bottom = 1.0
-offset_right = 232.0
+; ═════════════════════════════════════════════════════════════════════════════
+; TOP TOOLBAR
+; ═════════════════════════════════════════════════════════════════════════════
+
+[node name="Toolbar" type="PanelContainer" parent="UI"]
+anchors_preset = 15
+anchor_right = 1.0
+offset_bottom = 48.0
 grow_vertical = 2
-theme_override_styles/panel = SubResource("1_panel")
+theme_override_styles/panel = SubResource("sb_toolbar")
 
-[node name="Margin" type="MarginContainer" parent="UI/Left"]
+[node name="ToolbarMargin" type="MarginContainer" parent="UI/Toolbar"]
 layout_mode = 2
-theme_override_constants/margin_left = 12
-theme_override_constants/margin_top = 12
-theme_override_constants/margin_right = 12
-theme_override_constants/margin_bottom = 12
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_bottom = 6
 
-[node name="Rows" type="VBoxContainer" parent="UI/Left/Margin"]
+[node name="ToolbarRow" type="HBoxContainer" parent="UI/Toolbar/ToolbarMargin"]
 layout_mode = 2
-theme_override_constants/separation = 6
+theme_override_constants/separation = 8
 
-[node name="Title" type="Label" parent="UI/Left/Margin/Rows"]
+; Brand
+[node name="BrandLabel" type="Label" parent="UI/Toolbar/ToolbarMargin/ToolbarRow"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 22
-text = "Hearth Studio"
+theme_override_colors/font_color = Color(1.0, 0.63, 0.3, 1)
+theme_override_font_sizes/font_size = 18
+text = "🔥 Hearth Studio"
 
-[node name="Tabs" type="HBoxContainer" parent="UI/Left/Margin/Rows"]
+[node name="Sep1" type="VSeparator" parent="UI/Toolbar/ToolbarMargin/ToolbarRow"]
 layout_mode = 2
-theme_override_constants/separation = 6
 
-[node name="WorldsTab" type="Button" parent="UI/Left/Margin/Rows/Tabs"]
+; World management
+[node name="WorldDropdown" type="OptionButton" parent="UI/Toolbar/ToolbarMargin/ToolbarRow"]
 unique_name_in_owner = true
 layout_mode = 2
-size_flags_horizontal = 3
-toggle_mode = true
-button_pressed = true
-text = "Worlds"
+custom_minimum_size = Vector2(140, 0)
 
-[node name="AvatarsTab" type="Button" parent="UI/Left/Margin/Rows/Tabs"]
+[node name="NewNameEdit" type="LineEdit" parent="UI/Toolbar/ToolbarMargin/ToolbarRow"]
 unique_name_in_owner = true
 layout_mode = 2
-size_flags_horizontal = 3
-tooltip_text = "Avatars come next. The world format already reserves them."
-disabled = true
-text = "Avatars"
-
-[node name="WorldsLabel" type="Label" parent="UI/Left/Margin/Rows"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.68, 0.72, 0.78, 1)
-text = "Your worlds"
-
-[node name="WorldList" type="ItemList" parent="UI/Left/Margin/Rows"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 120)
-layout_mode = 2
-
-[node name="WorldButtons" type="HBoxContainer" parent="UI/Left/Margin/Rows"]
-layout_mode = 2
-theme_override_constants/separation = 4
-
-[node name="NewWorld" type="Button" parent="UI/Left/Margin/Rows/WorldButtons"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-text = "New"
-
-[node name="CopyWorld" type="Button" parent="UI/Left/Margin/Rows/WorldButtons"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-text = "Copy"
-
-[node name="NewName" type="LineEdit" parent="UI/Left/Margin/Rows"]
-unique_name_in_owner = true
-layout_mode = 2
-placeholder_text = "name for a new world"
+custom_minimum_size = Vector2(110, 0)
+placeholder_text = "new world name…"
 max_length = 32
 
-[node name="PaletteLabel" type="Label" parent="UI/Left/Margin/Rows"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.68, 0.72, 0.78, 1)
-text = "Click a piece, then click the ground"
-
-[node name="Palette" type="ItemList" parent="UI/Left/Margin/Rows"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 150)
-layout_mode = 2
-
-[node name="Import" type="Button" parent="UI/Left/Margin/Rows"]
+[node name="NewWorldBtn" type="Button" parent="UI/Toolbar/ToolbarMargin/ToolbarRow"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "Import a model..."
+text = "+ New"
 
-[node name="Help" type="Label" parent="UI/Left/Margin/Rows"]
+[node name="CopyWorldBtn" type="Button" parent="UI/Toolbar/ToolbarMargin/ToolbarRow"]
+unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.55, 0.58, 0.64, 1)
+text = "⎘ Copy"
+
+[node name="Sep2" type="VSeparator" parent="UI/Toolbar/ToolbarMargin/ToolbarRow"]
+layout_mode = 2
+
+; Primitives palette
+[node name="PrimLabel" type="Label" parent="UI/Toolbar/ToolbarMargin/ToolbarRow"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.63, 0.59, 0.57, 1)
+text = "Add:"
+
+[node name="Prim_Box" type="Button" parent="UI/Toolbar/ToolbarMargin/ToolbarRow"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "Box"
+text = "📦"
+
+[node name="Prim_Sphere" type="Button" parent="UI/Toolbar/ToolbarMargin/ToolbarRow"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "Sphere"
+text = "🔮"
+
+[node name="Prim_Cylinder" type="Button" parent="UI/Toolbar/ToolbarMargin/ToolbarRow"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "Cylinder"
+text = "🌀"
+
+[node name="Prim_Plane" type="Button" parent="UI/Toolbar/ToolbarMargin/ToolbarRow"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "Plane"
+text = "▬"
+
+[node name="Prim_Torus" type="Button" parent="UI/Toolbar/ToolbarMargin/ToolbarRow"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "Torus"
+text = "⭕"
+
+[node name="Prim_Light" type="Button" parent="UI/Toolbar/ToolbarMargin/ToolbarRow"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "Light"
+text = "💡"
+
+[node name="Sep3" type="VSeparator" parent="UI/Toolbar/ToolbarMargin/ToolbarRow"]
+layout_mode = 2
+
+[node name="ImportBtn" type="Button" parent="UI/Toolbar/ToolbarMargin/ToolbarRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "📂 Import…"
+
+; Spacer + hints
+[node name="ToolbarSpacer" type="Control" parent="UI/Toolbar/ToolbarMargin/ToolbarRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="HintLabel" type="Label" parent="UI/Toolbar/ToolbarMargin/ToolbarRow"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.5, 0.48, 0.46, 1)
 theme_override_font_sizes/font_size = 11
-text = "right drag looks, WASD/QE flies
-drag moves, Alt+drag lifts
-Del removes, Ctrl+D copies
-Ctrl+Z undoes, Ctrl+S saves"
-autowrap_mode = 3
+text = "Right-drag: look  WASD/QE: fly  Del: remove  Ctrl+Z: undo  Ctrl+S: save"
 
-[node name="Right" type="PanelContainer" parent="UI"]
-anchors_preset = 11
-anchor_left = 1.0
+; ═════════════════════════════════════════════════════════════════════════════
+; MAIN BODY — 3-column split
+; ═════════════════════════════════════════════════════════════════════════════
+
+[node name="Body" type="HBoxContainer" parent="UI"]
+anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -268.0
-grow_horizontal = 0
+offset_top = 48.0
+offset_bottom = -44.0
+grow_horizontal = 2
 grow_vertical = 2
-theme_override_styles/panel = SubResource("2_panel_right")
+theme_override_constants/separation = 0
 
-[node name="Margin" type="MarginContainer" parent="UI/Right"]
+; ─── LEFT: Hierarchy panel ────────────────────────────────────────────────────
+
+[node name="HierarchyPanel" type="PanelContainer" parent="UI/Body"]
+unique_name_in_owner = true
 layout_mode = 2
-theme_override_constants/margin_left = 12
-theme_override_constants/margin_top = 12
-theme_override_constants/margin_right = 12
-theme_override_constants/margin_bottom = 12
+custom_minimum_size = Vector2(220, 0)
+size_flags_vertical = 3
+theme_override_styles/panel = SubResource("sb_panel")
 
-[node name="Rows" type="VBoxContainer" parent="UI/Right/Margin"]
+[node name="HierarchyMargin" type="MarginContainer" parent="UI/Body/HierarchyPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="HierarchyRows" type="VBoxContainer" parent="UI/Body/HierarchyPanel/HierarchyMargin"]
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="SelectionLabel" type="Label" parent="UI/Right/Margin/Rows"]
+[node name="HierarchyHeader" type="Label" parent="UI/Body/HierarchyPanel/HierarchyMargin/HierarchyRows"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.63, 0.59, 0.57, 1)
+theme_override_font_sizes/font_size = 11
+text = "HIERARCHY"
+
+[node name="WorldNameLabel" type="Label" parent="UI/Body/HierarchyPanel/HierarchyMargin/HierarchyRows"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 18
-text = "Nothing selected"
+theme_override_font_sizes/font_size = 14
+text = "World"
 
-[node name="Fields" type="VBoxContainer" parent="UI/Right/Margin/Rows"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 4
-
-[node name="ObjectButtons" type="HBoxContainer" parent="UI/Right/Margin/Rows"]
-layout_mode = 2
-theme_override_constants/separation = 4
-
-[node name="Duplicate" type="Button" parent="UI/Right/Margin/Rows/ObjectButtons"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-text = "Copy"
-
-[node name="Delete" type="Button" parent="UI/Right/Margin/Rows/ObjectButtons"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-text = "Delete"
-
-[node name="ObjectsLabel" type="Label" parent="UI/Right/Margin/Rows"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.68, 0.72, 0.78, 1)
-text = "In this world"
-
-[node name="ObjectList" type="ItemList" parent="UI/Right/Margin/Rows"]
+[node name="HierarchyList" type="ItemList" parent="UI/Body/HierarchyPanel/HierarchyMargin/HierarchyRows"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="Bottom" type="PanelContainer" parent="UI"]
+; ─── CENTER: Viewport spacer (3D renders here, UI just leaves room) ───────────
+
+[node name="ViewportSpacer" type="Control" parent="UI/Body"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+; ─── RIGHT: Inspector panel ───────────────────────────────────────────────────
+
+[node name="InspectorPanel" type="PanelContainer" parent="UI/Body"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(280, 0)
+size_flags_vertical = 3
+theme_override_styles/panel = SubResource("sb_panel")
+
+[node name="InspectorScroll" type="ScrollContainer" parent="UI/Body/InspectorPanel"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="InspectorMargin" type="MarginContainer" parent="UI/Body/InspectorPanel/InspectorScroll"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="InspectorRows" type="VBoxContainer" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+; "Nothing selected" placeholder
+[node name="InspectorEmpty" type="Label" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.5, 0.48, 0.46, 1)
+text = "Select an object in the Hierarchy"
+autowrap_mode = 3
+
+; All content when something is selected
+[node name="InspectorContent" type="VBoxContainer" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows"]
+unique_name_in_owner = true
+layout_mode = 2
+visible = false
+theme_override_constants/separation = 4
+
+; Object name + action buttons row
+[node name="NameRow" type="HBoxContainer" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Field_Name" type="LineEdit" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/NameRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Object name"
+
+[node name="DuplicateBtn" type="Button" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/NameRow"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "Duplicate (Ctrl+D)"
+text = "⎘"
+
+[node name="DeleteBtn" type="Button" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/NameRow"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "Delete (Del)"
+text = "🗑"
+
+; ───────────────────────────────────────
+; SECTION: Transform
+; ───────────────────────────────────────
+
+[node name="TransformHeader" type="Button" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_styles/normal = SubResource("sb_section")
+theme_override_styles/hover = SubResource("sb_section")
+theme_override_styles/pressed = SubResource("sb_section")
+text = "▼ Transform"
+alignment = 0
+
+[node name="Section_Transform" type="VBoxContainer" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="PosRow" type="HBoxContainer" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/Section_Transform"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="PosLabel" type="Label" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/Section_Transform/PosRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(42, 0)
+text = "Pos"
+
+[node name="Field_PosX" type="SpinBox" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/Section_Transform/PosRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = -4096.0
+max_value = 4096.0
+step = 0.05
+allow_greater = true
+allow_lesser = true
+
+[node name="Field_PosY" type="SpinBox" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/Section_Transform/PosRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = -4096.0
+max_value = 4096.0
+step = 0.05
+allow_greater = true
+allow_lesser = true
+
+[node name="Field_PosZ" type="SpinBox" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/Section_Transform/PosRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = -4096.0
+max_value = 4096.0
+step = 0.05
+allow_greater = true
+allow_lesser = true
+
+[node name="RotRow" type="HBoxContainer" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/Section_Transform"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="RotLabel" type="Label" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/Section_Transform/RotRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(42, 0)
+text = "Rot"
+
+[node name="Field_RotX" type="SpinBox" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/Section_Transform/RotRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = -360.0
+max_value = 360.0
+step = 0.5
+allow_greater = true
+allow_lesser = true
+
+[node name="Field_RotY" type="SpinBox" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/Section_Transform/RotRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = -360.0
+max_value = 360.0
+step = 0.5
+allow_greater = true
+allow_lesser = true
+
+[node name="Field_RotZ" type="SpinBox" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/Section_Transform/RotRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = -360.0
+max_value = 360.0
+step = 0.5
+allow_greater = true
+allow_lesser = true
+
+[node name="ScaleRow" type="HBoxContainer" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/Section_Transform"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="ScaleLabel" type="Label" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/Section_Transform/ScaleRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(42, 0)
+text = "Scale"
+
+[node name="Field_ScaleX" type="SpinBox" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/Section_Transform/ScaleRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.001
+max_value = 100.0
+step = 0.05
+value = 1.0
+allow_greater = true
+
+[node name="Field_ScaleY" type="SpinBox" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/Section_Transform/ScaleRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.001
+max_value = 100.0
+step = 0.05
+value = 1.0
+allow_greater = true
+
+[node name="Field_ScaleZ" type="SpinBox" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/Section_Transform/ScaleRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.001
+max_value = 100.0
+step = 0.05
+value = 1.0
+allow_greater = true
+
+; ───────────────────────────────────────
+; SECTION: Shape
+; ───────────────────────────────────────
+
+[node name="ShapeHeader" type="Button" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent"]
+unique_name_in_owner = true
+layout_mode = 2
+visible = false
+theme_override_styles/normal = SubResource("sb_section")
+theme_override_styles/hover = SubResource("sb_section")
+theme_override_styles/pressed = SubResource("sb_section")
+text = "▼ Shape"
+alignment = 0
+
+[node name="ShapeSection" type="VBoxContainer" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent"]
+unique_name_in_owner = true
+layout_mode = 2
+visible = false
+theme_override_constants/separation = 4
+
+[node name="SizeRow" type="HBoxContainer" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/ShapeSection"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="SizeLabel" type="Label" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/ShapeSection/SizeRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(42, 0)
+text = "Size"
+
+[node name="Field_SizeX" type="SpinBox" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/ShapeSection/SizeRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.01
+max_value = 100.0
+step = 0.05
+value = 1.0
+allow_greater = true
+
+[node name="Field_SizeY" type="SpinBox" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/ShapeSection/SizeRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.01
+max_value = 100.0
+step = 0.05
+value = 1.0
+allow_greater = true
+
+[node name="Field_SizeZ" type="SpinBox" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/ShapeSection/SizeRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.01
+max_value = 100.0
+step = 0.05
+value = 1.0
+allow_greater = true
+
+[node name="ColorRow" type="HBoxContainer" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/ShapeSection"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="ColorLabel" type="Label" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/ShapeSection/ColorRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(42, 0)
+text = "Color"
+
+[node name="Field_Color" type="ColorPickerButton" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/ShapeSection/ColorRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+color = Color(0.6, 0.6, 0.62, 1)
+
+[node name="BodyRow" type="HBoxContainer" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/ShapeSection"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="BodyLabel" type="Label" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/ShapeSection/BodyRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(42, 0)
+text = "Body"
+
+[node name="Field_Body" type="OptionButton" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/ShapeSection/BodyRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="MassRow" type="HBoxContainer" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/ShapeSection"]
+unique_name_in_owner = true
+layout_mode = 2
+visible = false
+theme_override_constants/separation = 4
+
+[node name="MassLabel" type="Label" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/ShapeSection/MassRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(42, 0)
+text = "Mass"
+
+[node name="Field_Mass" type="SpinBox" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/ShapeSection/MassRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.01
+max_value = 1000.0
+step = 0.1
+value = 1.0
+
+; ───────────────────────────────────────
+; SECTION: Light
+; ───────────────────────────────────────
+
+[node name="LightHeader" type="Button" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent"]
+unique_name_in_owner = true
+layout_mode = 2
+visible = false
+theme_override_styles/normal = SubResource("sb_section")
+theme_override_styles/hover = SubResource("sb_section")
+theme_override_styles/pressed = SubResource("sb_section")
+text = "▼ Light"
+alignment = 0
+
+[node name="LightSection" type="VBoxContainer" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent"]
+unique_name_in_owner = true
+layout_mode = 2
+visible = false
+theme_override_constants/separation = 4
+
+[node name="EnergyRow" type="HBoxContainer" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/LightSection"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="EnergyLabel" type="Label" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/LightSection/EnergyRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(56, 0)
+text = "Energy"
+
+[node name="Field_Energy" type="SpinBox" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/LightSection/EnergyRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.0
+max_value = 16.0
+step = 0.1
+value = 2.0
+
+[node name="RangeRow" type="HBoxContainer" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/LightSection"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="RangeLabel" type="Label" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/LightSection/RangeRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(56, 0)
+text = "Range"
+
+[node name="Field_Range" type="SpinBox" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/LightSection/RangeRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.1
+max_value = 200.0
+step = 0.5
+value = 8.0
+
+[node name="LightColorRow" type="HBoxContainer" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/LightSection"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="LightColorLabel" type="Label" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/LightSection/LightColorRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(56, 0)
+text = "Color"
+
+[node name="Field_LightColor" type="ColorPickerButton" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/LightSection/LightColorRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+color = Color(1.0, 0.7, 0.4, 1)
+
+; ───────────────────────────────────────
+; SECTION: Fire# Scripts
+; ───────────────────────────────────────
+
+[node name="ScriptsHeader" type="Button" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_styles/normal = SubResource("sb_section")
+theme_override_styles/hover = SubResource("sb_section")
+theme_override_styles/pressed = SubResource("sb_section")
+text = "▼ Fire# Scripts"
+alignment = 0
+
+[node name="Section_Scripts" type="VBoxContainer" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="ScriptRows" type="VBoxContainer" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/Section_Scripts"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="AddScriptBtn" type="Button" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/Section_Scripts"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "+ Add Fire# Script"
+
+; Script file picker dialog
+[node name="ScriptFileDialog" type="FileDialog" parent="UI/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorRows/InspectorContent/Section_Scripts"]
+unique_name_in_owner = true
+title = "Select Fire# Script"
+initial_position = 2
+size = Vector2i(760, 520)
+ok_button_text = "Attach"
+file_mode = 0
+access = 2
+filters = PackedStringArray("*.fs ; Fire# Scripts")
+
+; ═════════════════════════════════════════════════════════════════════════════
+; BOTTOM STATUS BAR
+; ═════════════════════════════════════════════════════════════════════════════
+
+[node name="StatusBar" type="PanelContainer" parent="UI"]
 anchors_preset = 12
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 232.0
-offset_top = -52.0
-offset_right = -268.0
+offset_top = -44.0
 grow_horizontal = 2
 grow_vertical = 0
-theme_override_styles/panel = SubResource("3_panel_bottom")
+theme_override_styles/panel = SubResource("sb_statusbar")
 
-[node name="Margin" type="MarginContainer" parent="UI/Bottom"]
+[node name="StatusMargin" type="MarginContainer" parent="UI/StatusBar"]
 layout_mode = 2
 theme_override_constants/margin_left = 12
-theme_override_constants/margin_top = 8
+theme_override_constants/margin_top = 6
 theme_override_constants/margin_right = 12
-theme_override_constants/margin_bottom = 8
+theme_override_constants/margin_bottom = 6
 
-[node name="Row" type="HBoxContainer" parent="UI/Bottom/Margin"]
+[node name="StatusRow" type="HBoxContainer" parent="UI/StatusBar/StatusMargin"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="Save" type="Button" parent="UI/Bottom/Margin/Row"]
+[node name="SaveBtn" type="Button" parent="UI/StatusBar/StatusMargin/StatusRow"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "Save"
+tooltip_text = "Ctrl+S"
+text = "💾 Save"
 
-[node name="Pack" type="Button" parent="UI/Bottom/Margin/Row"]
+[node name="PackBtn" type="Button" parent="UI/StatusBar/StatusMargin/StatusRow"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "Pack .hworld"
+text = "📦 Pack .hworld"
 
-[node name="Test" type="Button" parent="UI/Bottom/Margin/Row"]
+[node name="TestBtn" type="Button" parent="UI/StatusBar/StatusMargin/StatusRow"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "Test"
+text = "▶ Test Play"
 
-[node name="SpawnHere" type="Button" parent="UI/Bottom/Margin/Row"]
+[node name="SpawnHereBtn" type="Button" parent="UI/StatusBar/StatusMargin/StatusRow"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "Spawn here"
+text = "📍 Spawn Here"
 
-[node name="Status" type="Label" parent="UI/Bottom/Margin/Row"]
+[node name="StatusLabel" type="Label" parent="UI/StatusBar/StatusMargin/StatusRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -241,9 +768,99 @@ theme_override_colors/font_color = Color(0.95, 0.82, 0.55, 1)
 vertical_alignment = 1
 clip_text = true
 
+; ═════════════════════════════════════════════════════════════════════════════
+; SCRIPT EDITOR POPUP (full-screen modal overlay)
+; ═════════════════════════════════════════════════════════════════════════════
+
+[node name="ScriptEditorPopup" type="PanelContainer" parent="UI"]
+unique_name_in_owner = true
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 60.0
+offset_top = 60.0
+offset_right = -60.0
+offset_bottom = -60.0
+grow_horizontal = 2
+grow_vertical = 2
+visible = false
+theme_override_styles/panel = SubResource("sb_popup")
+
+[node name="PopupMargin" type="MarginContainer" parent="UI/ScriptEditorPopup"]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 12
+
+[node name="PopupRows" type="VBoxContainer" parent="UI/ScriptEditorPopup/PopupMargin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+; Popup title bar
+[node name="PopupTitleRow" type="HBoxContainer" parent="UI/ScriptEditorPopup/PopupMargin/PopupRows"]
+layout_mode = 2
+
+[node name="ScriptEditorTitle" type="Label" parent="UI/ScriptEditorPopup/PopupMargin/PopupRows/PopupTitleRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(1.0, 0.63, 0.3, 1)
+theme_override_font_sizes/font_size = 16
+text = "🔥 Editing: script.fs"
+
+; CodeEdit for the script source
+[node name="ScriptCodeEdit" type="CodeEdit" parent="UI/ScriptEditorPopup/PopupMargin/PopupRows"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+syntax_highlighter = SubResource("firesharp_highlighter")
+draw_line_numbers = true
+line_folding = false
+indent_automatic = true
+indent_size = 4
+
+; Error label
+[node name="ScriptErrorLabel" type="Label" parent="UI/ScriptEditorPopup/PopupMargin/PopupRows"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1.0, 0.45, 0.42, 1)
+theme_override_font_sizes/font_size = 12
+text = ""
+
+; Popup bottom bar
+[node name="PopupActions" type="HBoxContainer" parent="UI/ScriptEditorPopup/PopupMargin/PopupRows"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="ScriptApplyBtn" type="Button" parent="UI/ScriptEditorPopup/PopupMargin/PopupRows/PopupActions"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_styles/normal = SubResource("sb_accent_btn")
+text = "✓ Apply & Close"
+
+[node name="ScriptDiscardBtn" type="Button" parent="UI/ScriptEditorPopup/PopupMargin/PopupRows/PopupActions"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "× Discard"
+
+[node name="PopupSpacer" type="Control" parent="UI/ScriptEditorPopup/PopupMargin/PopupRows/PopupActions"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="PopupHint" type="Label" parent="UI/ScriptEditorPopup/PopupMargin/PopupRows/PopupActions"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.5, 0.48, 0.46, 1)
+theme_override_font_sizes/font_size = 11
+text = "Fire# (C#-like) — public fields show in inspector"
+
+; ═════════════════════════════════════════════════════════════════════════════
+; FILE DIALOGS
+; ═════════════════════════════════════════════════════════════════════════════
+
 [node name="ImportDialog" type="FileDialog" parent="UI"]
 unique_name_in_owner = true
-title = "Import a model"
+title = "Import a 3D model"
 initial_position = 2
 size = Vector2i(760, 520)
 ok_button_text = "Import"

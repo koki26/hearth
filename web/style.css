@@ -395,6 +395,13 @@ select:focus { outline: none; border-color: var(--fire); }
   h1 { font-size: 1.6rem; }
 }
 
+.reports-list .report-item { display: flex; flex-direction: column; gap: 10px; padding: 14px 0; border-top: 1px solid var(--line); }
+.reports-list .report-item:first-child { border-top: 0; padding-top: 0; }
+.report-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.report-meta { display: flex; align-items: center; gap: 8px; font-size: .84rem; color: var(--dim); flex-wrap: wrap; margin-top: 4px; }
+.report-details { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; font-size: .88rem; color: var(--text); white-space: pre-wrap; word-break: break-word; }
+.report-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
 @keyframes enter { from { opacity: 0; transform: translateY(14px); } }
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
 @keyframes fade { from { opacity: 0; } }

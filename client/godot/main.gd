@@ -205,6 +205,9 @@ var _menu_tab := "worlds"
 var _menu_world := ""
 var _ember_name := ""
 var _ember_kind := 0
+var _reporting_handle := ""
+var _reporting_reason := "harassment"
+var _reporting_details := ""
 ## Carrying a panel by its grab bar: which one, and with which hand.
 var _dragging := false
 var _drag_ui: FlatPanel
@@ -270,6 +273,7 @@ func _ready() -> void:
 	_fireplace.profile_seen.connect(_on_profile_seen)
 	_fireplace.picture_ready.connect(_on_picture_ready)
 	_fireplace.flames_changed.connect(_refresh_panel)
+	_fireplace.reports_changed.connect(_refresh_menu)
 	_fireplace.failed.connect(_on_fireplace_failed)
 	_fireplace.said.connect(func(message: String) -> void:
 		_message = message
@@ -798,6 +802,8 @@ func _field_limit(id: String) -> int:
 			return 10
 		"signin_code":
 			return 6
+		"report_details":
+			return 500
 		_:
 			return 64
 
@@ -858,6 +864,8 @@ func _on_typed(text: String) -> void:
 		_fireplace.set_profile(text, str(_fireplace.me.get("bio", "")))
 	elif _editing == "my_bio":
 		_fireplace.set_profile(str(_fireplace.me.get("pronouns", "")), text)
+	elif _editing == "report_details":
+		_reporting_details = text
 	elif _editing == "addfriend":
 		_friend_typed = ""
 		_fireplace.add_friend(text)
@@ -1662,6 +1670,13 @@ func _menu_tabs() -> Array:
 		var copy := tab.duplicate()
 		copy["on"] = str(tab["id"]) == "tab:" + _menu_tab
 		tabs.append(copy)
+	if _fireplace != null and _fireplace.can("reports"):
+		tabs.append({
+			"id": "tab:reports",
+			"label": "Reports",
+			"icon": "res://icons/shield.svg",
+			"on": _menu_tab == "reports",
+		})
 	return tabs
 
 
@@ -1676,6 +1691,10 @@ func _menu_title() -> String:
 func _menu_rows() -> Array:
 	if _menu_tab == "profile":
 		return _profile_rows()
+	if _menu_tab == "report":
+		return _report_rows()
+	if _menu_tab == "reports":
+		return _reports_rows()
 	var rows: Array = [_me_row()]
 	match _menu_tab:
 		"camera":
@@ -1801,6 +1820,85 @@ func _profile_rows() -> Array:
 		for line in bio.split("\n"):
 			for piece in UiStyle.wrap(line, chars):
 				rows.append({"label": piece, "bright": true})
+	if not mine:
+		var target_handle := str(profile.get("handle", ""))
+		if target_handle != "":
+			rows.append({"label": ""})
+			rows.append({
+				"id": "report:" + target_handle,
+				"label": "Report @" + target_handle,
+				"icon": "res://icons/shield.svg",
+				"danger": true,
+				"more": true
+			})
+	return rows
+
+
+## Reporting a player: multiple reasons and details.
+func _report_rows() -> Array:
+	var rows: Array = [
+		{"id": "report_back", "label": "Back to Profile", "icon": "res://icons/back.svg"},
+		{"heading": "Report @" + _reporting_handle},
+		{"label": "Select a reason why you are reporting:", "bright": true},
+	]
+	var reasons: Array = _fireplace.get_report_reasons()
+	for r: Dictionary in reasons:
+		var rid := str(r.get("id", ""))
+		var rlabel := str(r.get("label", rid))
+		var is_selected := (rid == _reporting_reason)
+		rows.append({
+			"id": "reason:" + rid,
+			"label": rlabel,
+			"icon": "res://icons/check.svg" if is_selected else "res://icons/globe.svg",
+			"accent": is_selected,
+			"bright": is_selected,
+		})
+	rows.append({"label": ""})
+	rows.append({
+		"id": "report_details",
+		"label": "Details",
+		"text": _reporting_details,
+		"placeholder": "What happened? (optional, up to 500 chars)",
+		"icon": "res://icons/chat.svg"
+	})
+	rows.append({"label": ""})
+	rows.append({
+		"id": "report_submit",
+		"label": "Send Report",
+		"button": true,
+		"danger": true
+	})
+	return rows
+
+
+## For staff with the "reports" permission: open reports queue.
+func _reports_rows() -> Array:
+	var rows: Array = [
+		{"heading": "Moderation  -  Reports  (%d)" % _fireplace.admin_reports.size()},
+		{"id": "reports_refresh", "label": "Refresh Reports", "icon": "res://icons/globe.svg"}
+	]
+	if _fireplace.admin_reports.is_empty():
+		rows.append({"label": "No open reports. Everything is quiet."})
+		return rows
+	for r: Dictionary in _fireplace.admin_reports:
+		var target = r.get("target")
+		var target_handle: String = str(target.get("handle", "")) if target is Dictionary else "unknown"
+		var reason: String = str(r.get("reason_label", r.get("reason", "report")))
+		var reporter = r.get("reporter")
+		var reporter_handle: String = str(reporter.get("handle", "someone")) if reporter is Dictionary else "someone"
+		var details: String = str(r.get("details", ""))
+		var rid: int = int(r.get("id", 0))
+		rows.append({"label": ""})
+		rows.append({"heading": "@" + target_handle + "  [" + reason + "]"})
+		rows.append({"label": "Reported by @" + reporter_handle, "sub": "Report #" + str(rid)})
+		if details != "":
+			rows.append({"label": details, "small": true, "bright": true})
+		rows.append({"id": "resolve:%d" % rid, "label": "Resolve #%d" % rid, "button": true})
+		if target_handle != "" and target_handle != "unknown":
+			if _fireplace.can("ban"):
+				rows.append({"id": "report_suspend:%s" % target_handle, "label": "Suspend @" + target_handle, "button": true, "danger": true})
+			if _fireplace.can("moderate"):
+				rows.append({"id": "report_clear:%s" % target_handle, "label": "Clear profile of @" + target_handle, "button": true, "danger": true})
 	return rows
 
 
@@ -2226,6 +2324,36 @@ func _on_menu_chosen(id: String) -> void:
 		_menu_tab = "worlds"
 		_profile_seen = {}
 		_refresh_menu()
+	elif id.begins_with("report:"):
+		_reporting_handle = id.substr(7)
+		var reasons: Array = _fireplace.get_report_reasons()
+		_reporting_reason = str(reasons[0].get("id", "harassment")) if not reasons.is_empty() else "harassment"
+		_reporting_details = ""
+		_menu_tab = "report"
+		_refresh_menu()
+	elif id == "report_back":
+		_menu_tab = "profile"
+		_refresh_menu()
+	elif id.begins_with("reason:"):
+		_reporting_reason = id.substr(7)
+		_refresh_menu()
+	elif id == "report_submit":
+		_fireplace.file_report(_reporting_handle, _reporting_reason, _reporting_details)
+		_menu_tab = "profile"
+		_refresh_menu()
+	elif id == "reports_refresh":
+		_fireplace.fetch_reports()
+	elif id.begins_with("resolve:"):
+		_fireplace.resolve_report(int(id.substr(8)))
+	elif id.begins_with("report_suspend:"):
+		var who := id.substr(15)
+		_reporting_handle = who
+		_menu_tab = "profile"
+		_refresh_menu()
+	elif id.begins_with("report_clear:"):
+		var who := id.substr(13)
+		_fireplace.moderate(who, ["display_name", "pronouns", "bio", "avatar"])
+		_fireplace.said.emit("Cleared profile of @" + who + ".")
 	elif id == "my_picture":
 		OS.shell_open(_fireplace.base_url() + "/")
 

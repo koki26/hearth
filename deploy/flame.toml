@@ -3,6 +3,8 @@ data_dir = "data"
 worlds_dir = "data\\worlds"
 hub_world = "hub"
 allow_guests = true
+needs_account = false
+needs_same_fireplace = false
 fireplace = "https://fireplace.kokiland-services.eu"
 client_instancing = true
 # Limits: -1 means no limit.
@@ -15,4 +17,7 @@ max_instances_per_player = 1
 [listing]
 public = true
 name = "Kookii"
+description = ""
+banner = ""
+fireplace = ""
 address = ""

@@ -123,6 +123,20 @@ func _answers() -> void:
 	var text := ConfigFile.new()
 	text.load(Session.SETTINGS)
 	_check(not text.has_section_key("account", "password"), "and a password is never saved")
+
+	# Reports and permissions
+	fireplace.token = "v1.x"
+	fireplace.handle = "ada"
+	fireplace.me = {"owner": false, "perms": ["reports"]}
+	_check(fireplace.can("reports"), "permission 'reports' is detected")
+	_check(not fireplace.can("ban"), "unheld permission 'ban' is false")
+	_check(not fireplace.get_report_reasons().is_empty(), "report reasons list is populated")
+	fireplace._tag = "admin_reports"
+	fireplace._on_answer(HTTPRequest.RESULT_SUCCESS, 200, PackedStringArray(),
+		'[{"id":1,"reason":"harassment","details":"bad behaviour","at":100,"reporter":{"handle":"bob"},"target":{"handle":"ada"}}]'.to_utf8_buffer())
+	_check(fireplace.admin_reports.size() == 1, "admin reports parsed from JSON array")
+	_check(fireplace.admin_reports[0]["reason"] == "harassment", "report fields match")
+
 	# Put the settings file back as it was found.
 	details.account_token = ""
 	details.account_refresh = ""

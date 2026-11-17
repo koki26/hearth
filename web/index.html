@@ -37,6 +37,7 @@
   <symbol id="i-flame" viewBox="0 0 64 64"><path d="M32 8c4 10 16 16 16 30a16 16 0 0 1-32 0c0-8 4-12 8-16 0 6 3 9 6 9-2-8 0-16 2-23z"/></symbol>
   <symbol id="i-close" viewBox="0 0 64 64"><path d="M18 18l28 28M46 18L18 46"/></symbol>
   <symbol id="i-camera" viewBox="0 0 64 64"><path d="M8 22a5 5 0 0 1 5-5h8l4-6h14l4 6h8a5 5 0 0 1 5 5v24a5 5 0 0 1-5 5H13a5 5 0 0 1-5-5z"/><circle cx="32" cy="33" r="10"/></symbol>
+  <symbol id="i-flag" viewBox="0 0 64 64"><path d="M14 8v48M14 12h34l-7 12 7 12H14z"/></symbol>
 </svg>
 
 <!-- Signed out -->
@@ -393,6 +394,15 @@
         <ul class="people" id="review"></ul>
         <p class="msg" id="review-msg" role="status"></p>
       </div>
+      <div class="card" id="reports-card" hidden>
+        <div class="card-head">
+          <h2>Reports <span class="pill" id="reports-count"></span></h2>
+          <button type="button" id="reports-refresh" class="quiet">Refresh</button>
+        </div>
+        <p class="note">Reports filed by players about pictures, names, bios or behaviour. Dealt with, a report is deleted.</p>
+        <ul class="people reports-list" id="admin-reports"></ul>
+        <p class="msg" id="reports-msg" role="status"></p>
+      </div>
       <div class="card" id="groups-card" hidden>
         <h2>Groups</h2>
         <p class="note">Only you, the Fireplace owner, make groups and put people in them. A group's name is the
@@ -451,7 +461,10 @@
 <div class="overlay" id="who-box" hidden>
   <section class="sheet" role="dialog" aria-modal="true" aria-label="Profile">
     <div class="profile-card" id="who-card"></div>
-    <div class="actions row end"><button type="button" id="who-close">Close</button></div>
+    <div class="actions row end">
+      <button type="button" id="who-report" class="danger"><svg class="ic"><use href="#i-flag"/></svg>Report</button>
+      <button type="button" id="who-close">Close</button>
+    </div>
   </section>
 </div>
 
@@ -466,6 +479,25 @@
       <input id="ban-reason" required maxlength="300">
       <div class="actions row"><button class="danger">Suspend</button><button type="button" id="ban-cancel">Cancel</button></div>
       <p class="msg" id="ban-msg" role="status"></p>
+    </form>
+  </section>
+</div>
+
+<!-- Reporting a player: multiple reasons and details. -->
+<div class="overlay" id="report-box" hidden>
+  <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="report-title">
+    <h2 id="report-title"><svg class="ic"><use href="#i-flag"/></svg>Report player</h2>
+    <p class="note" id="report-target-note"></p>
+    <form id="report-form" class="stack">
+      <label for="report-reason">Reason</label>
+      <select id="report-reason" required aria-label="Reason"></select>
+      <label for="report-details">Details <small class="note">optional, up to 500 characters</small></label>
+      <textarea id="report-details" rows="3" maxlength="500" placeholder="Describe what happened..."></textarea>
+      <div class="actions row">
+        <button class="danger" id="report-go">Send report</button>
+        <button type="button" id="report-cancel">Cancel</button>
+      </div>
+      <p class="msg" id="report-msg" role="status"></p>
     </form>
   </section>
 </div>

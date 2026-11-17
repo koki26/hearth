@@ -113,14 +113,75 @@ function profileCard(target, p) {
   target.replaceChildren(face(el("span", "face big"), p), about);
 }
 
+let whoHandle = "";
 async function openProfile(handle) {
   try {
-    profileCard($("who-card"), await api("GET", "/profiles/" + encodeURIComponent(handle)));
+    whoHandle = handle;
+    const p = await api("GET", "/profiles/" + encodeURIComponent(handle));
+    profileCard($("who-card"), p);
+    $("who-report").hidden = !me || p.handle === me.handle;
     $("who-box").hidden = false;
     $("who-close").focus();
   } catch (err) { say("friend-msg", err.message); }
 }
 $("who-close").onclick = () => { $("who-box").hidden = true; };
+
+// --- reporting a player ------------------------------------------------------
+
+const DEFAULT_REASONS = [
+  { id: "picture", label: "Inappropriate picture" },
+  { id: "name", label: "Offensive name" },
+  { id: "bio", label: "Offensive bio or pronouns" },
+  { id: "harassment", label: "Harassment or bullying" },
+  { id: "hate", label: "Hate speech" },
+  { id: "cheating", label: "Cheating" },
+  { id: "spam", label: "Spam or scams" },
+  { id: "underage", label: "May be under the minimum age" },
+  { id: "other", label: "Something else" },
+];
+
+let reportTarget = "";
+function openReport(handle) {
+  reportTarget = handle;
+  $("report-target-note").textContent = "Reporting @" + handle + ". Sent to this server's moderators.";
+  const select = $("report-reason");
+  select.replaceChildren();
+  const list = (features.report_reasons && features.report_reasons.length) ? features.report_reasons : DEFAULT_REASONS;
+  for (const r of list) {
+    const opt = el("option", null, r.label);
+    opt.value = r.id;
+    select.append(opt);
+  }
+  $("report-details").value = "";
+  say("report-msg", "", true);
+  $("who-box").hidden = true;
+  $("report-box").hidden = false;
+  select.focus();
+}
+
+$("who-report").onclick = () => {
+  if (whoHandle) openReport(whoHandle);
+};
+$("report-cancel").onclick = () => { $("report-box").hidden = true; };
+
+$("report-form").onsubmit = async (e) => {
+  e.preventDefault();
+  const go = $("report-go");
+  go.disabled = true;
+  say("report-msg", "", true);
+  try {
+    await api("POST", "/reports", {
+      handle: reportTarget,
+      reason: $("report-reason").value,
+      details: $("report-details").value.trim(),
+    });
+    say("report-msg", "Report sent. Thank you.", true);
+    setTimeout(() => { $("report-box").hidden = true; go.disabled = false; }, 1200);
+  } catch (err) {
+    say("report-msg", err.message);
+    go.disabled = false;
+  }
+};
 
 // --- signing in and out ------------------------------------------------------
 
@@ -598,11 +659,12 @@ const can = (perm) => (me.perms || []).includes(perm);
 
 async function loadAdmin() {
   for (const [id, show] of [["admin-accounts", can("view")], ["ip-card", can("ban")], ["review-card", can("review")],
-    ["groups-card", me.owner], ["admin-flames-card", can("flames")]]) $(id).closest(".card").hidden = !show;
+    ["reports-card", can("reports")], ["groups-card", me.owner], ["admin-flames-card", can("flames")]]) $(id).closest(".card").hidden = !show;
   try {
     const asks = [can("view") ? api("GET", "/admin/accounts") : [], api("GET", "/admin/groups")];
     if (can("ban")) asks.push(loadIpBans());
     if (can("review")) asks.push(loadReview());
+    if (can("reports")) asks.push(loadReports());
     if (can("flames")) asks.push(loadAdminFlames());
     let g;
     [accounts, g] = await Promise.all(asks);
@@ -617,7 +679,7 @@ async function loadAdmin() {
 
 let perms = [];
 const PERM_NAMES = { view: "See accounts", ban: "Ban", delete: "Delete accounts", sign_out: "Sign people out",
-  moderate: "Clear profiles", review: "Review pictures", flames: "Unlist Flames" };
+  moderate: "Clear profiles", review: "Review pictures", reports: "Handle reports", flames: "Unlist Flames" };
 
 function drawGroups() {
   $("groups").replaceChildren(...groups.map((g, i) => {
@@ -686,6 +748,89 @@ async function loadReview() {
   $("review").replaceChildren(...rows);
   if (!rows.length) $("review").append(el("li", "empty", "Nothing waiting."));
 }
+
+// --- reports filed by players ----------------------------------------------------
+
+async function loadReports() {
+  const list = await api("GET", "/admin/reports");
+  $("reports-count").textContent = list.length || "";
+  const rows = list.map((r) => {
+    const li = el("li", "report-item");
+    const head = el("div", "report-head");
+
+    const who = el("div", "who");
+    face(el("span", "face small"), r.target || {});
+    const text = el("div");
+    const targetTitle = el("b", null, r.target ? (r.target.display_name || r.target.handle) : "Unknown account");
+    if (r.target && r.target.handle) {
+      targetTitle.append(el("small", "note", " @" + r.target.handle));
+    }
+    const meta = el("div", "report-meta");
+    const reasonPill = el("span", "pill warn", r.reason_label || r.reason);
+    const timeSpan = el("span", null, when(r.at));
+    const bySpan = el("span", null, "Reported by " + (r.reporter ? "@" + r.reporter.handle : "unknown"));
+    meta.append(reasonPill, timeSpan, bySpan);
+    text.append(targetTitle, meta);
+    who.append(text);
+
+    const buttons = el("div", "report-actions");
+    const resBtn = el("button", "main", "Resolve");
+    resBtn.type = "button";
+    resBtn.onclick = async () => {
+      resBtn.disabled = true;
+      try {
+        await api("POST", "/admin/reports/resolve", { id: r.id });
+        say("reports-msg", "Resolved report #" + r.id + ".", true);
+        await loadReports();
+      } catch (err) {
+        say("reports-msg", err.message);
+        resBtn.disabled = false;
+      }
+    };
+    buttons.append(resBtn);
+
+    if (r.target && r.target.handle) {
+      const viewBtn = el("button", "quiet", "View");
+      viewBtn.type = "button";
+      viewBtn.onclick = () => openProfile(r.target.handle);
+      buttons.append(viewBtn);
+
+      if (can("ban")) {
+        const banBtn = el("button", "danger", "Suspend");
+        banBtn.type = "button";
+        banBtn.onclick = () => openBan(r.target);
+        buttons.append(banBtn);
+      }
+      if (can("moderate")) {
+        const clearBtn = el("button", null, "Clear profile");
+        clearBtn.type = "button";
+        clearBtn.onclick = async () => {
+          if (!confirm("Clear profile details for @" + r.target.handle + "?")) return;
+          try {
+            await api("POST", "/admin/moderate", {
+              handle: r.target.handle,
+              clear: ["display_name", "pronouns", "bio", "avatar"]
+            });
+            say("reports-msg", "Cleared profile for @" + r.target.handle + ".", true);
+          } catch (err) { say("reports-msg", err.message); }
+        };
+        buttons.append(clearBtn);
+      }
+    }
+
+    head.append(who, buttons);
+    li.append(head);
+
+    if (r.details) {
+      const details = el("div", "report-details", r.details);
+      li.append(details);
+    }
+    return li;
+  });
+  $("admin-reports").replaceChildren(...rows);
+  if (!rows.length) $("admin-reports").append(el("li", "empty", "No open reports."));
+}
+if ($("reports-refresh")) $("reports-refresh").onclick = () => loadReports();
 
 // --- public Flames ---------------------------------------------------------------
 
