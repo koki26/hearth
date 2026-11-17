@@ -169,6 +169,7 @@ var _profile_seen := {}
 ## Which page of the lift panel is showing: "main", "warning" or "advanced".
 ## Three pages, one `_panel_rows`, no second scene.
 var _panel_page := "main"
+var _account_tab := "signin"
 ## Which panel field the keyboard is editing, if any, and its label.
 var _editing := ""
 var _editing_label := ""
@@ -372,15 +373,14 @@ func _ready() -> void:
 
 	# The launcher already asked which way to play; start the headset before
 	# anything is drawn, so the first thing you see is in the right place.
-	if Session.vr and not _enter_vr():
-		_message = "No headset found. Is your OpenXR runtime running?"
-	elif not Session.vr and _xr != null and _xr.is_initialized():
-		# project.godot has openxr/enabled, so Godot opens a session before
-		# anybody asks for one. An XRCamera3D is then driven by the headset
-		# pose even with use_xr off -- so on a desktop with a runtime
-		# installed and nothing on anybody head, the view sits at whatever
-		# stale angle the runtime last reported. Let the session go.
-		_xr.uninitialize()
+	var xr_found := XRServer.find_interface("OpenXR")
+	if Session.vr:
+		if not _enter_vr():
+			_message = "No headset found. Is your OpenXR runtime running?"
+	else:
+		get_viewport().use_xr = false
+		if xr_found != null and xr_found.is_initialized():
+			xr_found.uninitialize()
 
 	# The hub, with the lift standing in it. `_replace_world` starts the ride.
 	_replace_world(_home())
@@ -472,17 +472,20 @@ func _panel_rows() -> Array:
 	for i in mini(_fireplace.flames.size(), PUBLIC_FLAMES_SHOWN):
 		var flame: Dictionary = _fireplace.flames[i]
 		var most = flame.get("max_players")
+		var desc: String = str(flame.get("description", "")).strip_edges()
+		var addr: String = str(flame.get("address", ""))
+		var sub_text: String = desc if desc != "" else addr
 		rows.append({
 			"id": "flame:%d" % i,
 			"label": str(flame.get("name", "?")),
-			"sub": str(flame.get("address", "")),
-			"note": "%d / %s" % [int(flame.get("players", 0)), "-" if most == null else str(int(most))],
+			"sub": sub_text,
+			"note": "%d / %s players" % [int(flame.get("players", 0)), "-" if most == null else str(int(most))],
 			"icon": "res://icons/flame.svg",
 		})
-	rows.append({"id": "flames_refresh", "label": "Refresh the list", "icon": "res://icons/globe.svg"})
+	rows.append({"id": "flames_refresh", "label": "Refresh list", "icon": "res://icons/globe.svg"})
 	rows.append({"heading": "Direct connect"})
-	rows.append({"id": "address", "label": "Server", "text": _details.address, "icon": "res://icons/globe.svg"})
-	rows.append({"id": "name", "label": "Name", "text": _details.player_name, "icon": "res://icons/user.svg"})
+	rows.append({"id": "address", "label": "Server", "text": _details.address, "note": "%d/64" % _details.address.length(), "icon": "res://icons/globe.svg"})
+	rows.append({"id": "name", "label": "Name", "text": _details.player_name, "note": "%d/32" % _details.player_name.length(), "icon": "res://icons/user.svg"})
 	rows.append({
 		"id": "account",
 		"label": "Account",
@@ -496,21 +499,15 @@ func _panel_rows() -> Array:
 	rows.append({"label": ""})
 	rows.append({"id": "advanced", "label": "Advanced", "icon": "res://icons/gear.svg", "more": true})
 	rows.append({"id": "quit", "label": "Quit Hearth", "icon": "res://icons/exit.svg", "danger": true})
-	rows.append({"label": ""})
-	# The one thing nobody could guess, and the bug report that caused it.
-	rows.append({"label": "Point and click, or arrow keys and Enter." if not _in_vr
-		else "Point with a controller and pull the trigger."})
 	if _message != "":
+		rows.append({"label": ""})
 		rows.append({"label": _message, "warn": true})
 	return rows
 
 
-## Signing in to the Fireplace: the one server that knows who people are.
-## Your account is what friends add; the name above is what a Flame shows
-## over your head, and the two are deliberately separate (docs/TRUST.md).
+## Signing in or registering: clean, uncluttered views.
 func _account_rows() -> Array:
 	if _fireplace.is_signed_in() and not _fireplace.recovery_codes.is_empty():
-		# Straight after making an account: shown this once, never saved.
 		var codes: Array = [{"heading": "Your recovery codes"},
 			{"label": "Each resets your password once. Write"},
 			{"label": "them down: they are not shown again."}]
@@ -518,69 +515,76 @@ func _account_rows() -> Array:
 			codes.append({"label": str(code)})
 		codes.append({"id": "codes_done", "label": "I wrote them down", "button": true})
 		return codes
+
 	if _fireplace.is_signed_in():
 		var mine: Array = [
-			{"label": _fireplace.handle, "avatar": _fireplace.handle, "status": "online", "sub": "signed in"},
+			{"heading": "Signed In"},
+			{"label": _fireplace.handle, "avatar": _fireplace.handle, "face": _face_of(_fireplace.me), "status": "online", "sub": "authenticated"},
 			{"label": ""},
 		]
-		# Only where the Fireplace sends email at all (GET /features).
 		if bool(_fireplace.features.get("email", false)):
-			var state := "none yet, optional" if _fireplace.email == "" else (
-				"confirmed" if _fireplace.email_verified else "open the link we sent")
+			var state := "none yet" if _fireplace.email == "" else (
+				"verified" if _fireplace.email_verified else "open verification link")
 			mine.append({"id": "email", "label": "Email", "text": _email_typed if _email_typed != ""
 				else _fireplace.email, "icon": "res://icons/globe.svg", "sub": state})
 			mine.append({"id": "password", "label": "Password", "text": _password_typed, "secret": true,
 				"icon": "res://icons/lock.svg"})
 			mine.append({"id": "save_email", "label": "Save email", "icon": "res://icons/plus.svg"})
-			mine.append({"label": "Only for resets and security notices."})
 			mine.append({"label": ""})
-		mine.append({"id": "signout", "label": "Sign out", "icon": "res://icons/exit.svg"})
-		mine.append({"id": "back", "label": "Back", "icon": "res://icons/back.svg"})
-		mine.append({"label": ""})
-		mine.append({"label": "Friends are on the menu, in world."})
-		mine.append({"label": _message, "warn": true} if _message != "" else {"label": ""})
+		mine.append({"id": "signout", "label": "Sign out", "icon": "res://icons/exit.svg", "danger": true})
+		mine.append({"id": "back", "label": "Back to menu", "icon": "res://icons/back.svg"})
+		if _message != "":
+			mine.append({"label": _message, "warn": true})
 		return mine
-	var rows: Array = [
-		{"id": "handle", "label": "Handle", "text": _handle_typed, "icon": "res://icons/user.svg"},
-		{"id": "password", "label": "Password", "text": _password_typed, "secret": true,
-			"icon": "res://icons/lock.svg"},
-		{"label": ""},
-		{"id": "signin", "label": "Sign in", "button": true},
+
+	# Uncluttered Sign In vs Create Account tabs
+	if _account_tab == "signup":
+		var su: Array = [
+			{"heading": "Create Account"},
+			{"id": "handle", "label": "Handle", "text": _handle_typed, "note": "%d/20" % _handle_typed.length(), "icon": "res://icons/user.svg"},
+			{"id": "password", "label": "Password", "text": _password_typed, "secret": true, "icon": "res://icons/lock.svg"},
+			{"id": "email", "label": "Email", "text": _email_typed, "icon": "res://icons/send.svg"},
+			{"id": "birthday", "label": "Birthday", "text": _birthday_typed, "sub": "YYYY-MM-DD", "icon": "res://icons/user.svg"},
+			{"id": "accept_terms", "label": "I accept terms & privacy", "toggle": _accept_terms, "icon": "res://icons/check.svg"},
+		]
+		if bool(_fireplace.features.get("email", false)):
+			su.append({"id": "policy_emails", "label": "Email policy changes", "toggle": _policy_emails, "icon": "res://icons/globe.svg"})
+		su.append_array([
+			{"label": ""},
+			{"id": "signup", "label": "Register Account", "button": true, "icon": "res://icons/plus.svg"},
+			{"id": "to_signin", "label": "Already have an account? Sign in", "icon": "res://icons/user.svg"},
+			{"id": "privacy", "label": "Privacy Policy", "more": true},
+			{"id": "terms", "label": "Terms of Service", "more": true},
+			{"id": "back", "label": "Play as guest", "icon": "res://icons/back.svg"},
+		])
+		if _message != "":
+			su.append({"label": _message, "warn": true})
+		return su
+
+	# Default "signin" view - simple and clean!
+	var si: Array = [
+		{"heading": "Sign In"},
+		{"id": "handle", "label": "Handle", "text": _handle_typed, "note": "%d/20" % _handle_typed.length(), "icon": "res://icons/user.svg"},
+		{"id": "password", "label": "Password", "text": _password_typed, "secret": true, "icon": "res://icons/lock.svg"},
 	]
 	if _fireplace.code_ticket != "":
-		rows.append_array([
-			{"label": "We emailed you a 6-digit code:"},
-			{"id": "signin_code", "label": "Code from email", "text": _code_typed, "icon": "res://icons/send.svg"},
-			{"id": "send_code", "label": "Finish signing in", "button": true},
+		si.append_array([
+			{"label": "Enter the 6-digit code sent to your email:"},
+			{"id": "signin_code", "label": "Email Code", "text": _code_typed, "note": "%d/6" % _code_typed.length(), "icon": "res://icons/send.svg"},
+			{"id": "send_code", "label": "Verify & Sign in", "button": true},
 		])
-	rows.append_array([
-		{"label": "New here? Also fill in:"},
-		{"id": "email", "label": "Email", "text": _email_typed, "icon": "res://icons/send.svg"},
-		{"id": "birthday", "label": "Birthday YYYY-MM-DD", "text": _birthday_typed, "icon": "res://icons/user.svg"},
-		{"id": "accept_terms", "label": "I accept terms & privacy", "toggle": _accept_terms,
-			"icon": "res://icons/check.svg"},
+	else:
+		si.append({"label": ""})
+		si.append({"id": "signin", "label": "Sign in", "button": true, "icon": "res://icons/user.svg"})
+	si.append_array([
+		{"id": "to_signup", "label": "New player? Create account", "icon": "res://icons/plus.svg"},
 	])
-	if bool(_fireplace.features.get("email", false)):
-		rows.append({"id": "policy_emails", "label": "Email me policy changes", "toggle": _policy_emails,
-			"icon": "res://icons/globe.svg"})
-	rows.append_array([
-		{"id": "signup", "label": "Create an account", "icon": "res://icons/plus.svg"},
-		{"id": "back", "label": "Play without one", "icon": "res://icons/back.svg"},
-	])
-	# Opened in the system browser: the reset form and the policies are web
-	# pages the Fireplace serves, and they are read once, not played in.
 	if _fireplace.can_reset():
-		rows.append({"id": "forgot", "label": "Forgot password?", "icon": "res://icons/lock.svg", "more": true})
-	rows.append_array([
-		{"label": ""},
-		{"label": "An account is for friends and for finding"},
-		{"label": "them. A Flame never sees your password."},
-		{"label": "Your birthday only checks your age."},
-		{"id": "privacy", "label": "Privacy", "more": true},
-		{"id": "terms", "label": "Terms", "more": true},
-		{"label": _message, "warn": true} if _message != "" else {"label": ""},
-	])
-	return rows
+		si.append({"id": "forgot", "label": "Forgot password?", "icon": "res://icons/lock.svg", "more": true})
+	si.append({"id": "back", "label": "Play as guest", "icon": "res://icons/back.svg"})
+	if _message != "":
+		si.append({"label": _message, "warn": true})
+	return si
 
 
 ## Shown every time the advanced page is opened, and not remembered. It is
@@ -708,6 +712,15 @@ func _on_panel_chosen(id: String) -> void:
 		"account":
 			_message = ""
 			_panel_page = "account"
+			_account_tab = "signin"
+			_refresh_panel()
+		"to_signup":
+			_message = ""
+			_account_tab = "signup"
+			_refresh_panel()
+		"to_signin":
+			_message = ""
+			_account_tab = "signin"
 			_refresh_panel()
 		"signin":
 			_message = "Signing in..."
@@ -769,6 +782,26 @@ func _on_panel_chosen(id: String) -> void:
 			get_tree().quit()
 
 
+func _field_limit(id: String) -> int:
+	match id:
+		"bio", "my_bio":
+			return 300
+		"pronouns", "my_pronouns":
+			return 24
+		"name", "my_name", "display_name":
+			return 32
+		"handle":
+			return 20
+		"chat":
+			return 120
+		"birthday":
+			return 10
+		"signin_code":
+			return 6
+		_:
+			return 64
+
+
 ## A typed field on the menu: the ember's name. The menu goes away while the
 ## keyboard is up -- they draw in the same band, so one would show through the
 ## other -- and comes back when the typing is done.
@@ -782,7 +815,7 @@ func _on_menu_edit(id: String, label: String, value: String) -> void:
 	if id == "chat":
 		value = ""
 	_menu.close()
-	_keyboard.open(label, value, _in_vr)
+	_keyboard.open(label, value, _in_vr, false, _field_limit(id))
 	_place_lift_ui()
 
 
@@ -793,7 +826,7 @@ func _on_panel_edit(id: String, label: String, value: String) -> void:
 	# The key grid is for the headset only. On the desktop you already have a
 	# keyboard, so all that comes up is the line, to show what you are typing.
 	# A password is dots wherever it is shown.
-	_keyboard.open(label, value, _in_vr, id == "password")
+	_keyboard.open(label, value, _in_vr, id == "password", _field_limit(id))
 	_place_lift_ui()
 
 
@@ -1382,7 +1415,10 @@ func _release_slider() -> void:
 func _face(ui: Node3D, at: Vector3) -> void:
 	var head: Vector3 = $XROrigin3D/Camera.global_position
 	var away := at - head
-	away.y = 0.0
+	if not _in_vr:
+		away.y = 0.0
+	else:
+		away.y = clampf(away.y, -0.9, 0.9)
 	away = away.normalized() if away.length() > 0.01 else Vector3.FORWARD
 	ui.global_transform = Transform3D(Basis.IDENTITY, at).looking_at(at + away, Vector3.UP)
 
@@ -1729,34 +1765,38 @@ func _profile_rows() -> Array:
 		profile = _peers[_profile_of].profile
 	if profile.is_empty():
 		var who := _peer_name(_profile_of) if _peers.has(_profile_of) else _details.player_name.strip_edges()
-		rows.append({"label": who, "avatar": who, "sub": "a guest: no profile"})
+		rows.append({"circle_picture": null, "avatar": who})
+		rows.append({"heading": who})
+		rows.append({"label": "Guest Player", "sub": "No Fireplace account linked"})
 		return rows
 	var face := _face_of(profile)
-	if face != null:
-		rows.append({"picture": face})
 	var display := str(profile.get("display_name", ""))
 	var handle := str(profile.get("handle", ""))
 	var pronouns := str(profile.get("pronouns", ""))
-	rows.append({"heading": display})
+
+	# VRChat-inspired circular avatar picture header
+	rows.append({"circle_picture": face, "avatar": handle if handle != "" else display})
+	rows.append({"heading": display if display != "" else "@" + handle})
 	rows.append({"label": "@" + handle, "avatar": handle, "face": face,
 		"sub": pronouns if pronouns != "" else "no pronouns set"})
 	var badge = profile.get("badge")
 	if badge is Dictionary:
 		var is_owner := str(badge.get("kind", "")) == "owner"
-		rows.append({"label": str(badge.get("label", "")), "sub": "verified by this Fireplace",
+		rows.append({"label": str(badge.get("label", "")), "sub": "Verified by Fireplace",
 			"icon": "res://icons/crown.svg" if is_owner else "res://icons/shield.svg"})
 	if mine:
-		rows.append({"heading": "Edit"})
-		rows.append({"id": "my_name", "label": "Display name", "text": display, "icon": "res://icons/user.svg"})
-		rows.append({"id": "my_pronouns", "label": "Pronouns", "text": pronouns, "icon": "res://icons/user.svg"})
-		rows.append({"id": "my_bio", "label": "Bio", "text": str(profile.get("bio", "")), "icon": "res://icons/chat.svg"})
+		rows.append({"heading": "Edit Profile"})
+		rows.append({"id": "my_name", "label": "Display Name", "text": display, "note": "%d/32" % display.length(), "icon": "res://icons/user.svg"})
+		rows.append({"id": "my_pronouns", "label": "Pronouns", "text": pronouns, "note": "%d/24" % pronouns.length(), "icon": "res://icons/user.svg"})
+		var my_bio: String = str(profile.get("bio", ""))
+		rows.append({"id": "my_bio", "label": "Bio", "text": my_bio, "note": "%d/300" % my_bio.length(), "icon": "res://icons/chat.svg"})
 		var waiting := int(profile.get("avatar_pending", 0)) > 0
-		rows.append({"id": "my_picture", "label": "Change picture", "icon": "res://icons/image.svg", "more": true,
-			"sub": "waiting for review" if waiting else "on your account page"})
+		rows.append({"id": "my_picture", "label": "Change Picture", "icon": "res://icons/image.svg", "more": true,
+			"sub": "Waiting for review" if waiting else "Set on account page"})
 		return rows
 	var bio := str(profile.get("bio", ""))
 	if bio != "":
-		rows.append({"heading": "Bio"})
+		rows.append({"heading": "Bio  [%d/300]" % bio.length()})
 		var chars := int((_menu.width - UiStyle.PAD * 2.0) / (UiStyle.FONT * UiStyle.PIXEL * UiStyle.CHAR_WIDTH))
 		for line in bio.split("\n"):
 			for piece in UiStyle.wrap(line, chars):
@@ -1819,26 +1859,54 @@ func _chat_rows() -> Array:
 ## Worlds on this flame, and then one world's embers.
 func _worlds_rows() -> Array:
 	if Session.offline or not $Client.is_connected_to_server():
-		return [{"label": "You are not on a flame.", "icon": "res://icons/globe.svg",
-			"sub": "Worlds show up here once you join one."}]
+		return [{"label": "Not Connected", "icon": "res://icons/globe.svg",
+			"sub": "Join a server to explore worlds and instances."}]
 	if _menu_world != "":
 		return _ember_rows(_menu_world)
 	var rows: Array = []
 	if _instance != HUB_INSTANCE:
-		rows.append({"id": "join:%d" % HUB_INSTANCE, "label": "Back to the hub",
-			"icon": "res://icons/home.svg", "more": true})
-	rows.append({"heading": "Worlds on this flame"})
-	for slug: String in _worlds:
+		rows.append({"id": "join:%d" % HUB_INSTANCE, "label": "Return to Hub",
+			"icon": "res://icons/home.svg", "button": true})
+		rows.append({"label": ""})
+
+	# Worlds with stylish banners
+	rows.append({"heading": "Worlds"})
+	var world_slugs := _worlds.keys()
+	if not world_slugs.has("hub") and $Client.is_connected_to_server():
+		world_slugs.push_front("hub")
+	for slug: String in world_slugs:
 		var embers := _embers_of(slug).size()
 		rows.append({
+			"banner": true,
 			"id": "world:%s" % slug,
-			"label": slug,
+			"label": slug.capitalize(),
+			"sub": "%d active instance%s" % [embers, "" if embers == 1 else "s"],
 			"icon": "res://icons/globe.svg",
-			"note": "%d %s" % [embers, "ember" if embers == 1 else "embers"],
 			"more": true,
 		})
-	if _worlds.is_empty():
-		rows.append({"label": "this flame hands out no worlds"})
+
+	# Instances listed cleanly
+	rows.append({"heading": "Instances"})
+	var found_any := false
+	for inst: int in _instances:
+		var running: Dictionary = _instances[inst]
+		var here := int(running.get("players", 0))
+		var kind := int(running.get("kind", 0))
+		var slug: String = str(running.get("slug", ""))
+		var inst_name := _ember_label(inst)
+		var is_current := inst == _instance
+		var item := {
+			"id": "join:%d" % inst,
+			"label": inst_name + (" (Current)" if is_current else ""),
+			"sub": "%s  •  %d player%s" % [slug.capitalize(), here, "" if here == 1 else "s"],
+			"icon": _kind_icon(kind),
+			"action": "Joined" if is_current else "Join",
+		}
+		rows.append(item)
+		found_any = true
+	if not found_any:
+		rows.append({"label": "No other instances active."})
+
 	return rows
 
 
@@ -1853,34 +1921,39 @@ func _embers_of(slug: String) -> Array:
 
 ## One world: the embers burning in it, and how to light another.
 func _ember_rows(slug: String) -> Array:
+	var embers := _embers_of(slug)
 	var rows: Array = [
-		{"id": "worlds", "label": "All worlds", "icon": "res://icons/back.svg"},
-		{"heading": "Embers of %s" % slug},
+		{"id": "worlds", "label": "Back to Worlds", "icon": "res://icons/back.svg"},
+		{
+			"banner": true,
+			"label": slug.capitalize(),
+			"sub": "%d instance%s online" % [embers.size(), "" if embers.size() == 1 else "s"],
+			"icon": "res://icons/globe.svg",
+		},
+		{"heading": "Instances"},
 	]
-	for instance: int in _embers_of(slug):
+	for instance: int in embers:
 		var running: Dictionary = _instances[instance]
 		var here := int(running.get("players", 0))
 		var kind := int(running.get("kind", 0))
+		var is_current := instance == _instance
 		var row := {
 			"id": "join:%d" % instance,
-			"label": _ember_label(instance) + ("  (you are here)" if instance == _instance else ""),
+			"label": _ember_label(instance) + (" (Current)" if is_current else ""),
 			"icon": _kind_icon(kind),
-			"note": "%d here  -  %s" % [here, _kind_label(kind)],
+			"sub": "%d player%s  •  %s" % [here, "" if here == 1 else "s", _kind_label(kind)],
+			"action": "Joined" if is_current else "Join",
 		}
-		if instance != _instance:
-			row["action"] = "Join"
 		rows.append(row)
-	if _embers_of(slug).is_empty():
-		rows.append({"label": "none burning"})
-	if not _can_create:
-		rows.append({"label": "This flame lights its own embers only."})
-		return rows
-	rows.append({"heading": "Light a new ember"})
-	rows.append({"id": "ember_name", "label": "Name", "text": _ember_name,
-		"placeholder": slug, "icon": "res://icons/flame.svg"})
-	rows.append({"id": "ember_kind", "label": "Who can join", "choice": _kind_label(_ember_kind),
-		"icon": _kind_icon(_ember_kind)})
-	rows.append({"id": "ember_new", "label": "Light it", "icon": "res://icons/plus.svg", "button": true})
+	if embers.is_empty():
+		rows.append({"label": "No instances burning right now."})
+	if _can_create:
+		rows.append({"heading": "New Instance"})
+		rows.append({"id": "ember_name", "label": "Name", "text": _ember_name,
+			"placeholder": slug, "icon": "res://icons/flame.svg"})
+		rows.append({"id": "ember_kind", "label": "Privacy", "choice": _kind_label(_ember_kind),
+			"icon": _kind_icon(_ember_kind)})
+		rows.append({"id": "ember_new", "label": "Create Instance", "icon": "res://icons/plus.svg", "button": true})
 	return rows
 
 
@@ -1988,18 +2061,23 @@ func _on_fireplace_failed(what: String, message: String) -> void:
 	_status(message)
 
 
-## Where the pointer is aimed, an arm's length or so out: the menu opens there
-## rather than always straight ahead, so it lands where you were looking.
+## Where the menu opens: in VR directly in front of where your eyes are looking;
+## on desktop, where the cursor is aimed.
 func _pointed_at() -> Vector3:
+	if _in_vr:
+		var cam: XRCamera3D = $XROrigin3D/Camera
+		var head_pos: Vector3 = cam.global_position
+		var look: Vector3 = -cam.global_transform.basis.z
+		look = look.normalized() if look.length_squared() > 0.001 else Vector3.FORWARD
+		return head_pos + look * 1.15
 	var ray := _pointer()
 	var from: Vector3 = ray["from"]
 	var dir: Vector3 = ray["dir"]
 	var reach := MENU_REACH
 	var sight: RayCast3D = $XROrigin3D/Camera/AimRay
-	if not _in_vr:
-		sight.force_raycast_update()
-		if sight.is_colliding():
-			reach = minf(reach, sight.get_collision_point().distance_to(from) - 0.3)
+	sight.force_raycast_update()
+	if sight.is_colliding():
+		reach = minf(reach, sight.get_collision_point().distance_to(from) - 0.3)
 	return from + dir * clampf(reach, 0.7, MENU_REACH)
 
 
@@ -2356,7 +2434,7 @@ func _start_chat(from_menu: bool) -> void:
 	_editing_label = "Say something"
 	_return_to_menu = from_menu
 	_menu.close()
-	_keyboard.open("Say something", "", _in_vr)
+	_keyboard.open("Say something", "", _in_vr, false, 120)
 	_place_lift_ui()
 
 

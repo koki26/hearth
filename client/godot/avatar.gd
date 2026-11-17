@@ -30,6 +30,7 @@ var _bubble_left := 0.0
 func _ready() -> void:
 	$Head/Voice.play()
 	_voice = $Head/Voice.get_stream_playback()
+	set_picture(null)
 
 
 func _exit_tree() -> void:
@@ -52,6 +53,9 @@ func push_voice(samples: PackedFloat32Array) -> void:
 
 func set_label(text: String) -> void:
 	$Head/Label.text = text
+	var initial: Label3D = $Head/Plate.get_node_or_null("Initial")
+	if initial != null and initial.visible:
+		initial.text = text.substr(0, 1).to_upper()
 	_lay_out_plate()
 
 
@@ -83,7 +87,7 @@ func set_profile(found: Dictionary) -> void:
 	_lay_out_plate()
 
 
-## Their picture beside their name; null takes it away.
+## Their picture beside their name; circles are enforced even in nametags.
 func set_picture(texture: Texture2D) -> void:
 	var sprite: Sprite3D = $Head/Plate.get_node_or_null("Picture")
 	if sprite == null:
@@ -93,10 +97,46 @@ func set_picture(texture: Texture2D) -> void:
 		sprite.no_depth_test = true
 		sprite.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		$Head/Plate.add_child(sprite)
-	sprite.texture = texture
-	sprite.visible = texture != null
 	if texture != null:
-		sprite.pixel_size = PICTURE / float(maxi(texture.get_height(), 1))
+		var img := texture.get_image()
+		if img != null:
+			var masked := img.duplicate()
+			FireplaceClient.circle_mask(masked)
+			sprite.texture = ImageTexture.create_from_image(masked)
+		else:
+			sprite.texture = texture
+		sprite.visible = true
+		sprite.pixel_size = PICTURE / float(maxi(sprite.texture.get_height(), 1))
+		var initial: Label3D = $Head/Plate.get_node_or_null("Initial")
+		if initial != null:
+			initial.visible = false
+	else:
+		var col := UiStyle.avatar_colour(label())
+		var img := Image.create(64, 64, false, Image.FORMAT_RGBA8)
+		img.fill(Color(0, 0, 0, 0))
+		var r := 30.0
+		for y in 64:
+			for x in 64:
+				var dx := float(x) - 31.5
+				var dy := float(y) - 31.5
+				var d := sqrt(dx * dx + dy * dy)
+				if d <= r:
+					var a := clampf(r - d + 0.5, 0.0, 1.0)
+					img.set_pixel(x, y, Color(col.r, col.g, col.b, a))
+		sprite.texture = ImageTexture.create_from_image(img)
+		sprite.visible = true
+		sprite.pixel_size = PICTURE / 64.0
+		var initial: Label3D = $Head/Plate.get_node_or_null("Initial")
+		if initial == null:
+			initial = Label3D.new()
+			initial.name = "Initial"
+			initial.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+			initial.no_depth_test = true
+			initial.font_size = UiStyle.FONT_SMALL
+			initial.pixel_size = 0.0018
+			$Head/Plate.add_child(initial)
+		initial.text = label().substr(0, 1).to_upper()
+		initial.visible = true
 	_lay_out_plate()
 
 
@@ -108,7 +148,11 @@ func _lay_out_plate() -> void:
 	var picture: Sprite3D = $Head/Plate.get_node_or_null("Picture")
 	if picture != null and picture.visible:
 		var gap := 0.015
-		picture.offset = Vector2(-(name_width * 0.5 + gap + PICTURE * 0.5) / picture.pixel_size, 0.0)
+		var off_x := -(name_width * 0.5 + gap + PICTURE * 0.5)
+		picture.offset = Vector2(off_x / picture.pixel_size, 0.0)
+		var initial: Label3D = $Head/Plate.get_node_or_null("Initial")
+		if initial != null and initial.visible:
+			initial.offset = Vector2(off_x / initial.pixel_size, 0.0)
 	var words: Label3D = $Head/Plate.get_node_or_null("BadgeWords")
 	if words == null:
 		return

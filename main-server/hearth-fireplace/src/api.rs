@@ -1236,6 +1236,10 @@ async fn public_flames(State(state): State<Arc<Fireplace>>) -> Json<Value> {
 #[derive(serde::Deserialize)]
 struct Announce {
     name: String,
+    #[serde(default)]
+    description: String,
+    #[serde(default)]
+    banner: String,
     /// `host` or `host:port`; empty for the address this request came from.
     #[serde(default)]
     address: String,
@@ -1294,10 +1298,14 @@ async fn announce_flame(
         return Err(bad("that is not a port"));
     }
     let address = if host.contains(':') { format!("[{host}]:{port}") } else { format!("{host}:{port}") };
+    let description = body.description.trim().chars().take(500).collect::<String>();
+    let banner = body.banner.trim().chars().take(300).collect::<String>();
     tokio::spawn(async move {
         match flames::probe(&host, port).await {
             Ok(shown) if shown == certificate => state.flames.lock().unwrap().reached(flames::Listed {
                 name,
+                description,
+                banner,
                 address,
                 certificate,
                 players: body.players.min(u32::from(u16::MAX)),

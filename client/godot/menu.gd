@@ -337,6 +337,10 @@ func activate_at(local: Vector3) -> void:
 
 ## How tall a row is, from what it has.
 static func height_of(row: Dictionary) -> float:
+	if row.has("circle_picture") or row.get("circle", false):
+		return 0.38
+	if row.get("banner", false):
+		return 0.18
 	if row.has("picture"):
 		return PICTURE
 	if row.get("small", false):
@@ -473,8 +477,14 @@ func _build_row(i: int) -> Dictionary:
 	var left := -width * 0.5 + UiStyle.PAD
 	var right := width * 0.5 - UiStyle.PAD
 
+	if row.has("circle_picture") or (row.has("picture") and row.get("circle", false)):
+		_build_circle_picture(row, y)
+		return parts
 	if row.has("picture"):
 		_build_picture(row, y)
+		return parts
+	if row.get("banner", false):
+		_build_banner(row, y)
 		return parts
 	if row.get("button", false):
 		_build_button(row, y)
@@ -623,13 +633,22 @@ func _build_field(row: Dictionary, from: float, to: float, y: float) -> void:
 	var shown := _label(_field(row), UiStyle.FONT_SMALL, UiStyle.TEXT_DIM if empty else UiStyle.ACCENT)
 	shown.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	shown.position = Vector3(from + 0.03, y, 0.004)
-	UiStyle.fit(shown, size.x - 0.1)
+	var max_text_width := size.x - 0.1
+	var note_text: String = str(row.get("note", ""))
+	if note_text != "":
+		var note_label := _label(note_text, UiStyle.FONT_SMALL, UiStyle.TEXT_DIM)
+		note_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		note_label.position = Vector3(to - 0.03, y, 0.004)
+		_body.add_child(note_label)
+		max_text_width -= UiStyle.text_width(note_text, UiStyle.FONT_SMALL) + 0.04
+	UiStyle.fit(shown, maxf(0.1, max_text_width))
 	_body.add_child(shown)
 	if row.has("icon") and _text(row) == "":
 		return
-	var pen := UiStyle.icon("res://icons/chevron.svg", UiStyle.ICON * 0.55, UiStyle.TEXT_DIM, UiStyle.LAYER_TEXT + band)
-	pen.position = Vector3(to - 0.035, y, 0.004)
-	_body.add_child(pen)
+	if note_text == "":
+		var pen := UiStyle.icon("res://icons/chevron.svg", UiStyle.ICON * 0.55, UiStyle.TEXT_DIM, UiStyle.LAYER_TEXT + band)
+		pen.position = Vector3(to - 0.035, y, 0.004)
+		_body.add_child(pen)
 
 
 ## A small filled pill at the end of a row -- Join, Accept -- that says what
@@ -710,6 +729,73 @@ func _build_picture(row: Dictionary, y: float) -> void:
 	sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	sprite.position = Vector3(0, y, 0.004)
 	_body.add_child(sprite)
+
+
+## A stylized world banner card across the panel.
+func _build_banner(row: Dictionary, y: float) -> void:
+	var h: float = 0.165
+	var size := Vector2(width - UiStyle.PAD * 2.0, h)
+	var at := Vector3(0.0, y, 0.002)
+	_body.add_child(UiStyle.rounded(size, Color(UiStyle.INK_LIFT, 0.98), at,
+		UiStyle.LAYER_FILL + band, UiStyle.RADIUS, Color(UiStyle.ACCENT, 0.45), UiStyle.HAIRLINE * 1.5))
+	var left := -size.x * 0.5 + 0.04
+	var icon_name: String = str(row.get("icon", "res://icons/globe.svg"))
+	var chip_at := Vector3(left + 0.05, y, 0.003)
+	_body.add_child(UiStyle.circle(0.095, Color(UiStyle.ACCENT, 0.2), chip_at, UiStyle.LAYER_FILL + band))
+	var mark := UiStyle.icon(icon_name, 0.055, UiStyle.ACCENT, UiStyle.LAYER_TEXT + band)
+	mark.position = chip_at + Vector3(0.0, 0.0, 0.002)
+	_body.add_child(mark)
+	var text_x := left + 0.13
+	var label_text: String = str(row.get("label", ""))
+	var label := _label(label_text, UiStyle.FONT_BIG, UiStyle.TEXT)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	label.position = Vector3(text_x, y + 0.026, 0.004)
+	_body.add_child(label)
+	var sub_text: String = str(row.get("sub", ""))
+	if sub_text != "":
+		var sub := _label(sub_text, UiStyle.FONT_SMALL, UiStyle.TEXT_DIM)
+		sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		sub.position = Vector3(text_x, y - 0.026, 0.004)
+		_body.add_child(sub)
+	if row.has("action"):
+		_build_action(str(row["action"]), size.x * 0.5 - 0.03, y)
+	elif row.get("more", false):
+		var chevron := UiStyle.icon("res://icons/chevron.svg", UiStyle.ICON * 0.8, UiStyle.ACCENT, UiStyle.LAYER_TEXT + band)
+		chevron.position = Vector3(size.x * 0.5 - 0.04, y, 0.004)
+		_body.add_child(chevron)
+
+
+## A VRChat-inspired circular avatar picture with an accent glow ring.
+func _build_circle_picture(row: Dictionary, y: float) -> void:
+	var r := 0.17
+	var at := Vector3(0.0, y, 0.002)
+	var texture: Texture2D = row.get("circle_picture") if row.has("circle_picture") else row.get("picture") as Texture2D
+	_body.add_child(UiStyle.circle(r * 2.0 + 0.02, Color(UiStyle.ACCENT, 0.65), at, UiStyle.LAYER_FILL + band))
+	_body.add_child(UiStyle.circle(r * 2.0 + 0.012, UiStyle.INK, at + Vector3(0, 0, 0.001), UiStyle.LAYER_FILL + band))
+	if texture != null:
+		var img := texture.get_image()
+		var masked_texture := texture
+		if img != null:
+			var masked := img.duplicate()
+			FireplaceClient.circle_mask(masked)
+			masked_texture = ImageTexture.create_from_image(masked)
+		var sprite := Sprite3D.new()
+		sprite.texture = masked_texture
+		sprite.pixel_size = (r * 2.0) / maxf(1.0, float(masked_texture.get_height()))
+		sprite.no_depth_test = true
+		sprite.render_priority = UiStyle.LAYER_TEXT + band
+		sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+		sprite.position = at + Vector3(0, 0, 0.003)
+		_body.add_child(sprite)
+	else:
+		var who := str(row.get("avatar", "U"))
+		var col := UiStyle.avatar_colour(who)
+		_body.add_child(UiStyle.circle(r * 2.0, col, at + Vector3(0, 0, 0.002), UiStyle.LAYER_FILL + band))
+		var initial := _label(who.substr(0, 1).to_upper(), UiStyle.FONT_BIG, UiStyle.on(col))
+		initial.outline_size = 0
+		initial.pixel_size = UiStyle.PIXEL_BIG * 1.8
+		initial.position = at + Vector3(0, 0, 0.004)
+		_body.add_child(initial)
 
 
 ## The strip across the top: an icon and the page's name, a note at the

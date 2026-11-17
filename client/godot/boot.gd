@@ -24,7 +24,7 @@ const STRAY_ANGLE := 0.6
 
 var _asking := false
 var _xr: XRInterface
-var _xr_retry := 0.0
+var _xr_retry := 0.15
 ## Give up after this many tries. A machine with no headset should not spend
 ## the whole launcher re-initialising OpenXR once a second for ever.
 var _xr_tries := 12
@@ -240,6 +240,8 @@ func _on_chosen(id: String) -> void:
 
 func _pick(use_vr: bool) -> void:
 	Session.vr = use_vr
+	_asking = false
+	set_process(false)
 	if not use_vr:
 		# Picked the monitor with a headset already rendering: hand the
 		# viewport back and release the session, or the game draws to an HMD
@@ -247,6 +249,12 @@ func _pick(use_vr: bool) -> void:
 		get_viewport().use_xr = false
 		if _xr != null and _xr.is_initialized():
 			_xr.uninitialize()
+	if _origin != null and is_instance_valid(_origin):
+		_origin.queue_free()
+		_origin = null
+		_menu = null
+		_camera = null
+		_hands.clear()
 	_start()
 
 

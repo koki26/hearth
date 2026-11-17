@@ -19,3 +19,4 @@ graphify-out/
 # Leftovers from Godot replacing a loaded DLL, and Python bytecode
 *.TMP
 __pycache__/
+.impeccable/

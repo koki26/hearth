@@ -299,11 +299,33 @@ func picture(id: int, version: int) -> Texture2D:
 		var image := Image.new()
 		if result != HTTPRequest.RESULT_SUCCESS or code != 200 or image.load_jpg_from_buffer(body) != OK:
 			return
+		circle_mask(image)
 		var texture := ImageTexture.create_from_image(image)
 		_pictures[key] = texture
 		picture_ready.emit(id, texture))
 	http.request("%s/avatars/%d.jpg?v=%d" % [base_url(), id, version])
 	return null
+
+
+## Masks an image to a smooth anti-aliased circle.
+static func circle_mask(image: Image) -> void:
+	image.convert(Image.FORMAT_RGBA8)
+	var w := image.get_width()
+	var h := image.get_height()
+	var r := float(mini(w, h)) * 0.5
+	var cx := float(w) * 0.5
+	var cy := float(h) * 0.5
+	for y in h:
+		for x in w:
+			var dx := float(x) + 0.5 - cx
+			var dy := float(y) + 0.5 - cy
+			var dist := sqrt(dx * dx + dy * dy)
+			if dist > r:
+				image.set_pixel(x, y, Color(0, 0, 0, 0))
+			elif dist > r - 1.0:
+				var pixel := image.get_pixel(x, y)
+				pixel.a *= clampf(r - dist, 0.0, 1.0)
+				image.set_pixel(x, y, pixel)
 
 
 # --- the rows the menu draws --------------------------------------------------

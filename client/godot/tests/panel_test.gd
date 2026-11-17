@@ -234,13 +234,15 @@ func _keyboard_keys() -> void:
 	_check(not keys.hit(ray[0], ray[1]).is_empty(), "the keyboard is hittable")
 
 	# The top row is the digits, so the key under the far left of it is "1".
-	var top_left := keys.key_at(Vector3(-WorldKeyboard.KEY * 4.5, keys._top, 0.0))
+	var first_x: float = float(keys._grid[0][0]["x"])
+	var top_left := keys.key_at(Vector3(first_x, keys._top, 0.0))
 	_check(top_left == Vector2i(0, 0), "the first key is where it is drawn")
-	_check(keys.press_at(Vector3(-WorldKeyboard.KEY * 4.5, keys._top, 0.0)), "and can be pressed")
+	_check(keys.press_at(Vector3(first_x, keys._top, 0.0)), "and can be pressed")
 	_check(keys.text() == "1", "pressing it types it")
 
 	# Second row, second key: "w".
-	var w := Vector3(-WorldKeyboard.KEY * 3.5, keys._top - WorldKeyboard.KEY, 0.0)
+	var w_x: float = float(keys._grid[1][1]["x"])
+	var w := Vector3(w_x, keys._top - WorldKeyboard.KEY, 0.0)
 	_check(keys.key_at(w) == Vector2i(1, 1), "a key one row down and one across is found")
 	keys.press_at(w)
 	_check(keys.text() == "1w", "and types the right letter")

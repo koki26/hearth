@@ -51,11 +51,12 @@ pub fn esc(text: &str) -> String {
 
 // The account page's palette (web/style.css): night stone and firelight.
 const STYLE: &str = "
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap');
 :root{--bg:#0d1022;--fg:#e9ecf8;--muted:#8f97bd;--card:#171c3a;--line:#2a3160;--accent:#ffb366;--stone:#aec2ff;--on:#2a1404}
 @media (prefers-color-scheme:light){:root{--bg:#eceef5;--fg:#1a1f3a;--muted:#565d7c;--card:#fff;--line:#d3d8e6;--accent:#ad500f;--stone:#3d4f9c;--on:#fff}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.6 system-ui,-apple-system,'Segoe UI',sans-serif}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.6 'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI Variable Text','Segoe UI',system-ui,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
 main{max-width:40rem;margin:0 auto;padding:3rem 16px;animation:rise .5s cubic-bezier(.2,.7,.2,1) both}
-h1,h2{font-family:'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;font-weight:600}
+h1,h2{font-family:'Plus Jakarta Sans','Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-weight:700;letter-spacing:-.02em}
 h1{font-size:1.9rem;margin:0 0 1.5rem;display:flex;align-items:center;gap:12px}h1 img{width:40px;height:40px;flex:none;border-radius:10px}
 h2{font-size:1.15rem;margin:0 0 .5rem}section{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:1.2rem 1.4rem;margin:1rem 0}
 label{display:block;margin:.9rem 0 .3rem;font-size:.82rem;font-weight:500;color:var(--muted)}

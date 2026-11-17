@@ -26,6 +26,8 @@ const PROBE_TIMEOUT: Duration = Duration::from_secs(5);
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct Listed {
     pub name: String,
+    pub description: String,
+    pub banner: String,
     /// `host:port`, as a player types it.
     pub address: String,
     /// SHA-256 of its certificate, hex, as the Fireplace saw it.
@@ -163,6 +165,8 @@ mod tests {
     fn flame(cert: &str, players: u32, seen: u64) -> Listed {
         Listed {
             name: cert.into(),
+            description: String::new(),
+            banner: String::new(),
             address: "example.org:7777".into(),
             certificate: cert.into(),
             players,

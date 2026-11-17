@@ -1,9 +1,13 @@
 /* Night stone and firelight: the palette of the logo and the hub world. */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
+
 :root {
   --bg: #0d1022; --side: #121633; --panel: #171c3a; --raise: #1e2448; --line: #2a3160;
   --text: #e9ecf8; --dim: #8f97bd; --stone: #aec2ff; --fire: #ffb366; --ember: #ff7a2f;
   --on-fire: #2a1404; --red: #ff8a7d; --green: #74d8a0;
-  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --font-sans: "Outfit", -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Outfit", "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --serif: var(--font-display);
   --ease: cubic-bezier(.2, .7, .2, 1);
 }
 @media (prefers-color-scheme: light) {
@@ -16,17 +20,17 @@
 * { box-sizing: border-box; }
 html, body { height: 100%; }
 body { margin: 0; background: var(--bg); color: var(--text);
-       font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+       font: 15px/1.6 var(--font-sans); -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 [hidden] { display: none !important; }
 .sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
 a { color: var(--fire); text-decoration-thickness: 1px; text-underline-offset: 3px; }
-h1, h2 { font-family: var(--serif); font-weight: 600; letter-spacing: -.01em; }
+h1, h2 { font-family: var(--font-display); font-weight: 700; letter-spacing: -.02em; }
 h1 { font-size: 2rem; margin: 0; line-height: 1.15; }
 h2 { font-size: 1.15rem; margin: 0 0 12px; display: flex; align-items: center; gap: 10px; }
 
 .ic { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 5.5;
       stroke-linecap: round; stroke-linejoin: round; }
-.brand { display: flex; align-items: center; gap: 10px; font: 600 1.25rem var(--serif); }
+.brand { display: flex; align-items: center; gap: 10px; font: 700 1.25rem var(--font-display); letter-spacing: -.02em; }
 .brand-mark { width: 32px; height: 32px; border-radius: 8px; }
 
 /* --- fields and buttons --------------------------------------------------- */
@@ -116,10 +120,12 @@ textarea:focus { outline: none; border-color: var(--fire); box-shadow: 0 0 0 3px
 
 .auth-side { display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 48px 24px 24px; }
 .auth-card { width: 100%; max-width: 380px; animation: enter .7s .1s var(--ease) both; }
-.auth-card .brand { margin-bottom: 36px; }
-.auth-card h1 { margin-bottom: 22px; }
+.auth-card .brand { margin-bottom: 24px; }
+.auth-card h1 { margin-bottom: 16px; font-size: 1.6rem; }
+#new-only label { margin-top: 10px; }
+#new-only .note { margin-top: 4px; }
 .tabs { display: grid; grid-template-columns: 1fr 1fr; padding: 4px; border-radius: 12px; background: var(--side);
-        border: 1px solid var(--line); position: relative; margin-bottom: 6px; }
+        border: 1px solid var(--line); position: relative; margin-bottom: 18px; }
 .tabs::before { content: ""; position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc(50% - 4px);
                 border-radius: 9px; background: var(--raise); box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
                 transition: translate .35s var(--ease); }
@@ -128,8 +134,7 @@ textarea:focus { outline: none; border-color: var(--fire); box-shadow: 0 0 0 3px
 .tabs button[aria-selected="true"] { color: var(--text); }
 .tabs button:active { transform: none; }
 #new-only:not([hidden]) { animation: rise .3s var(--ease); }
-#new-only .note { margin-top: 6px; }
-.tick { display: flex; gap: 10px; align-items: flex-start; margin: 14px 0 0; color: var(--text); font-size: .88rem;
+.tick { display: flex; gap: 10px; align-items: flex-start; margin: 10px 0 0; color: var(--text); font-size: .88rem;
         font-weight: 400; line-height: 1.45; cursor: pointer; }
 .tick input { appearance: none; flex: none; width: 18px; height: 18px; margin: 1px 0 0; padding: 0; border-radius: 5px;
               border: 1.5px solid var(--dim); background: var(--bg); display: grid; place-items: center; cursor: pointer;
@@ -140,7 +145,8 @@ textarea:focus { outline: none; border-color: var(--fire); box-shadow: 0 0 0 3px
 .tick input:checked::after { scale: 1; }
 .tick input:focus-visible { outline: 2px solid var(--fire); outline-offset: 2px; box-shadow: none; }
 .tick small { display: block; color: var(--dim); font-size: .8rem; margin-top: 2px; }
-.auth-card .note { margin-top: 14px; }
+.auth-card .note { margin-top: 10px; }
+#auth-form button.main.wide { margin-top: 18px; }
 footer { display: flex; gap: 18px; justify-content: center; margin-top: 40px; font-size: .85rem; }
 footer a { color: var(--dim); text-decoration: none; }
 footer a:hover { color: var(--text); }
@@ -275,6 +281,17 @@ body[data-view="settings"] #confirm-banner { display: none; }
                     font-weight: 500; cursor: pointer; }
 button.quiet { background: transparent; border-style: dashed; color: var(--dim); margin-top: 4px; }
 button.quiet:hover { color: var(--text); }
+
+/* --- public Flame cards in the Servers list --------------------------------- */
+.flame-row { flex-direction: column; align-items: stretch; gap: 0; padding: 14px 0; }
+.flame-row:first-child { padding-top: 0; }
+.flame-row:last-child { padding-bottom: 0; }
+.flame-banner { width: 100%; max-height: 120px; object-fit: cover; border-radius: 8px; margin-bottom: 10px; display: block; }
+.flame-body { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.flame-body b { font-weight: 600; }
+.flame-body small { color: var(--dim); font-size: .82rem; }
+.flame-desc { margin: 4px 0 8px; font-size: .88rem; color: var(--dim); white-space: pre-wrap; overflow-wrap: anywhere; }
+.flame-row > button, .flame-row > div:last-child:not(.flame-body) { margin-top: 8px; align-self: flex-start; }
 
 /* --- pictures, banners, places, admin ------------------------------------------ */
 .visually-hidden { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; clip-path: inset(50%); }

@@ -91,6 +91,13 @@ pub struct Config {
     /// Whether people without an account may join. They play, but nothing a
     /// world stores for them is kept: saves belong to accounts.
     pub allow_guests: bool,
+    /// Explicit alias: requires players to have an account (overrides allow_guests).
+    #[serde(default)]
+    pub needs_account: Option<bool>,
+    /// Whether players must have an account on this specific Flame's Fireplace.
+    /// If false (default), players authenticated on another Fireplace fall back to guests.
+    #[serde(default)]
+    pub needs_same_fireplace: bool,
     /// The Fireplace whose accounts this Flame accepts. Empty for none, which
     /// leaves only guests.
     pub fireplace: String,
@@ -115,6 +122,8 @@ impl Default for Config {
             hub_world: "hub".into(),
             client_instancing: false,
             allow_guests: true,
+            needs_account: None,
+            needs_same_fireplace: false,
             fireplace: DEFAULT_FIREPLACE.into(),
             max_players: Limit::of(16),
             max_players_per_instance: Limit::NONE,
@@ -132,6 +141,10 @@ impl Config {
         Ok(config)
     }
 
+    pub fn allows_guests(&self) -> bool {
+        self.allow_guests && !self.needs_account.unwrap_or(false)
+    }
+
     /// What `parse` refuses, for settings that did not come from a file.
     pub fn check(&self) -> anyhow::Result<()> {
         if self.max_players == Limit::of(0) {
@@ -143,7 +156,7 @@ impl Config {
         if self.max_instances == Limit::of(0) {
             bail!("max_instances must be at least 1 (the hub), or -1 for no limit");
         }
-        if !self.allow_guests && self.fireplace.trim().is_empty() {
+        if !self.allows_guests() && self.fireplace.trim().is_empty() {
             bail!("with no fireplace and no guests, nobody could ever join");
         }
         hearth_protocol::validate_slug(&self.hub_world)
@@ -156,16 +169,19 @@ impl Config {
     pub fn to_toml(&self) -> String {
         format!(
             "port = {}\ndata_dir = {:?}\nworlds_dir = {:?}\nhub_world = {:?}\n\
-             allow_guests = {}\nfireplace = {:?}\nclient_instancing = {}\n\
+             allow_guests = {}\nneeds_account = {}\nneeds_same_fireplace = {}\n\
+             fireplace = {:?}\nclient_instancing = {}\n\
              # Limits: -1 means no limit.\nmax_players = {}\nmax_players_per_instance = {}\n\
              max_instances = {}\nmax_instances_per_player = {}\n\n\
              # Ask the Fireplace to list this Flame for everybody.\n\
-             [listing]\npublic = {}\nname = {:?}\naddress = {:?}\n",
+             [listing]\npublic = {}\nname = {:?}\ndescription = {:?}\nbanner = {:?}\nfireplace = {:?}\naddress = {:?}\n",
             self.port,
             self.data_dir.display().to_string(),
             self.worlds_dir().display().to_string(),
             self.hub_world,
-            self.allow_guests,
+            self.allows_guests(),
+            !self.allows_guests(),
+            self.needs_same_fireplace,
             self.fireplace,
             self.client_instancing,
             self.max_players.to_toml(),
@@ -174,6 +190,9 @@ impl Config {
             self.max_instances_per_player.to_toml(),
             self.listing.public,
             self.listing.name,
+            self.listing.description,
+            self.listing.banner,
+            self.listing.fireplace,
             self.listing.address,
         )
     }
@@ -481,6 +500,7 @@ pub struct Server {
     pub max_instances: Limit,
     pub max_instances_per_player: Limit,
     pub allow_guests: bool,
+    pub needs_same_fireplace: bool,
     client_instancing: AtomicBool,
     /// Checks the Fireplace tickets of people with accounts.
     pub tickets: Arc<ticket::Tickets>,
@@ -525,7 +545,8 @@ impl Server {
             max_instances: if config.max_instances == Limit::of(0) { Limit::of(1) } else { config.max_instances },
             max_instances_per_player: config.max_instances_per_player,
             // No Fireplace means nobody can have an account here.
-            allow_guests: config.allow_guests || !accounts,
+            allow_guests: config.allows_guests() || !accounts,
+            needs_same_fireplace: config.needs_same_fireplace,
             client_instancing: AtomicBool::new(config.client_instancing),
             tickets,
             accounts,
@@ -840,8 +861,14 @@ async fn handle_connection(incoming: quinn::Incoming, server: Arc<Server>) -> an
         match server.tickets.check(&ticket) {
             Ok(player) => (player.name, Some(player.id)),
             Err(why) => {
-                info!(%addr, %name, ?why, "rejected: bad join ticket");
-                return reject(&conn, send, RejectReason::BadTicket).await;
+                if !server.needs_same_fireplace && server.allow_guests {
+                    // Different fireplace or untrusted ticket: connect as guest
+                    info!(%addr, %name, ?why, "ticket not verified for this fireplace; connecting as guest");
+                    (name, None)
+                } else {
+                    info!(%addr, %name, ?why, "rejected: bad join ticket");
+                    return reject(&conn, send, RejectReason::BadTicket).await;
+                }
             }
         }
     };
@@ -1218,7 +1245,14 @@ mod tests {
         assert!(Config::parse("hub_world = \"Hub World\"").is_err());
         assert!(Config::parse("max_instances = 0").is_err());
         assert!(Config::parse("client_instancing = true").unwrap().client_instancing);
-        let listing = public::Listing { public: true, name: "Ada's".into(), address: "example.org".into() };
+        let listing = public::Listing {
+            public: true,
+            name: "Ada's".into(),
+            description: "Welcome".into(),
+            banner: "banner.png".into(),
+            fireplace: "https://fireplace.example.org".into(),
+            address: "example.org".into(),
+        };
         let listed = Config { listing, ..Config::default() };
         assert_eq!(Config::parse(&listed.to_toml()).unwrap().listing, listed.listing, "written and read back");
     }

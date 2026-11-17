@@ -33,25 +33,23 @@ const BAR := 0.1
 const HEADROOM := 0.54
 ## Held stick or arrow key: this many seconds between steps after the first.
 const REPEAT := 0.16
-const MAX_LENGTH := 64
+const DEFAULT_MAX_LENGTH := 64
 
-const LETTERS := [
-	"1234567890",
-	"qwertyuiop",
-	"asdfghjkl:",
-	"zxcvbnm.-_",
+const ROWS_LETTERS := [
+	["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "="],
+	["q", "w", "e", "r", "t", "y", "u", "i", "o", "p", "[", "]"],
+	["a", "s", "d", "f", "g", "h", "j", "k", "l", ";", "'", "\\"],
 ]
-## The bottom row. `width` is in key pitches; eight of these at 1.2 come to
-## the same width as a row of ten letters, so the panel does not grow.
+
+const ROW_BOTTOM_KEYS := ["z", "x", "c", "v", "b", "n", "m", ",", ".", "/"]
+
 const COMMANDS := [
-	{"label": "Shift", "value": "\tshift", "width": 1.2},
-	{"label": "Space", "value": "\tspace", "width": 1.2},
-	{"label": "Back", "value": "\tback", "width": 1.2},
 	{"label": "Clear", "value": "\tclear", "width": 1.2},
-	{"label": "Copy", "value": "\tcopy", "width": 1.2},
-	{"label": "Paste", "value": "\tpaste", "width": 1.2},
-	{"label": "Cancel", "value": "\tcancel", "width": 1.2},
-	{"label": "Done", "value": "\tdone", "width": 1.2},
+	{"label": "Copy", "value": "\tcopy", "width": 1.1},
+	{"label": "Paste", "value": "\tpaste", "width": 1.1},
+	{"label": "Space", "value": "\tspace", "width": 4.6},
+	{"label": "Cancel", "value": "\tcancel", "width": 1.5},
+	{"label": "Done", "value": "\tdone", "width": 2.5},
 ]
 
 var _grid: Array = []
@@ -60,7 +58,9 @@ var _col := 0
 var _text := ""
 var _title := ""
 var _shift := false
+var _caps := false
 var _repeat := 0.0
+var _max_length := DEFAULT_MAX_LENGTH
 var _highlight: MeshInstance3D
 ## The bright bar under the highlighted key.
 var _marker: MeshInstance3D
@@ -68,6 +68,7 @@ var _marker: MeshInstance3D
 ## two jobs, so they get two places rather than one run-on line.
 var _title_label: Label3D
 var _readout: Label3D
+var _counter_label: Label3D
 var _labels: Array = []
 ## The y of the top row of keys, which the key lookup measures from.
 var _top := 0.0
@@ -92,10 +93,12 @@ func has_keys() -> bool:
 ## `secret` masks what is typed in the readout -- the keys, the panel and the
 ## person standing next to you all see dots. `text()` still hands back what
 ## was really typed.
-func open(title: String, text: String, with_keys := true, secret := false) -> void:
+func open(title: String, text: String, with_keys := true, secret := false, max_len := DEFAULT_MAX_LENGTH) -> void:
 	_title = title
-	_text = text.substr(0, MAX_LENGTH)
+	_max_length = max_len
+	_text = text.substr(0, _max_length)
 	_shift = false
+	_caps = false
 	_row = 0
 	_col = 0
 	_repeat = 0.0
@@ -115,6 +118,7 @@ func close() -> void:
 	_highlight = null
 	_marker = null
 	_readout = null
+	_counter_label = null
 	_title_label = null
 	_width = 0.0
 	_height = 0.0
@@ -192,9 +196,7 @@ func press() -> void:
 	var value := str(_grid[_row][_col]["value"])
 	if not value.begins_with("\t"):
 		type(_shift_applied(value))
-		# Shift is for one character, like a phone: nobody wants to turn it off
-		# again after every capital.
-		if _shift:
+		if _shift and not _caps:
 			_shift = false
 			_relabel()
 		return
@@ -202,6 +204,12 @@ func press() -> void:
 		"\tshift":
 			_shift = not _shift
 			_relabel()
+		"\tcaps":
+			_caps = not _caps
+			_shift = _caps
+			_relabel()
+		"\ttab":
+			type("  ")
 		"\tspace":
 			type(" ")
 		"\tback":
@@ -227,7 +235,7 @@ func accept() -> void:
 
 
 func type(character: String) -> void:
-	if not is_open() or _text.length() >= MAX_LENGTH:
+	if not is_open() or _text.length() >= _max_length:
 		return
 	_text += character
 	_refresh()
@@ -246,7 +254,7 @@ func copy() -> void:
 func paste() -> void:
 	if not is_open():
 		return
-	var room := MAX_LENGTH - _text.length()
+	var room := _max_length - _text.length()
 	if room <= 0:
 		return
 	_text += clean_paste(DisplayServer.clipboard_get(), room)
@@ -275,7 +283,18 @@ func backspace() -> void:
 
 
 func _shift_applied(value: String) -> String:
-	return value.to_upper() if _shift else value
+	const PAIRS := {
+		"1": "!", "2": "@", "3": "#", "4": "$", "5": "%",
+		"6": "^", "7": "&", "8": "*", "9": "(", "0": ")",
+		"-": "_", "=": "+", "[": "{", "]": "}", ";": ":",
+		"'": "\"", "\\": "|", ",": "<", ".": ">", "/": "?",
+		"`": "~",
+	}
+	if _shift:
+		if PAIRS.has(value):
+			return PAIRS[value]
+		return value.to_upper()
+	return value
 
 
 func _refresh() -> void:
@@ -283,6 +302,8 @@ func _refresh() -> void:
 		_title_label.text = _title
 	if _readout != null:
 		_readout.text = ("*".repeat(_text.length()) if _secret else _text) + "_"
+	if _counter_label != null:
+		_counter_label.text = "%d / %d" % [_text.length(), _max_length]
 
 
 ## Redraws the letters when shift changes, without rebuilding the grid.
@@ -291,7 +312,7 @@ func _relabel() -> void:
 		var key: Dictionary = _labels[i]["key"]
 		var value := str(key["value"])
 		if value.begins_with("\t"):
-			if value == "\tshift":
+			if value == "\tshift" or value == "\tcaps":
 				_labels[i]["node"].modulate = UiStyle.ACCENT if _shift else UiStyle.TEXT
 			continue
 		_labels[i]["node"].text = _shift_applied(value)
@@ -307,12 +328,48 @@ func _build() -> void:
 	if not _keys_shown:
 		_build_line()
 		return
-	for line: String in LETTERS:
-		var row: Array = []
-		for i in line.length():
-			row.append({"label": line[i], "value": line[i], "width": 1.0})
-		_grid.append(row)
-	_grid.append(COMMANDS.duplicate(true))
+
+	# SteamVR-style layout: wide, dual shift keys, numbers, and all symbols
+	# Row 0: 1 2 3 4 5 6 7 8 9 0 - = ` Back
+	var r0: Array = []
+	for k: String in ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "=", "`"]:
+		r0.append({"label": k, "value": k, "width": 1.0})
+	r0.append({"label": "Back", "value": "\tback", "width": 1.5})
+	_grid.append(r0)
+
+	# Row 1: q w e r t y u i o p [ ] \
+	var r1: Array = []
+	for k: String in ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p", "[", "]"]:
+		r1.append({"label": k, "value": k, "width": 1.0})
+	r1.append({"label": "\\", "value": "\\", "width": 1.5})
+	_grid.append(r1)
+
+	# Row 2: a s d f g h j k l ; ' Enter
+	var r2: Array = []
+	for k: String in ["a", "s", "d", "f", "g", "h", "j", "k", "l", ";", "'"]:
+		r2.append({"label": k, "value": k, "width": 1.0})
+	r2.append({"label": "Enter", "value": "\tdone", "width": 2.5})
+	_grid.append(r2)
+
+	# Row 3: Left Shift, z x c v b n m , . /, Right Shift
+	var r3: Array = []
+	r3.append({"label": "Shift", "value": "\tshift", "width": 1.8})
+	for k: String in ["z", "x", "c", "v", "b", "n", "m", ",", ".", "/"]:
+		r3.append({"label": k, "value": k, "width": 1.0})
+	r3.append({"label": "Shift", "value": "\tshift", "width": 1.8})
+	_grid.append(r3)
+
+	# Row 4: Controls, Tab & Space
+	var r4: Array = [
+		{"label": "Clear", "value": "\tclear", "width": 1.2},
+		{"label": "Copy", "value": "\tcopy", "width": 1.1},
+		{"label": "Paste", "value": "\tpaste", "width": 1.1},
+		{"label": "Tab", "value": "\ttab", "width": 1.1},
+		{"label": "Space", "value": "\tspace", "width": 5.0},
+		{"label": "Cancel", "value": "\tcancel", "width": 1.5},
+		{"label": "Done", "value": "\tdone", "width": 2.5},
+	]
+	_grid.append(r4)
 
 	var widest := 0.0
 	for row: Array in _grid:
@@ -328,19 +385,24 @@ func _build() -> void:
 
 	_frame(_width, _height)
 
-	# The handle: a pill along the top edge, the way a sheet you can drag says
-	# so on a phone. The whole strip under it is what you grab.
+	# The handle: a pill along the top edge
 	add_child(UiStyle.rounded(Vector2(0.2, 0.014), Color(UiStyle.EDGE_BRIGHT, 0.55),
 		Vector3(0.0, _height * 0.5 - BAR * 0.45, 0.004), UiStyle.LAYER_EDGE + band, 0.007))
-	# The readout sits in a sunken field, so it reads as the thing being typed
-	# into rather than as a caption.
+	# The readout sits in a sunken field
 	add_child(UiStyle.rounded(Vector2(_width - 0.16, 0.13), UiStyle.BACKDROP,
 		Vector3(0.0, _height * 0.5 - 0.29, 0.002), UiStyle.LAYER_FILL + band, UiStyle.RADIUS_SMALL,
 		UiStyle.EDGE, UiStyle.HAIRLINE))
 
 	_title_label = _label("", UiStyle.FONT_SMALL, UiStyle.TEXT_DIM)
-	_title_label.position = Vector3(0.0, _height * 0.5 - 0.17, 0.004)
+	_title_label.position = Vector3(-_width * 0.5 + 0.14, _height * 0.5 - 0.17, 0.004)
+	_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	add_child(_title_label)
+
+	_counter_label = _label("", UiStyle.FONT_SMALL, UiStyle.TEXT_DIM)
+	_counter_label.position = Vector3(_width * 0.5 - 0.14, _height * 0.5 - 0.17, 0.004)
+	_counter_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	add_child(_counter_label)
+
 	_readout = _label("", UiStyle.FONT, UiStyle.ACCENT)
 	_readout.position = Vector3(0.0, _height * 0.5 - 0.29, 0.004)
 	add_child(_readout)
@@ -395,8 +457,14 @@ func _build_line() -> void:
 	_frame(width, height)
 
 	_title_label = _label("", UiStyle.FONT_SMALL, UiStyle.TEXT_DIM)
-	_title_label.position = Vector3(0.0, 0.14, 0.004)
+	_title_label.position = Vector3(-width * 0.5 + 0.14, 0.14, 0.004)
+	_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	add_child(_title_label)
+
+	_counter_label = _label("", UiStyle.FONT_SMALL, UiStyle.TEXT_DIM)
+	_counter_label.position = Vector3(width * 0.5 - 0.14, 0.14, 0.004)
+	_counter_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	add_child(_counter_label)
 
 	_readout = _label("", UiStyle.FONT_BIG, UiStyle.ACCENT)
 	_readout.pixel_size = UiStyle.PIXEL_BIG

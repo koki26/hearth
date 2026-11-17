@@ -22,17 +22,30 @@ pub struct Listing {
     pub public: bool,
     /// What the list calls this Flame. Empty: the hub world's name.
     pub name: String,
+    /// A short description of the server or world shown on public listings.
+    pub description: String,
+    /// A banner image URL or path shown on public listings.
+    pub banner: String,
+    /// Optional Fireplace to publish this Flame to (defaults to the server's accounts Fireplace if empty).
+    pub fireplace: String,
     /// `host` or `host:port` players should use, when it is not the address
     /// the Fireplace sees the request come from (a domain name, a forward).
     pub address: String,
 }
 
 pub fn announce(server: &Arc<Server>, fireplace: &str, listing: &Listing, port: u16, hub: &str) {
-    if !listing.public || fireplace.trim().is_empty() {
+    let target_fireplace = if !listing.fireplace.trim().is_empty() {
+        listing.fireplace.trim()
+    } else {
+        fireplace.trim()
+    };
+    if !listing.public || target_fireplace.is_empty() {
         return;
     }
-    let url = format!("{}/flames/announce", fireplace.trim().trim_end_matches('/'));
+    let url = format!("{}/flames/announce", target_fireplace.trim_end_matches('/'));
     let name = if listing.name.trim().is_empty() { hub.to_owned() } else { listing.name.trim().to_owned() };
+    let description = listing.description.trim().to_owned();
+    let banner = listing.banner.trim().to_owned();
     let address = listing.address.trim().to_owned();
     let server: Weak<Server> = Arc::downgrade(server);
     std::thread::spawn(move || {
@@ -41,6 +54,8 @@ pub fn announce(server: &Arc<Server>, fireplace: &str, listing: &Listing, port: 
         while let Some(server) = server.upgrade() {
             let body = serde_json::json!({
                 "name": name,
+                "description": description,
+                "banner": banner,
                 "address": address,
                 "port": port,
                 "certificate": server.tickets.certificate(),

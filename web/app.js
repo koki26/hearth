@@ -690,12 +690,21 @@ async function loadReview() {
 // --- public Flames ---------------------------------------------------------------
 
 function flameRow(f, extra) {
-  const li = el("li");
-  const text = el("div");
+  const li = el("li", "flame-row");
+  if (f.banner) {
+    const img = el("img", "flame-banner");
+    img.src = f.banner;
+    img.alt = "";
+    img.onerror = () => img.remove();
+    li.append(img);
+  }
+  const body = el("div", "flame-body");
   const name = el("b", null, f.name);
-  text.append(name, el("small", null, f.address + " · " + f.players + (f.max_players == null ? "" : " / " + f.max_players)
-    + " playing" + (f.guests ? " · guests welcome" : " · account needed")));
-  li.append(text);
+  const meta = el("small", null, f.address + " · " + f.players + (f.max_players == null ? "" : " / " + f.max_players)
+    + " playing" + (f.guests ? " · guests welcome" : " · account needed"));
+  body.append(name, meta);
+  if (f.description) body.append(el("p", "flame-desc", f.description));
+  li.append(body);
   if (extra) li.append(extra);
   return li;
 }

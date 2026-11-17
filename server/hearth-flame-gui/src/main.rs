@@ -59,6 +59,7 @@ struct App {
     hub_world: String,
     client_instancing: bool,
     allow_guests: bool,
+    needs_same_fireplace: bool,
     fireplace: String,
     listing: hearth_flame::public::Listing,
     max_players: Limit,
@@ -97,6 +98,7 @@ impl App {
             hub_world: config.hub_world,
             client_instancing: config.client_instancing,
             allow_guests: config.allow_guests,
+            needs_same_fireplace: config.needs_same_fireplace,
             fireplace: config.fireplace,
             listing: config.listing,
             max_players: config.max_players,
@@ -121,6 +123,8 @@ impl App {
             hub_world: self.hub_world.clone(),
             client_instancing: self.client_instancing,
             allow_guests: self.allow_guests,
+            needs_account: Some(!self.allow_guests),
+            needs_same_fireplace: self.needs_same_fireplace,
             fireplace: self.fireplace.trim().to_owned(),
             max_players: self.max_players,
             max_players_per_instance: self.max_players_per_instance,
@@ -422,18 +426,32 @@ impl eframe::App for App {
                 ui.label("Hub world");
                 ui.text_edit_singleline(&mut self.hub_world);
                 ui.end_row();
-                ui.label("Accounts from");
-                ui.add(egui::TextEdit::singleline(&mut self.fireplace).hint_text("no accounts, guests only"));
+                ui.label("Accounts Fireplace");
+                ui.add(egui::TextEdit::singleline(&mut self.fireplace).hint_text("https://fireplace... (or blank for guests only)"));
                 ui.end_row();
                 ui.label("");
-                ui.checkbox(&mut self.allow_guests, "Let people in without an account (they get no saves)");
+                ui.checkbox(&mut self.allow_guests, "Allow guests (no account required, no saves kept)");
+                ui.end_row();
+                ui.label("");
+                ui.checkbox(&mut self.needs_same_fireplace, "Require account from this specific Fireplace (otherwise guests)");
                 ui.end_row();
                 ui.label("");
                 ui.checkbox(&mut self.listing.public, "List this Flame publicly on the Fireplace");
                 ui.end_row();
-                ui.label("Public name");
-                ui.add(egui::TextEdit::singleline(&mut self.listing.name).hint_text("the hub world's name"));
-                ui.end_row();
+                if self.listing.public {
+                    ui.label("Publish to");
+                    ui.add(egui::TextEdit::singleline(&mut self.listing.fireplace).hint_text("leave blank to use Accounts Fireplace"));
+                    ui.end_row();
+                    ui.label("Public name");
+                    ui.add(egui::TextEdit::singleline(&mut self.listing.name).hint_text("the hub world's name"));
+                    ui.end_row();
+                    ui.label("Description");
+                    ui.add(egui::TextEdit::singleline(&mut self.listing.description).hint_text("short summary of this server"));
+                    ui.end_row();
+                    ui.label("Banner URL");
+                    ui.add(egui::TextEdit::singleline(&mut self.listing.banner).hint_text("https://... or banner.png"));
+                    ui.end_row();
+                }
             });
             ui.add_space(6.0);
             ui.label("Limits");
