@@ -10,7 +10,7 @@ use std::sync::Arc;
 use axum::Router;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use hearth_fireplace::{Config, Fireplace, api, limit, mail, pages, token};
+use hearth_fireplace::{Config, Fireplace, Moderation, api, limit, mail, pages, token};
 use serde_json::{Value, json};
 use tower::ServiceExt;
 
@@ -1046,7 +1046,15 @@ async fn upload(app: &Router, access: &str, bytes: Vec<u8>) -> (StatusCode, Valu
 
 #[tokio::test]
 async fn a_picture_is_redrawn_small_and_anything_else_is_refused() {
-    let (app, state) = fireplace_state("avatar");
+    let dir = std::env::temp_dir().join(format!("hearth-fireplace-api-{}-avatar", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let config = Config {
+        data_dir: dir.clone(),
+        moderation: Moderation { review_pictures: true, ..Moderation::default() },
+        ..Config::default()
+    };
+    let state = std::sync::Arc::new(Fireplace::open(&config).unwrap());
+    let app = api::router(state.clone());
     let dir = state.config.data_dir.clone();
     let root = join(&app, "root").await;
     claim(&app, &state, "root").await;

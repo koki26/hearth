@@ -251,7 +251,7 @@ pub struct Group {
 
 /// Everything a group can be allowed. The owner has all of them, and alone
 /// manages groups.
-pub const PERMS: &[&str] = &["view", "ban", "delete", "sign_out", "moderate", "review", "flames"];
+pub const PERMS: &[&str] = &["view", "ban", "delete", "sign_out", "moderate", "review", "reports", "flames"];
 const MAX_GROUPS: usize = 20;
 pub const MAX_PRONOUNS: usize = 24;
 pub const MAX_BIO: usize = 300;

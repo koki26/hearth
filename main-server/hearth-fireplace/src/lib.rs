@@ -31,6 +31,7 @@ pub mod limit;
 pub mod mail;
 pub mod pages;
 pub mod presence;
+pub mod reports;
 pub mod token;
 pub mod words;
 
@@ -81,7 +82,8 @@ pub struct Config {
 #[serde(deny_unknown_fields, default)]
 pub struct Moderation {
     /// New pictures wait for somebody with the `review` permission before
-    /// anybody else sees them.
+    /// anybody else sees them. Off: they show at once, and players report
+    /// what should not be there.
     pub review_pictures: bool,
     /// A command run as `<command> <picture.jpg>` on every upload, e.g. a
     /// local NSFW classifier; a non-zero exit refuses the picture. Empty for
@@ -91,7 +93,7 @@ pub struct Moderation {
 
 impl Default for Moderation {
     fn default() -> Self {
-        Self { review_pictures: true, picture_check: String::new() }
+        Self { review_pictures: false, picture_check: String::new() }
     }
 }
 
@@ -163,6 +165,7 @@ pub struct Fireplace {
     pub codes: Mutex<codes::Codes>,
     pub limits: Mutex<limit::Limiter>,
     pub flames: Mutex<flames::Flames>,
+    pub reports: Mutex<reports::Reports>,
     pub words: words::Words,
     pub keys: token::Keys,
     pub max_accounts: usize,
@@ -221,6 +224,7 @@ impl Fireplace {
             codes: Mutex::new(codes::Codes::default()),
             limits: Mutex::new(limit::Limiter::default()),
             flames: Mutex::new(flames::Flames::default()),
+            reports: Mutex::new(reports::Reports::open(&config.data_dir)?),
             words: words::Words::open(&config.data_dir),
             keys: token::Keys::open(&config.data_dir)?,
             max_accounts: config.max_accounts,

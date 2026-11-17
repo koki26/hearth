@@ -78,6 +78,9 @@ pub fn router(state: Arc<Fireplace>) -> Router {
         .route("/admin/pictures", get(admin_pictures))
         .route("/admin/pictures/decide", post(admin_decide_picture))
         .route("/admin/pictures/{file}", get(admin_picture_file))
+        .route("/reports", post(file_report))
+        .route("/admin/reports", get(admin_reports))
+        .route("/admin/reports/resolve", post(admin_resolve_report))
         .route("/admin/flames/hide", post(admin_hide_flame))
         .route("/admin/flames/unhide", post(admin_unhide_flame))
         .route("/me/profile", post(set_profile))
@@ -341,6 +344,7 @@ async fn features(State(state): State<Arc<Fireplace>>) -> Json<Value> {
         "min_age": state.config.operator.min_age,
         "email_required": state.mail.enabled(),
         "renames": accounts::RENAMES,
+        "report_reasons": crate::reports::REASONS.iter().map(|(id, label)| json!({ "id": id, "label": label })).collect::<Vec<_>>(),
     }))
 }
 
@@ -677,6 +681,9 @@ async fn export(State(state): State<Arc<Fireplace>>, headers: HeaderMap) -> Resu
         "display_name_changes": account.renamed,
         "picture": (account.avatar > 0).then(|| format!("/avatars/{}.jpg", account.id)),
         "picture_waiting_for_review": account.avatar_pending > 0,
+        "reports_filed": state.reports.lock().unwrap().filed_by(id).iter()
+            .map(|r| json!({ "about": accounts.get(r.target).map(|a| &a.handle), "reason": r.reason, "details": r.details, "at": r.at }))
+            .collect::<Vec<_>>(),
         "pronouns": account.pronouns,
         "bio": account.bio,
         "owner": account.owner,
@@ -912,6 +919,7 @@ async fn delete_account(
     }
     state.accounts.lock().unwrap().delete(id)?;
     state.presence.lock().unwrap().clear(id);
+    state.reports.lock().unwrap().forget(id);
     avatar::remove(&state.config.data_dir, id);
     tracing::info!(id, %handle, "deleted their account");
     Ok(StatusCode::NO_CONTENT)
@@ -1339,7 +1347,7 @@ async fn avatar_file(State(state): State<Arc<Fireplace>>, Path(file): Path<Strin
 
 /// The asker, if they may do `perm`, or 403.
 fn admin_of(state: &Fireplace, headers: &HeaderMap, perm: &str) -> Result<(u64, String), ApiError> {
-    let id = signed_in(state, headers)?;
+    let id = staff(state, headers)?;
     let accounts = state.accounts.lock().unwrap();
     match accounts.get(id) {
         Some(account) if accounts.can(id, perm) => Ok((id, account.handle.clone())),
@@ -1348,12 +1356,30 @@ fn admin_of(state: &Fireplace, headers: &HeaderMap, perm: &str) -> Result<(u64, 
 }
 
 fn owner_of(state: &Fireplace, headers: &HeaderMap) -> Result<u64, ApiError> {
-    let id = signed_in(state, headers)?;
+    let id = staff(state, headers)?;
     if state.accounts.lock().unwrap().get(id).is_some_and(|a| a.owner) {
         Ok(id)
     } else {
         Err(ApiError::new(StatusCode::FORBIDDEN, "only the Fireplace owner can do that"))
     }
+}
+
+/// The owner or somebody in a group, signed in with two steps. A stolen
+/// password alone must not be a stolen admin. Where this Fireplace sends no
+/// email there is no second step to have, so it is not asked for.
+fn staff(state: &Fireplace, headers: &HeaderMap) -> Result<u64, ApiError> {
+    let id = signed_in(state, headers)?;
+    let accounts = state.accounts.lock().unwrap();
+    if accounts.rank(id) == 0 {
+        return Err(ApiError::new(StatusCode::FORBIDDEN, "you are not allowed to do that here"));
+    }
+    if state.mail.enabled() && !accounts.get(id).is_some_and(|a| a.two_factor) {
+        return Err(ApiError::new(
+            StatusCode::FORBIDDEN,
+            "turn on two-step sign-in on the Security page first: admin tools need it",
+        ));
+    }
+    Ok(id)
 }
 
 /// Another account, by handle, ranked below the asker. Their own account
@@ -1549,6 +1575,7 @@ async fn admin_delete(
     let id = target(&state, me, &body.handle)?;
     state.accounts.lock().unwrap().delete(id)?;
     state.presence.lock().unwrap().clear(id);
+    state.reports.lock().unwrap().forget(id);
     avatar::remove(&state.config.data_dir, id);
     tracing::info!(admin = me, target = id, "deleted an account");
     Ok(StatusCode::NO_CONTENT)
@@ -1568,11 +1595,8 @@ async fn admin_sign_out(
 
 /// The groups, and every permission there is, for anybody in one.
 async fn admin_groups(State(state): State<Arc<Fireplace>>, headers: HeaderMap) -> Result<Json<Value>, ApiError> {
-    let id = signed_in(&state, &headers)?;
+    staff(&state, &headers)?;
     let accounts = state.accounts.lock().unwrap();
-    if accounts.rank(id) == 0 {
-        return Err(ApiError::new(StatusCode::FORBIDDEN, "you are not allowed to do that here"));
-    }
     Ok(Json(json!({ "groups": accounts.groups(), "perms": accounts::PERMS })))
 }
 
@@ -1912,4 +1936,86 @@ async fn end_session(
     };
     tracing::info!(id, ended, "ended sessions");
     Ok(Json(json!({ "ended": ended })))
+}
+
+// --- reports ----------------------------------------------------------------------
+
+/// Reports one account may file in an hour.
+const REPORTS_PER_HOUR: u32 = 20;
+
+#[derive(serde::Deserialize)]
+struct NewReport {
+    handle: String,
+    reason: String,
+    #[serde(default)]
+    details: String,
+}
+
+async fn file_report(
+    State(state): State<Arc<Fireplace>>,
+    headers: HeaderMap,
+    Json(body): Json<NewReport>,
+) -> Result<StatusCode, ApiError> {
+    let id = signed_in(&state, &headers)?;
+    let now = token::now();
+    if !state.limits.lock().unwrap().allow(&format!("report@{id}"), REPORTS_PER_HOUR, limit::HOUR, now) {
+        return Err(too_many("that is a lot of reports: the ones you sent are being looked at"));
+    }
+    let target = state.accounts.lock().unwrap().by_handle(body.handle.trim()).map(|a| a.id).ok_or(Refused::NoSuchAccount)?;
+    if target == id {
+        return Err(Refused::Yourself.into());
+    }
+    use crate::reports::Refused as Why;
+    match state.reports.lock().unwrap().file(id, target, &body.reason, &body.details, now) {
+        Ok(report) => {
+            tracing::info!(report, reporter = id, target, reason = %body.reason, "a report");
+            Ok(StatusCode::CREATED)
+        }
+        Err(Why::BadReason) => Err(bad("pick one of the reasons")),
+        Err(Why::TooLong) => Err(bad("details are up to 500 characters")),
+        // Said already: as good as taken, and no reason to tell them apart.
+        Err(Why::AlreadyReported) => Ok(StatusCode::CREATED),
+        Err(Why::Full) => Err(ApiError::new(StatusCode::SERVICE_UNAVAILABLE, "reports are full: try again later")),
+    }
+}
+
+/// Everything waiting, oldest first, with who about whom.
+async fn admin_reports(State(state): State<Arc<Fireplace>>, headers: HeaderMap) -> Result<Json<Value>, ApiError> {
+    admin_of(&state, &headers, "reports")?;
+    let accounts = state.accounts.lock().unwrap();
+    let reports = state.reports.lock().unwrap();
+    let who = |id: u64| accounts.get(id).map(profile_json).unwrap_or(Value::Null);
+    let label = |reason: &str| {
+        crate::reports::REASONS.iter().find(|(id, _)| *id == reason).map_or(reason.to_owned(), |(_, l)| (*l).to_owned())
+    };
+    Ok(Json(json!(reports
+        .open_reports()
+        .iter()
+        .map(|r| json!({
+            "id": r.id,
+            "reason": r.reason,
+            "reason_label": label(&r.reason),
+            "details": r.details,
+            "at": r.at,
+            "reporter": who(r.reporter),
+            "target": who(r.target),
+        }))
+        .collect::<Vec<_>>())))
+}
+
+#[derive(serde::Deserialize)]
+struct Resolve {
+    id: u64,
+}
+
+/// Dealt with (or nothing to do): the report is deleted.
+async fn admin_resolve_report(
+    State(state): State<Arc<Fireplace>>,
+    headers: HeaderMap,
+    Json(body): Json<Resolve>,
+) -> Result<StatusCode, ApiError> {
+    let (me, _) = admin_of(&state, &headers, "reports")?;
+    let report = state.reports.lock().unwrap().resolve(body.id).ok_or(Refused::NoSuchAccount)?;
+    tracing::info!(admin = me, report = report.id, target = report.target, "closed a report");
+    Ok(StatusCode::NO_CONTENT)
 }

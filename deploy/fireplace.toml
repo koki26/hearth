@@ -77,7 +77,8 @@ backup_days = 14
 
 # --- What happens to pictures before anybody else sees them -----------------
 [moderation]
-# New pictures wait for somebody with the `review` permission.
-review_pictures = true
+# New pictures wait for somebody with the `review` permission. Off: they show
+# at once, and players report anything that should not be there.
+review_pictures = false
 # Run as `<command> <picture.jpg>` on every upload; a non-zero exit refuses it.
 picture_check = ""
