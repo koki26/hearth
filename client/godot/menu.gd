@@ -203,7 +203,7 @@ func move(by: int) -> void:
 
 ## Left or right on the picked row: only sliders care.
 func nudge(by: int) -> void:
-	if not is_open():
+	if not is_open() or _rows.is_empty() or _pick < 0 or _pick >= _rows.size():
 		return
 	var row: Dictionary = _rows[_pick]
 	if not row.has("value"):
@@ -214,7 +214,7 @@ func nudge(by: int) -> void:
 
 
 func activate() -> void:
-	if not is_open():
+	if not is_open() or _rows.is_empty() or _pick < 0 or _pick >= _rows.size():
 		return
 	var row: Dictionary = _rows[_pick]
 	if not row.has("id"):
@@ -870,7 +870,11 @@ func _build_tabs(height: float) -> void:
 
 
 func _place_highlight() -> void:
-	if _highlight == null or _rows.is_empty():
+	if _highlight == null or _rows.is_empty() or _pick < 0 or _pick >= _rows.size() or _pick >= _row_y.size() or _pick >= _row_h.size():
+		if _highlight != null:
+			_highlight.visible = false
+		if _marker != null:
+			_marker.visible = false
 		return
 	var show: bool = _focused and _rows[_pick].has("id") and not _rows[_pick].get("button", false)
 	_highlight.visible = show

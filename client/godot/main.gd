@@ -704,10 +704,12 @@ func _join() -> void:
 func _on_panel_chosen(id: String) -> void:
 	_audio.play("click")
 	if id.begins_with("flame:"):
-		var flame: Dictionary = _fireplace.flames[int(id.substr(6))]
-		if not _connecting:
-			_details.address = str(flame.get("address", ""))
-			_join()
+		var idx := int(id.substr(6))
+		if idx >= 0 and idx < _fireplace.flames.size():
+			var flame: Dictionary = _fireplace.flames[idx]
+			if not _connecting:
+				_details.address = str(flame.get("address", ""))
+				_join()
 		return
 	match id:
 		"flames_refresh":
@@ -1196,10 +1198,11 @@ func _failed(reason: String) -> void:
 func _enter_vr() -> bool:
 	if _in_vr:
 		return true
+	if _xr == null:
+		_xr = XRServer.find_interface("OpenXR")
 	if _xr == null or (not _xr.is_initialized() and not _xr.initialize()):
 		return false
 	get_viewport().use_xr = true
-	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
 	# Flat and level: from here the headset drives it.
 	$XROrigin3D/Camera.transform = Transform3D.IDENTITY
 	_in_vr = true
@@ -1429,8 +1432,14 @@ func _face(ui: Node3D, at: Vector3) -> void:
 		away.y = 0.0
 	else:
 		away.y = clampf(away.y, -0.9, 0.9)
-	away = away.normalized() if away.length() > 0.01 else Vector3.FORWARD
-	ui.global_transform = Transform3D(Basis.IDENTITY, at).looking_at(at + away, Vector3.UP)
+	if is_zero_approx(away.x) and is_zero_approx(away.z):
+		away = Vector3.FORWARD
+	else:
+		away = away.normalized()
+	var up := Vector3.UP
+	if absf(away.dot(up)) > 0.99:
+		up = Vector3.BACK
+	ui.global_transform = Transform3D(Basis.IDENTITY, at).looking_at(at + away, up)
 
 
 ## The mouse points at panels while one is up and looks around when none is.

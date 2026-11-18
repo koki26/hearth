@@ -229,157 +229,162 @@ layout_mode = 2
 custom_minimum_size = Vector2(0, 44)
 theme_override_styles/panel = SubResource("sb_toolbar")
 
-[node name="ToolbarMargin" type="MarginContainer" parent="UI/RootLayout/Toolbar"]
+[node name="ToolbarScroll" type="ScrollContainer" parent="UI/RootLayout/Toolbar"]
+layout_mode = 2
+size_flags_horizontal = 3
+vertical_scroll_mode = 0
+
+[node name="ToolbarMargin" type="MarginContainer" parent="UI/RootLayout/Toolbar/ToolbarScroll"]
 layout_mode = 2
 theme_override_constants/margin_left = 8
 theme_override_constants/margin_right = 8
 theme_override_constants/margin_top = 4
 theme_override_constants/margin_bottom = 4
 
-[node name="ToolbarRow" type="HBoxContainer" parent="UI/RootLayout/Toolbar/ToolbarMargin"]
+[node name="ToolbarRow" type="HBoxContainer" parent="UI/RootLayout/Toolbar/ToolbarScroll/ToolbarMargin"]
 layout_mode = 2
 theme_override_constants/separation = 6
 
 ; Brand
-[node name="BrandLabel" type="Label" parent="UI/RootLayout/Toolbar/ToolbarMargin/ToolbarRow"]
+[node name="BrandLabel" type="Label" parent="UI/RootLayout/Toolbar/ToolbarScroll/ToolbarMargin/ToolbarRow"]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.65, 0.3, 1)
 theme_override_font_sizes/font_size = 15
 text = "🔥 Hearth Studio"
 
-[node name="Sep0" type="VSeparator" parent="UI/RootLayout/Toolbar/ToolbarMargin/ToolbarRow"]
+[node name="Sep0" type="VSeparator" parent="UI/RootLayout/Toolbar/ToolbarScroll/ToolbarMargin/ToolbarRow"]
 layout_mode = 2
 
 ; Unity Gizmo Tools (Move W, Rotate E, Scale R)
-[node name="ToolGizmoMove" type="Button" parent="UI/RootLayout/Toolbar/ToolbarMargin/ToolbarRow"]
+[node name="ToolGizmoMove" type="Button" parent="UI/RootLayout/Toolbar/ToolbarScroll/ToolbarMargin/ToolbarRow"]
 unique_name_in_owner = true
 layout_mode = 2
 toggle_mode = true
 button_pressed = true
 text = "✛ Move (W)"
 
-[node name="ToolGizmoRotate" type="Button" parent="UI/RootLayout/Toolbar/ToolbarMargin/ToolbarRow"]
+[node name="ToolGizmoRotate" type="Button" parent="UI/RootLayout/Toolbar/ToolbarScroll/ToolbarMargin/ToolbarRow"]
 unique_name_in_owner = true
 layout_mode = 2
 toggle_mode = true
 text = "🔄 Rotate (E)"
 
-[node name="ToolGizmoScale" type="Button" parent="UI/RootLayout/Toolbar/ToolbarMargin/ToolbarRow"]
+[node name="ToolGizmoScale" type="Button" parent="UI/RootLayout/Toolbar/ToolbarScroll/ToolbarMargin/ToolbarRow"]
 unique_name_in_owner = true
 layout_mode = 2
 toggle_mode = true
 text = "⤢ Scale (R)"
 
-[node name="SnapToggleBtn" type="Button" parent="UI/RootLayout/Toolbar/ToolbarMargin/ToolbarRow"]
+[node name="SnapToggleBtn" type="Button" parent="UI/RootLayout/Toolbar/ToolbarScroll/ToolbarMargin/ToolbarRow"]
 unique_name_in_owner = true
 layout_mode = 2
 toggle_mode = true
 button_pressed = true
 text = "🧲 Snap"
 
-[node name="FocusBtn" type="Button" parent="UI/RootLayout/Toolbar/ToolbarMargin/ToolbarRow"]
+[node name="FocusBtn" type="Button" parent="UI/RootLayout/Toolbar/ToolbarScroll/ToolbarMargin/ToolbarRow"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "🎯 Focus (F)"
 
-[node name="Sep1" type="VSeparator" parent="UI/RootLayout/Toolbar/ToolbarMargin/ToolbarRow"]
+[node name="Sep1" type="VSeparator" parent="UI/RootLayout/Toolbar/ToolbarScroll/ToolbarMargin/ToolbarRow"]
 layout_mode = 2
 
 ; World picker
-[node name="WorldDropdown" type="OptionButton" parent="UI/RootLayout/Toolbar/ToolbarMargin/ToolbarRow"]
+[node name="WorldDropdown" type="OptionButton" parent="UI/RootLayout/Toolbar/ToolbarScroll/ToolbarMargin/ToolbarRow"]
 unique_name_in_owner = true
 layout_mode = 2
 custom_minimum_size = Vector2(110, 0)
 
-[node name="NewNameEdit" type="LineEdit" parent="UI/RootLayout/Toolbar/ToolbarMargin/ToolbarRow"]
+[node name="NewNameEdit" type="LineEdit" parent="UI/RootLayout/Toolbar/ToolbarScroll/ToolbarMargin/ToolbarRow"]
 unique_name_in_owner = true
 layout_mode = 2
 custom_minimum_size = Vector2(100, 0)
 placeholder_text = "new world"
 
-[node name="NewWorldBtn" type="Button" parent="UI/RootLayout/Toolbar/ToolbarMargin/ToolbarRow"]
+[node name="NewWorldBtn" type="Button" parent="UI/RootLayout/Toolbar/ToolbarScroll/ToolbarMargin/ToolbarRow"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "+ World"
 
-[node name="CopyWorldBtn" type="Button" parent="UI/RootLayout/Toolbar/ToolbarMargin/ToolbarRow"]
+[node name="CopyWorldBtn" type="Button" parent="UI/RootLayout/Toolbar/ToolbarScroll/ToolbarMargin/ToolbarRow"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Copy"
 
-[node name="Sep2" type="VSeparator" parent="UI/RootLayout/Toolbar/ToolbarMargin/ToolbarRow"]
+[node name="Sep2" type="VSeparator" parent="UI/RootLayout/Toolbar/ToolbarScroll/ToolbarMargin/ToolbarRow"]
 layout_mode = 2
 
 ; Primitives
-[node name="Prim_Box" type="Button" parent="UI/RootLayout/Toolbar/ToolbarMargin/ToolbarRow"]
+[node name="Prim_Box" type="Button" parent="UI/RootLayout/Toolbar/ToolbarScroll/ToolbarMargin/ToolbarRow"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "📦 Box"
 
-[node name="Prim_Sphere" type="Button" parent="UI/RootLayout/Toolbar/ToolbarMargin/ToolbarRow"]
+[node name="Prim_Sphere" type="Button" parent="UI/RootLayout/Toolbar/ToolbarScroll/ToolbarMargin/ToolbarRow"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "🔮 Sphere"
 
-[node name="Prim_Cylinder" type="Button" parent="UI/RootLayout/Toolbar/ToolbarMargin/ToolbarRow"]
+[node name="Prim_Cylinder" type="Button" parent="UI/RootLayout/Toolbar/ToolbarScroll/ToolbarMargin/ToolbarRow"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "🌀 Cyl"
 
-[node name="Prim_Plane" type="Button" parent="UI/RootLayout/Toolbar/ToolbarMargin/ToolbarRow"]
+[node name="Prim_Plane" type="Button" parent="UI/RootLayout/Toolbar/ToolbarScroll/ToolbarMargin/ToolbarRow"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "▬ Plane"
 
-[node name="Prim_Light" type="Button" parent="UI/RootLayout/Toolbar/ToolbarMargin/ToolbarRow"]
+[node name="Prim_Light" type="Button" parent="UI/RootLayout/Toolbar/ToolbarScroll/ToolbarMargin/ToolbarRow"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "💡 Light"
 
-[node name="ImportBtn" type="Button" parent="UI/RootLayout/Toolbar/ToolbarMargin/ToolbarRow"]
+[node name="ImportBtn" type="Button" parent="UI/RootLayout/Toolbar/ToolbarScroll/ToolbarMargin/ToolbarRow"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "🗿 Import"
 
-[node name="Sep3" type="VSeparator" parent="UI/RootLayout/Toolbar/ToolbarMargin/ToolbarRow"]
+[node name="Sep3" type="VSeparator" parent="UI/RootLayout/Toolbar/ToolbarScroll/ToolbarMargin/ToolbarRow"]
 layout_mode = 2
 
 ; Test & Save
-[node name="TestBtn" type="Button" parent="UI/RootLayout/Toolbar/ToolbarMargin/ToolbarRow"]
+[node name="TestBtn" type="Button" parent="UI/RootLayout/Toolbar/ToolbarScroll/ToolbarMargin/ToolbarRow"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_styles/normal = SubResource("sb_accent_btn")
 text = "▶ Test"
 
-[node name="SaveBtn" type="Button" parent="UI/RootLayout/Toolbar/ToolbarMargin/ToolbarRow"]
+[node name="SaveBtn" type="Button" parent="UI/RootLayout/Toolbar/ToolbarScroll/ToolbarMargin/ToolbarRow"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "💾 Save"
 
-[node name="PackBtn" type="Button" parent="UI/RootLayout/Toolbar/ToolbarMargin/ToolbarRow"]
+[node name="PackBtn" type="Button" parent="UI/RootLayout/Toolbar/ToolbarScroll/ToolbarMargin/ToolbarRow"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "📦 Pack"
 
-[node name="SpawnHereBtn" type="Button" parent="UI/RootLayout/Toolbar/ToolbarMargin/ToolbarRow"]
+[node name="SpawnHereBtn" type="Button" parent="UI/RootLayout/Toolbar/ToolbarScroll/ToolbarMargin/ToolbarRow"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "📍 Spawn"
 
 ; Spacer
-[node name="ToolSpacer" type="Control" parent="UI/RootLayout/Toolbar/ToolbarMargin/ToolbarRow"]
+[node name="ToolSpacer" type="Control" parent="UI/RootLayout/Toolbar/ToolbarScroll/ToolbarMargin/ToolbarRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 
 ; Mode Switcher: World vs Avatar Creator
-[node name="ToolModeWorldBtn" type="Button" parent="UI/RootLayout/Toolbar/ToolbarMargin/ToolbarRow"]
+[node name="ToolModeWorldBtn" type="Button" parent="UI/RootLayout/Toolbar/ToolbarScroll/ToolbarMargin/ToolbarRow"]
 unique_name_in_owner = true
 layout_mode = 2
 toggle_mode = true
 button_pressed = true
 text = "🌐 World Editor"
 
-[node name="ToolModeAvatarBtn" type="Button" parent="UI/RootLayout/Toolbar/ToolbarMargin/ToolbarRow"]
+[node name="ToolModeAvatarBtn" type="Button" parent="UI/RootLayout/Toolbar/ToolbarScroll/ToolbarMargin/ToolbarRow"]
 unique_name_in_owner = true
 layout_mode = 2
 toggle_mode = true
@@ -387,12 +392,14 @@ theme_override_styles/pressed = SubResource("sb_accent_btn")
 text = "👤 Avatar Creator"
 
 ; ═════════════════════════════════════════════════════════════════════════════
-; MAIN BODY (Hierarchy Left, Viewport Center, Inspector Right)
+; MAIN BODY (Hierarchy Left, Viewport Centre, Inspector Right)
 ; ═════════════════════════════════════════════════════════════════════════════
 
-[node name="Body" type="HBoxContainer" parent="UI/RootLayout"]
+; Outer split: Hierarchy | rest
+[node name="Body" type="HSplitContainer" parent="UI/RootLayout"]
 layout_mode = 2
 size_flags_vertical = 3
+split_offset = 230
 theme_override_constants/separation = 2
 
 ; ─── LEFT: Hierarchy Panel ────────────────────────────────────────────────────
@@ -400,7 +407,7 @@ theme_override_constants/separation = 2
 [node name="HierarchyPanel" type="PanelContainer" parent="UI/RootLayout/Body"]
 unique_name_in_owner = true
 layout_mode = 2
-custom_minimum_size = Vector2(230, 0)
+custom_minimum_size = Vector2(180, 0)
 theme_override_styles/panel = SubResource("sb_panel")
 
 [node name="HierarchyMargin" type="MarginContainer" parent="UI/RootLayout/Body/HierarchyPanel"]
@@ -473,88 +480,96 @@ hide_root = false
 
 ; ─── CENTER: 3D Viewport & Bottom Dock ────────────────────────────────────────
 
-[node name="CenterArea" type="VBoxContainer" parent="UI/RootLayout/Body"]
+; Inner split: Viewport | Inspector
+[node name="RightSplit" type="HSplitContainer" parent="UI/RootLayout/Body"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+split_offset = -290
+theme_override_constants/separation = 2
+
+[node name="CenterArea" type="VBoxContainer" parent="UI/RootLayout/Body/RightSplit"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 theme_override_constants/separation = 0
 
 ; Viewport area (3D renders behind here)
-[node name="ViewportSpacer" type="Control" parent="UI/RootLayout/Body/CenterArea"]
+[node name="ViewportSpacer" type="Control" parent="UI/RootLayout/Body/RightSplit/CenterArea"]
 layout_mode = 2
 size_flags_vertical = 3
 
 ; Bottom Dock (Project, Console, Avatars)
-[node name="BottomDock" type="PanelContainer" parent="UI/RootLayout/Body/CenterArea"]
+[node name="BottomDock" type="PanelContainer" parent="UI/RootLayout/Body/RightSplit/CenterArea"]
 unique_name_in_owner = true
 layout_mode = 2
 custom_minimum_size = Vector2(0, 140)
 theme_override_styles/panel = SubResource("sb_dock")
 
-[node name="DockMargin" type="MarginContainer" parent="UI/RootLayout/Body/CenterArea/BottomDock"]
+[node name="DockMargin" type="MarginContainer" parent="UI/RootLayout/Body/RightSplit/CenterArea/BottomDock"]
 layout_mode = 2
 theme_override_constants/margin_left = 6
 theme_override_constants/margin_top = 4
 theme_override_constants/margin_right = 6
 theme_override_constants/margin_bottom = 4
 
-[node name="DockTabContainer" type="TabContainer" parent="UI/RootLayout/Body/CenterArea/BottomDock/DockMargin"]
+[node name="DockTabContainer" type="TabContainer" parent="UI/RootLayout/Body/RightSplit/CenterArea/BottomDock/DockMargin"]
 unique_name_in_owner = true
 layout_mode = 2
 current_tab = 0
 
 ; Project tab
-[node name="📁 Project" type="HBoxContainer" parent="UI/RootLayout/Body/CenterArea/BottomDock/DockMargin/DockTabContainer"]
+[node name="📁 Project" type="HBoxContainer" parent="UI/RootLayout/Body/RightSplit/CenterArea/BottomDock/DockMargin/DockTabContainer"]
 layout_mode = 2
 
-[node name="ProjectList" type="ItemList" parent="UI/RootLayout/Body/CenterArea/BottomDock/DockMargin/DockTabContainer/📁 Project"]
+[node name="ProjectList" type="ItemList" parent="UI/RootLayout/Body/RightSplit/CenterArea/BottomDock/DockMargin/DockTabContainer/📁 Project"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
 ; Console tab
-[node name="📜 Console" type="VBoxContainer" parent="UI/RootLayout/Body/CenterArea/BottomDock/DockMargin/DockTabContainer"]
+[node name="📜 Console" type="VBoxContainer" parent="UI/RootLayout/Body/RightSplit/CenterArea/BottomDock/DockMargin/DockTabContainer"]
 visible = false
 layout_mode = 2
 
-[node name="ConsoleTopRow" type="HBoxContainer" parent="UI/RootLayout/Body/CenterArea/BottomDock/DockMargin/DockTabContainer/📜 Console"]
+[node name="ConsoleTopRow" type="HBoxContainer" parent="UI/RootLayout/Body/RightSplit/CenterArea/BottomDock/DockMargin/DockTabContainer/📜 Console"]
 layout_mode = 2
 
-[node name="ConsoleClearBtn" type="Button" parent="UI/RootLayout/Body/CenterArea/BottomDock/DockMargin/DockTabContainer/📜 Console/ConsoleTopRow"]
+[node name="ConsoleClearBtn" type="Button" parent="UI/RootLayout/Body/RightSplit/CenterArea/BottomDock/DockMargin/DockTabContainer/📜 Console/ConsoleTopRow"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Clear"
 
-[node name="ConsoleList" type="ItemList" parent="UI/RootLayout/Body/CenterArea/BottomDock/DockMargin/DockTabContainer/📜 Console"]
+[node name="ConsoleList" type="ItemList" parent="UI/RootLayout/Body/RightSplit/CenterArea/BottomDock/DockMargin/DockTabContainer/📜 Console"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
 
 ; Avatars tab
-[node name="👤 Avatars" type="VBoxContainer" parent="UI/RootLayout/Body/CenterArea/BottomDock/DockMargin/DockTabContainer"]
+[node name="👤 Avatars" type="VBoxContainer" parent="UI/RootLayout/Body/RightSplit/CenterArea/BottomDock/DockMargin/DockTabContainer"]
 visible = false
 layout_mode = 2
 
-[node name="AvatarsList" type="ItemList" parent="UI/RootLayout/Body/CenterArea/BottomDock/DockMargin/DockTabContainer/👤 Avatars"]
+[node name="AvatarsList" type="ItemList" parent="UI/RootLayout/Body/RightSplit/CenterArea/BottomDock/DockMargin/DockTabContainer/👤 Avatars"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
 
 ; ─── RIGHT: Inspector Panel ───────────────────────────────────────────────────
 
-[node name="InspectorPanel" type="PanelContainer" parent="UI/RootLayout/Body"]
+[node name="InspectorPanel" type="PanelContainer" parent="UI/RootLayout/Body/RightSplit"]
 unique_name_in_owner = true
 layout_mode = 2
 custom_minimum_size = Vector2(290, 0)
 theme_override_styles/panel = SubResource("sb_panel")
 
 ; World Inspector
-[node name="InspectorScroll" type="ScrollContainer" parent="UI/RootLayout/Body/InspectorPanel"]
+[node name="InspectorScroll" type="ScrollContainer" parent="UI/RootLayout/Body/RightSplit/InspectorPanel"]
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="InspectorMargin" type="MarginContainer" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll"]
+[node name="InspectorMargin" type="MarginContainer" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll"]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/margin_left = 8
@@ -562,72 +577,72 @@ theme_override_constants/margin_top = 8
 theme_override_constants/margin_right = 8
 theme_override_constants/margin_bottom = 8
 
-[node name="InspectorVBox" type="VBoxContainer" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin"]
+[node name="InspectorVBox" type="VBoxContainer" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin"]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 6
 
-[node name="InspectorEmpty" type="Label" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox"]
+[node name="InspectorEmpty" type="Label" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.5, 0.5, 0.55, 1)
 text = "Select an object to inspect"
 horizontal_alignment = 1
 
-[node name="InspectorContent" type="VBoxContainer" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox"]
+[node name="InspectorContent" type="VBoxContainer" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
 theme_override_constants/separation = 6
 
 ; Unity GameObject Header
-[node name="ObjHeaderRow" type="HBoxContainer" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent"]
+[node name="ObjHeaderRow" type="HBoxContainer" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent"]
 layout_mode = 2
 theme_override_constants/separation = 4
 
-[node name="Field_Active" type="CheckBox" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/ObjHeaderRow"]
+[node name="Field_Active" type="CheckBox" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/ObjHeaderRow"]
 layout_mode = 2
 button_pressed = true
 
-[node name="Field_Name" type="LineEdit" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/ObjHeaderRow"]
+[node name="Field_Name" type="LineEdit" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/ObjHeaderRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 text = "GameObject"
 
-[node name="Field_Static" type="CheckBox" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/ObjHeaderRow"]
+[node name="Field_Static" type="CheckBox" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/ObjHeaderRow"]
 layout_mode = 2
 text = "Static"
 
 ; Transform Component
-[node name="TransformHeader" type="Button" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent"]
+[node name="TransformHeader" type="Button" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_styles/normal = SubResource("sb_section")
 text = "▼ Transform"
 alignment = 0
 
-[node name="Section_Transform" type="VBoxContainer" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent"]
+[node name="Section_Transform" type="VBoxContainer" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 4
 
 ; Position
-[node name="PosRow" type="HBoxContainer" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform"]
+[node name="PosRow" type="HBoxContainer" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform"]
 layout_mode = 2
 theme_override_constants/separation = 3
 
-[node name="PosLabel" type="Label" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/PosRow"]
+[node name="PosLabel" type="Label" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/PosRow"]
 layout_mode = 2
 custom_minimum_size = Vector2(40, 0)
 text = "Pos"
 
-[node name="BadgeX1" type="Label" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/PosRow"]
+[node name="BadgeX1" type="Label" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/PosRow"]
 layout_mode = 2
 theme_override_styles/normal = SubResource("badge_x")
 text = "X"
 
-[node name="Field_PosX" type="SpinBox" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/PosRow"]
+[node name="Field_PosX" type="SpinBox" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/PosRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -635,12 +650,12 @@ min_value = -1000.0
 max_value = 1000.0
 step = 0.25
 
-[node name="BadgeY1" type="Label" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/PosRow"]
+[node name="BadgeY1" type="Label" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/PosRow"]
 layout_mode = 2
 theme_override_styles/normal = SubResource("badge_y")
 text = "Y"
 
-[node name="Field_PosY" type="SpinBox" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/PosRow"]
+[node name="Field_PosY" type="SpinBox" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/PosRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -648,12 +663,12 @@ min_value = -1000.0
 max_value = 1000.0
 step = 0.25
 
-[node name="BadgeZ1" type="Label" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/PosRow"]
+[node name="BadgeZ1" type="Label" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/PosRow"]
 layout_mode = 2
 theme_override_styles/normal = SubResource("badge_z")
 text = "Z"
 
-[node name="Field_PosZ" type="SpinBox" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/PosRow"]
+[node name="Field_PosZ" type="SpinBox" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/PosRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -662,21 +677,21 @@ max_value = 1000.0
 step = 0.25
 
 ; Rotation
-[node name="RotRow" type="HBoxContainer" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform"]
+[node name="RotRow" type="HBoxContainer" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform"]
 layout_mode = 2
 theme_override_constants/separation = 3
 
-[node name="RotLabel" type="Label" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/RotRow"]
+[node name="RotLabel" type="Label" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/RotRow"]
 layout_mode = 2
 custom_minimum_size = Vector2(40, 0)
 text = "Rot"
 
-[node name="BadgeX2" type="Label" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/RotRow"]
+[node name="BadgeX2" type="Label" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/RotRow"]
 layout_mode = 2
 theme_override_styles/normal = SubResource("badge_x")
 text = "X"
 
-[node name="Field_RotX" type="SpinBox" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/RotRow"]
+[node name="Field_RotX" type="SpinBox" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/RotRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -684,12 +699,12 @@ min_value = -360.0
 max_value = 360.0
 step = 15.0
 
-[node name="BadgeY2" type="Label" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/RotRow"]
+[node name="BadgeY2" type="Label" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/RotRow"]
 layout_mode = 2
 theme_override_styles/normal = SubResource("badge_y")
 text = "Y"
 
-[node name="Field_RotY" type="SpinBox" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/RotRow"]
+[node name="Field_RotY" type="SpinBox" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/RotRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -697,12 +712,12 @@ min_value = -360.0
 max_value = 360.0
 step = 15.0
 
-[node name="BadgeZ2" type="Label" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/RotRow"]
+[node name="BadgeZ2" type="Label" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/RotRow"]
 layout_mode = 2
 theme_override_styles/normal = SubResource("badge_z")
 text = "Z"
 
-[node name="Field_RotZ" type="SpinBox" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/RotRow"]
+[node name="Field_RotZ" type="SpinBox" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/RotRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -711,21 +726,21 @@ max_value = 360.0
 step = 15.0
 
 ; Scale
-[node name="ScaleRow" type="HBoxContainer" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform"]
+[node name="ScaleRow" type="HBoxContainer" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform"]
 layout_mode = 2
 theme_override_constants/separation = 3
 
-[node name="ScaleLabel" type="Label" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/ScaleRow"]
+[node name="ScaleLabel" type="Label" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/ScaleRow"]
 layout_mode = 2
 custom_minimum_size = Vector2(40, 0)
 text = "Scale"
 
-[node name="BadgeX3" type="Label" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/ScaleRow"]
+[node name="BadgeX3" type="Label" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/ScaleRow"]
 layout_mode = 2
 theme_override_styles/normal = SubResource("badge_x")
 text = "X"
 
-[node name="Field_ScaleX" type="SpinBox" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/ScaleRow"]
+[node name="Field_ScaleX" type="SpinBox" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/ScaleRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -734,12 +749,12 @@ max_value = 100.0
 step = 0.1
 value = 1.0
 
-[node name="BadgeY3" type="Label" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/ScaleRow"]
+[node name="BadgeY3" type="Label" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/ScaleRow"]
 layout_mode = 2
 theme_override_styles/normal = SubResource("badge_y")
 text = "Y"
 
-[node name="Field_ScaleY" type="SpinBox" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/ScaleRow"]
+[node name="Field_ScaleY" type="SpinBox" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/ScaleRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -748,12 +763,12 @@ max_value = 100.0
 step = 0.1
 value = 1.0
 
-[node name="BadgeZ3" type="Label" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/ScaleRow"]
+[node name="BadgeZ3" type="Label" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/ScaleRow"]
 layout_mode = 2
 theme_override_styles/normal = SubResource("badge_z")
 text = "Z"
 
-[node name="Field_ScaleZ" type="SpinBox" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/ScaleRow"]
+[node name="Field_ScaleZ" type="SpinBox" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Transform/ScaleRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -763,28 +778,28 @@ step = 0.1
 value = 1.0
 
 ; Shape Section
-[node name="ShapeHeader" type="Button" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent"]
+[node name="ShapeHeader" type="Button" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_styles/normal = SubResource("sb_section")
 text = "▼ Shape / Mesh"
 alignment = 0
 
-[node name="ShapeSection" type="VBoxContainer" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent"]
+[node name="ShapeSection" type="VBoxContainer" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 4
 
-[node name="SizeRow" type="HBoxContainer" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/ShapeSection"]
+[node name="SizeRow" type="HBoxContainer" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/ShapeSection"]
 layout_mode = 2
 theme_override_constants/separation = 3
 
-[node name="SizeLabel" type="Label" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/ShapeSection/SizeRow"]
+[node name="SizeLabel" type="Label" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/ShapeSection/SizeRow"]
 layout_mode = 2
 custom_minimum_size = Vector2(40, 0)
 text = "Size"
 
-[node name="Field_SizeX" type="SpinBox" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/ShapeSection/SizeRow"]
+[node name="Field_SizeX" type="SpinBox" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/ShapeSection/SizeRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -792,7 +807,7 @@ min_value = 0.05
 max_value = 500.0
 step = 0.25
 
-[node name="Field_SizeY" type="SpinBox" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/ShapeSection/SizeRow"]
+[node name="Field_SizeY" type="SpinBox" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/ShapeSection/SizeRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -800,7 +815,7 @@ min_value = 0.05
 max_value = 500.0
 step = 0.25
 
-[node name="Field_SizeZ" type="SpinBox" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/ShapeSection/SizeRow"]
+[node name="Field_SizeZ" type="SpinBox" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/ShapeSection/SizeRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -808,42 +823,42 @@ min_value = 0.05
 max_value = 500.0
 step = 0.25
 
-[node name="ColorRow" type="HBoxContainer" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/ShapeSection"]
+[node name="ColorRow" type="HBoxContainer" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/ShapeSection"]
 layout_mode = 2
 
-[node name="ColorLabel" type="Label" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/ShapeSection/ColorRow"]
+[node name="ColorLabel" type="Label" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/ShapeSection/ColorRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Color / Material"
 
-[node name="Field_Color" type="ColorPickerButton" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/ShapeSection/ColorRow"]
+[node name="Field_Color" type="ColorPickerButton" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/ShapeSection/ColorRow"]
 unique_name_in_owner = true
 layout_mode = 2
 custom_minimum_size = Vector2(60, 24)
 
-[node name="BodyRow" type="HBoxContainer" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/ShapeSection"]
+[node name="BodyRow" type="HBoxContainer" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/ShapeSection"]
 layout_mode = 2
 
-[node name="BodyLabel" type="Label" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/ShapeSection/BodyRow"]
+[node name="BodyLabel" type="Label" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/ShapeSection/BodyRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Physics Body"
 
-[node name="Field_Body" type="OptionButton" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/ShapeSection/BodyRow"]
+[node name="Field_Body" type="OptionButton" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/ShapeSection/BodyRow"]
 unique_name_in_owner = true
 layout_mode = 2
 
-[node name="MassRow" type="HBoxContainer" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/ShapeSection"]
+[node name="MassRow" type="HBoxContainer" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/ShapeSection"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
 
-[node name="MassLabel" type="Label" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/ShapeSection/MassRow"]
+[node name="MassLabel" type="Label" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/ShapeSection/MassRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Mass (kg)"
 
-[node name="Field_Mass" type="SpinBox" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/ShapeSection/MassRow"]
+[node name="Field_Mass" type="SpinBox" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/ShapeSection/MassRow"]
 unique_name_in_owner = true
 layout_mode = 2
 min_value = 0.1
@@ -851,7 +866,7 @@ max_value = 1000.0
 value = 1.0
 
 ; Light Section
-[node name="LightHeader" type="Button" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent"]
+[node name="LightHeader" type="Button" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
@@ -859,99 +874,99 @@ theme_override_styles/normal = SubResource("sb_section")
 text = "▼ Light"
 alignment = 0
 
-[node name="LightSection" type="VBoxContainer" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent"]
+[node name="LightSection" type="VBoxContainer" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
 theme_override_constants/separation = 4
 
-[node name="EnergyRow" type="HBoxContainer" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/LightSection"]
+[node name="EnergyRow" type="HBoxContainer" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/LightSection"]
 layout_mode = 2
 
-[node name="EnergyLabel" type="Label" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/LightSection/EnergyRow"]
+[node name="EnergyLabel" type="Label" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/LightSection/EnergyRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Energy"
 
-[node name="Field_Energy" type="SpinBox" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/LightSection/EnergyRow"]
+[node name="Field_Energy" type="SpinBox" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/LightSection/EnergyRow"]
 unique_name_in_owner = true
 layout_mode = 2
 max_value = 50.0
 step = 0.5
 value = 2.0
 
-[node name="RangeRow" type="HBoxContainer" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/LightSection"]
+[node name="RangeRow" type="HBoxContainer" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/LightSection"]
 layout_mode = 2
 
-[node name="RangeLabel" type="Label" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/LightSection/RangeRow"]
+[node name="RangeLabel" type="Label" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/LightSection/RangeRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Range (m)"
 
-[node name="Field_Range" type="SpinBox" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/LightSection/RangeRow"]
+[node name="Field_Range" type="SpinBox" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/LightSection/RangeRow"]
 unique_name_in_owner = true
 layout_mode = 2
 max_value = 200.0
 step = 1.0
 value = 8.0
 
-[node name="LightColorRow" type="HBoxContainer" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/LightSection"]
+[node name="LightColorRow" type="HBoxContainer" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/LightSection"]
 layout_mode = 2
 
-[node name="LightColorLabel" type="Label" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/LightSection/LightColorRow"]
+[node name="LightColorLabel" type="Label" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/LightSection/LightColorRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Light Color"
 
-[node name="Field_LightColor" type="ColorPickerButton" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/LightSection/LightColorRow"]
+[node name="Field_LightColor" type="ColorPickerButton" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/LightSection/LightColorRow"]
 unique_name_in_owner = true
 layout_mode = 2
 custom_minimum_size = Vector2(60, 24)
 
 ; Scripts Section
-[node name="ScriptsHeader" type="Button" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent"]
+[node name="ScriptsHeader" type="Button" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_styles/normal = SubResource("sb_section")
 text = "▼ Fire# Scripts"
 alignment = 0
 
-[node name="Section_Scripts" type="VBoxContainer" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent"]
+[node name="Section_Scripts" type="VBoxContainer" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 4
 
-[node name="ScriptRows" type="VBoxContainer" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Scripts"]
+[node name="ScriptRows" type="VBoxContainer" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Scripts"]
 unique_name_in_owner = true
 layout_mode = 2
 
-[node name="AddScriptBtn" type="Button" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Scripts"]
+[node name="AddScriptBtn" type="Button" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/Section_Scripts"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "+ Attach Script"
 
-[node name="SepInspector" type="HSeparator" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent"]
+[node name="SepInspector" type="HSeparator" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent"]
 layout_mode = 2
 
 ; Unity-style Add Component Button
-[node name="AddComponentBtn" type="Button" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent"]
+[node name="AddComponentBtn" type="Button" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_styles/normal = SubResource("sb_section")
 text = "+ Add Component"
 
 ; Object Action Buttons
-[node name="ActionsRow" type="HBoxContainer" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent"]
+[node name="ActionsRow" type="HBoxContainer" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent"]
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="DuplicateBtn" type="Button" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/ActionsRow"]
+[node name="DuplicateBtn" type="Button" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/ActionsRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Duplicate"
 
-[node name="DeleteBtn" type="Button" parent="UI/RootLayout/Body/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/ActionsRow"]
+[node name="DeleteBtn" type="Button" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/InspectorScroll/InspectorMargin/InspectorVBox/InspectorContent/ActionsRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -961,13 +976,13 @@ text = "Delete"
 ; AVATAR CREATOR INSPECTOR
 ; ═════════════════════════════════════════════════════════════════════════════
 
-[node name="AvatarInspectorContent" type="ScrollContainer" parent="UI/RootLayout/Body/InspectorPanel"]
+[node name="AvatarInspectorContent" type="ScrollContainer" parent="UI/RootLayout/Body/RightSplit/InspectorPanel"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="AvatarMargin" type="MarginContainer" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent"]
+[node name="AvatarMargin" type="MarginContainer" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent"]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/margin_left = 8
@@ -975,27 +990,27 @@ theme_override_constants/margin_top = 8
 theme_override_constants/margin_right = 8
 theme_override_constants/margin_bottom = 8
 
-[node name="AvatarVBox" type="VBoxContainer" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin"]
+[node name="AvatarVBox" type="VBoxContainer" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin"]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 6
 
-[node name="AvatarTitle" type="Label" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
+[node name="AvatarTitle" type="Label" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.65, 0.3, 1)
 theme_override_font_sizes/font_size = 14
 text = "👤 Avatar Customizer"
 
 ; Presets
-[node name="PresetRow" type="HBoxContainer" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
+[node name="PresetRow" type="HBoxContainer" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
 layout_mode = 2
 
-[node name="PresetLabel" type="Label" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/PresetRow"]
+[node name="PresetLabel" type="Label" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/PresetRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Preset Template"
 
-[node name="AvatarPresetOption" type="OptionButton" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/PresetRow"]
+[node name="AvatarPresetOption" type="OptionButton" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/PresetRow"]
 unique_name_in_owner = true
 layout_mode = 2
 selected = 0
@@ -1016,29 +1031,29 @@ popup/item_6/text = "Celestial"
 popup/item_6/id = 6
 
 ; Identity & Height
-[node name="AvatarNameRow" type="HBoxContainer" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
+[node name="AvatarNameRow" type="HBoxContainer" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
 layout_mode = 2
 
-[node name="AvatarNameLabel" type="Label" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/AvatarNameRow"]
+[node name="AvatarNameLabel" type="Label" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/AvatarNameRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Avatar Name"
 
-[node name="AvatarNameEdit" type="LineEdit" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/AvatarNameRow"]
+[node name="AvatarNameEdit" type="LineEdit" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/AvatarNameRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 text = "MyAvatar"
 
-[node name="AvatarHeightRow" type="HBoxContainer" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
+[node name="AvatarHeightRow" type="HBoxContainer" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
 layout_mode = 2
 
-[node name="AvatarHeightLabel" type="Label" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/AvatarHeightRow"]
+[node name="AvatarHeightLabel" type="Label" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/AvatarHeightRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Scale Height"
 
-[node name="AvatarHeightSlider" type="HSlider" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/AvatarHeightRow"]
+[node name="AvatarHeightSlider" type="HSlider" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/AvatarHeightRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -1047,91 +1062,91 @@ max_value = 1.8
 step = 0.05
 value = 1.0
 
-[node name="AvatarHeightVal" type="Label" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/AvatarHeightRow"]
+[node name="AvatarHeightVal" type="Label" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/AvatarHeightRow"]
 unique_name_in_owner = true
 layout_mode = 2
 custom_minimum_size = Vector2(40, 0)
 text = "1.00x"
 
 ; Colors Section
-[node name="ColorsHeader" type="Label" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
+[node name="ColorsHeader" type="Label" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.65, 0.65, 0.68, 1)
 theme_override_font_sizes/font_size = 11
 text = "COLORS"
 
-[node name="SkinColorRow" type="HBoxContainer" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
+[node name="SkinColorRow" type="HBoxContainer" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
 layout_mode = 2
 
-[node name="SkinColorLabel" type="Label" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/SkinColorRow"]
+[node name="SkinColorLabel" type="Label" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/SkinColorRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Skin Color"
 
-[node name="AvatarSkinColor" type="ColorPickerButton" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/SkinColorRow"]
+[node name="AvatarSkinColor" type="ColorPickerButton" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/SkinColorRow"]
 unique_name_in_owner = true
 layout_mode = 2
 custom_minimum_size = Vector2(50, 22)
 color = Color(0.45, 0.62, 0.9, 1)
 
-[node name="ClothColorRow" type="HBoxContainer" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
+[node name="ClothColorRow" type="HBoxContainer" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
 layout_mode = 2
 
-[node name="ClothColorLabel" type="Label" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/ClothColorRow"]
+[node name="ClothColorLabel" type="Label" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/ClothColorRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Clothing Color"
 
-[node name="AvatarClothColor" type="ColorPickerButton" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/ClothColorRow"]
+[node name="AvatarClothColor" type="ColorPickerButton" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/ClothColorRow"]
 unique_name_in_owner = true
 layout_mode = 2
 custom_minimum_size = Vector2(50, 22)
 color = Color(0.18, 0.29, 0.54, 1)
 
-[node name="HairHatColorRow" type="HBoxContainer" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
+[node name="HairHatColorRow" type="HBoxContainer" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
 layout_mode = 2
 
-[node name="HairHatColorLabel" type="Label" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/HairHatColorRow"]
+[node name="HairHatColorLabel" type="Label" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/HairHatColorRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Hair / Hat Color"
 
-[node name="AvatarHairHatColor" type="ColorPickerButton" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/HairHatColorRow"]
+[node name="AvatarHairHatColor" type="ColorPickerButton" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/HairHatColorRow"]
 unique_name_in_owner = true
 layout_mode = 2
 custom_minimum_size = Vector2(50, 22)
 color = Color(0.22, 0.14, 0.08, 1)
 
-[node name="AccentColorRow" type="HBoxContainer" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
+[node name="AccentColorRow" type="HBoxContainer" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
 layout_mode = 2
 
-[node name="AccentColorLabel" type="Label" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/AccentColorRow"]
+[node name="AccentColorLabel" type="Label" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/AccentColorRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Accent / Glow"
 
-[node name="AvatarAccentColor" type="ColorPickerButton" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/AccentColorRow"]
+[node name="AvatarAccentColor" type="ColorPickerButton" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/AccentColorRow"]
 unique_name_in_owner = true
 layout_mode = 2
 custom_minimum_size = Vector2(50, 22)
 color = Color(0.96, 0.77, 0.26, 1)
 
 ; Head & Face Section
-[node name="HeadHeader" type="Label" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
+[node name="HeadHeader" type="Label" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.65, 0.65, 0.68, 1)
 theme_override_font_sizes/font_size = 11
 text = "HEAD & FACE"
 
-[node name="HeadShapeRow" type="HBoxContainer" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
+[node name="HeadShapeRow" type="HBoxContainer" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
 layout_mode = 2
 
-[node name="HeadShapeLabel" type="Label" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/HeadShapeRow"]
+[node name="HeadShapeLabel" type="Label" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/HeadShapeRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Head Shape"
 
-[node name="AvatarHeadShape" type="OptionButton" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/HeadShapeRow"]
+[node name="AvatarHeadShape" type="OptionButton" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/HeadShapeRow"]
 unique_name_in_owner = true
 layout_mode = 2
 selected = 0
@@ -1145,15 +1160,15 @@ popup/item_2/id = 2
 popup/item_3/text = "Cylinder"
 popup/item_3/id = 3
 
-[node name="EyeStyleRow" type="HBoxContainer" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
+[node name="EyeStyleRow" type="HBoxContainer" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
 layout_mode = 2
 
-[node name="EyeStyleLabel" type="Label" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/EyeStyleRow"]
+[node name="EyeStyleLabel" type="Label" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/EyeStyleRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Eyes / Visor"
 
-[node name="AvatarEyeStyle" type="OptionButton" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/EyeStyleRow"]
+[node name="AvatarEyeStyle" type="OptionButton" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/EyeStyleRow"]
 unique_name_in_owner = true
 layout_mode = 2
 selected = 0
@@ -1169,36 +1184,36 @@ popup/item_3/id = 3
 popup/item_4/text = "None"
 popup/item_4/id = 4
 
-[node name="FaceFeaturesRow" type="HBoxContainer" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
+[node name="FaceFeaturesRow" type="HBoxContainer" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
 layout_mode = 2
 
-[node name="AvatarNoseCheck" type="CheckBox" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/FaceFeaturesRow"]
+[node name="AvatarNoseCheck" type="CheckBox" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/FaceFeaturesRow"]
 unique_name_in_owner = true
 layout_mode = 2
 button_pressed = true
 text = "Nose"
 
-[node name="AvatarBlushCheck" type="CheckBox" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/FaceFeaturesRow"]
+[node name="AvatarBlushCheck" type="CheckBox" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/FaceFeaturesRow"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Blush"
 
 ; Hair / Hats Section
-[node name="HairHeader" type="Label" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
+[node name="HairHeader" type="Label" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.65, 0.65, 0.68, 1)
 theme_override_font_sizes/font_size = 11
 text = "HATS & HAIR"
 
-[node name="HatRow" type="HBoxContainer" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
+[node name="HatRow" type="HBoxContainer" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
 layout_mode = 2
 
-[node name="HatLabel" type="Label" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/HatRow"]
+[node name="HatLabel" type="Label" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/HatRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Headpiece"
 
-[node name="AvatarHatStyle" type="OptionButton" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/HatRow"]
+[node name="AvatarHatStyle" type="OptionButton" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/HatRow"]
 unique_name_in_owner = true
 layout_mode = 2
 selected = 0
@@ -1225,21 +1240,21 @@ popup/item_9/text = "Halo"
 popup/item_9/id = 9
 
 ; Body & Hands Section
-[node name="BodyHeader" type="Label" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
+[node name="BodyHeader" type="Label" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.65, 0.65, 0.68, 1)
 theme_override_font_sizes/font_size = 11
 text = "BODY & HANDS"
 
-[node name="BodyShapeRow" type="HBoxContainer" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
+[node name="BodyShapeRow" type="HBoxContainer" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
 layout_mode = 2
 
-[node name="BodyShapeLabel" type="Label" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/BodyShapeRow"]
+[node name="BodyShapeLabel" type="Label" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/BodyShapeRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Torso Shape"
 
-[node name="AvatarBodyShape" type="OptionButton" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/BodyShapeRow"]
+[node name="AvatarBodyShape" type="OptionButton" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/BodyShapeRow"]
 unique_name_in_owner = true
 layout_mode = 2
 selected = 0
@@ -1251,15 +1266,15 @@ popup/item_1/id = 1
 popup/item_2/text = "Cylinder"
 popup/item_2/id = 2
 
-[node name="HandShapeRow" type="HBoxContainer" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
+[node name="HandShapeRow" type="HBoxContainer" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
 layout_mode = 2
 
-[node name="HandShapeLabel" type="Label" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/HandShapeRow"]
+[node name="HandShapeLabel" type="Label" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/HandShapeRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Hand Shape"
 
-[node name="AvatarHandShape" type="OptionButton" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/HandShapeRow"]
+[node name="AvatarHandShape" type="OptionButton" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/HandShapeRow"]
 unique_name_in_owner = true
 layout_mode = 2
 selected = 0
@@ -1270,60 +1285,60 @@ popup/item_1/text = "Sphere"
 popup/item_1/id = 1
 
 ; Accessories Section
-[node name="AccHeader" type="Label" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
+[node name="AccHeader" type="Label" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.65, 0.65, 0.68, 1)
 theme_override_font_sizes/font_size = 11
 text = "ATTACHED ACCESSORIES"
 
-[node name="AccRow1" type="HBoxContainer" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
+[node name="AccRow1" type="HBoxContainer" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
 layout_mode = 2
 
-[node name="AvatarAcc_Backpack" type="CheckBox" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/AccRow1"]
+[node name="AvatarAcc_Backpack" type="CheckBox" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/AccRow1"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "🎒 Backpack"
 
-[node name="AvatarAcc_Wings" type="CheckBox" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/AccRow1"]
+[node name="AvatarAcc_Wings" type="CheckBox" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/AccRow1"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "🪽 Wings"
 
-[node name="AvatarAcc_Tail" type="CheckBox" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/AccRow1"]
+[node name="AvatarAcc_Tail" type="CheckBox" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/AccRow1"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Tail"
 
-[node name="AccRow2" type="HBoxContainer" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
+[node name="AccRow2" type="HBoxContainer" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
 layout_mode = 2
 
-[node name="AvatarAcc_Gem" type="CheckBox" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/AccRow2"]
+[node name="AvatarAcc_Gem" type="CheckBox" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/AccRow2"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "💎 Floating Gem"
 
-[node name="AvatarAcc_Scarf" type="CheckBox" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/AccRow2"]
+[node name="AvatarAcc_Scarf" type="CheckBox" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox/AccRow2"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "🧣 Scarf"
 
-[node name="SepAvatar" type="HSeparator" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
+[node name="SepAvatar" type="HSeparator" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
 layout_mode = 2
 
 ; Action buttons
-[node name="AvatarSaveBtn" type="Button" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
+[node name="AvatarSaveBtn" type="Button" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_styles/normal = SubResource("sb_accent_btn")
 text = "💾 Save Avatar"
 
-[node name="AvatarEquipBtn" type="Button" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
+[node name="AvatarEquipBtn" type="Button" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_styles/normal = SubResource("sb_equip_btn")
 text = "⭐ Set as Active Avatar (In-Game)"
 
-[node name="AvatarTurntableToggle" type="CheckBox" parent="UI/RootLayout/Body/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
+[node name="AvatarTurntableToggle" type="CheckBox" parent="UI/RootLayout/Body/RightSplit/InspectorPanel/AvatarInspectorContent/AvatarMargin/AvatarVBox"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Auto-rotate Turntable"

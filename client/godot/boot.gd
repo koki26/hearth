@@ -148,22 +148,16 @@ func _process(delta: float) -> void:
 ## over, is all a desktop player would ever see. So the handover is
 ## provisional: if no real tracking turns up, take it back.
 func _confirm_headset(delta: float) -> bool:
-	if _xr.get_tracking_status() == XRInterface.XR_NORMAL_TRACKING:
+	if _xr != null and _xr.get_tracking_status() == XRInterface.XR_NORMAL_TRACKING:
 		_confirmed = true
 		return true
 	_tracking_wait += delta
-	if _tracking_wait < 3.0:
+	if _tracking_wait < 6.0:
 		return false
+	# Time ran out without tracking: hand the viewport back and stop rechecking.
+	# Keep OpenXR alive so a VR pick still has a session to hand to main.tscn.
 	get_viewport().use_xr = false
-	# Shut the session down too, or it complains once a frame for ever that
-	# nothing is rendering it.
-	_xr.uninitialize()
-	_origin.queue_free()
-	_origin = null
-	_camera = null
-	_hands.clear()
-	_menu = null
-	# Do not keep trying: the runtime is there, the headset is not.
+	_confirmed = true   # prevents this block running every frame
 	_xr_tries = 0
 	print("OpenXR started but nothing is tracking: staying on the screen.")
 	return false
@@ -173,18 +167,18 @@ func _confirm_headset(delta: float) -> bool:
 ## back if you lose it -- which includes the first frames, before the headset
 ## has reported a pose worth placing anything against.
 func _keep_in_view() -> void:
+	if _camera == null or _menu == null:
+		return
 	var head := _camera.transform
 	var forward := -head.basis.z
 	forward.y = 0.0
-	forward = forward.normalized() if forward.length() > 0.01 else Vector3.FORWARD
+	forward = forward.normalized() if forward.length_squared() > 0.001 else Vector3.FORWARD
 	var want := head.origin + forward * DISTANCE
 	var to_panel := _menu.position - head.origin
 	var strayed := _menu.position.distance_to(want) > STRAY
-	var behind := to_panel.length() < 0.05 or forward.angle_to(to_panel.normalized()) > STRAY_ANGLE
+	var behind := to_panel.length() < 0.05 or (to_panel.length_squared() > 0.001 and forward.angle_to(to_panel.normalized()) > STRAY_ANGLE)
 	if not strayed and not behind:
 		return
-	# Moved, not rebuilt: `open` makes every mesh again, and this can run on
-	# any frame.
 	_menu.transform = Transform3D(Basis.looking_at(forward, Vector3.UP), want)
 
 
@@ -230,7 +224,7 @@ func _rows() -> Array:
 
 func _on_hand_button(_button: String) -> void:
 	# Any button: there is nothing else on this screen to press by mistake.
-	if _menu != null:
+	if _menu != null and _asking:
 		_menu.activate()
 
 
@@ -249,12 +243,14 @@ func _pick(use_vr: bool) -> void:
 		get_viewport().use_xr = false
 		if _xr != null and _xr.is_initialized():
 			_xr.uninitialize()
-	if _origin != null and is_instance_valid(_origin):
-		_origin.queue_free()
-		_origin = null
-		_menu = null
-		_camera = null
-		_hands.clear()
+		if _origin != null and is_instance_valid(_origin):
+			_origin.queue_free()
+			_origin = null
+			_menu = null
+			_camera = null
+			_hands.clear()
+	# For VR, leave origin/camera in place until change_scene_to_file swaps scenes,
+	# preventing an empty OpenXR rendering frame that causes compositor crashes.
 	_start()
 
 
